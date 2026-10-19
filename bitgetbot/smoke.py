@@ -182,11 +182,13 @@ def _preflight(settings: Settings, reader, ft) -> tuple[bool, dict]:
     if not _mode_matches(settings, config):
         return False, config
     account_kind, positions, orders, balance = "unknown", [], 0, None
+    plan_orders = 0
     if not settings.dry_run:
         account_kind = classify_account(reader.account_mode_report())
         print(f"계정 모드: {account_kind}")
         positions = reader.fetch_positions()
         orders = reader.fetch_open_order_count()
+        plan_orders = reader.fetch_plan_order_count()
         try:
             balance = reader.fetch_usdt_available()
         except ValueError:
@@ -194,6 +196,8 @@ def _preflight(settings: Settings, reader, ft) -> tuple[bool, dict]:
     problems = preflight_problems(
         True, settings.dry_run, account_kind, positions, orders, len(trades), balance,
     )
+    if plan_orders >= 1:
+        problems.append(f"미체결 예약(트리거·손절) 주문이 {plan_orders}개 있습니다")
     try:
         stake = smoke_stake(reader.fetch_contract(SYMBOL), reader.fetch_mark_price(SYMBOL), 2)
         print(f"예상 증거금: {stake:.2f} USDT (상한 10 USDT)")
@@ -240,6 +244,9 @@ def _enter(settings: Settings, reader, ft) -> int:
     stake = smoke_stake(reader.fetch_contract(SYMBOL), reader.fetch_mark_price(SYMBOL), 2)
     if config.get("state") == "stopped":
         ft.start()
+        if not _wait(lambda: ft.show_config().get("state") == "running", 10, 1):
+            print("10초 내 Freqtrade 실행 상태가 running이 되지 않았습니다. 주문하지 않습니다.")
+            return 1
     elif config.get("state") != "running":
         print("Freqtrade 실행 상태를 확인할 수 없습니다. 주문하지 않습니다.")
         return 1
@@ -283,9 +290,12 @@ def _check(settings: Settings, reader, ft) -> int:
         return 1
     checks = ft_trade_checks(trades[0])
     _print_checks(checks)
-    if overall(checks) != "PASS":
+    result = overall(checks)
+    if result == "FAIL":
         print(EXIT_WARNING)
         return 1
+    if result == "UNKNOWN":
+        print("경고: 청산가를 알 수 없거나 판정 자료가 부족합니다. 모의 점검만 계속하며 실전에서는 PASS가 필요합니다.")
     return 0
 
 

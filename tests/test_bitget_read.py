@@ -209,6 +209,37 @@ def test_open_order_count(data, expected):
     assert ex.calls == [("orders", {"productType": "USDT-FUTURES"})]
 
 
+@pytest.mark.parametrize("symbol", [None, "BTCUSDT"])
+def test_plan_order_count_sums_all_plan_types(monkeypatch, symbol):
+    ex = FakeEx()
+    responses = {
+        "normal_plan": {"data": {"entrustedList": [{"orderId": "1"}, {"orderId": "2"}]}},
+        "track_plan": {"data": {"entrustedList": [{"orderId": "3"}]}},
+        "profit_loss": {"data": {"entrustedList": [{"orderId": "4"}]}},
+    }
+
+    def pending(params):
+        ex.calls.append(("plans", params))
+        return responses[params["planType"]]
+
+    monkeypatch.setattr(ex, "privateMixGetV2MixOrderOrdersPlanPending", pending)
+    assert BitgetReader(ex).fetch_plan_order_count(symbol) == 4
+    assert ex.calls == [
+        ("plans", {"productType": "USDT-FUTURES", "planType": plan_type,
+                   **({"symbol": symbol} if symbol is not None else {})})
+        for plan_type in ("normal_plan", "track_plan", "profit_loss")
+    ]
+
+
+@pytest.mark.parametrize("response", [{}, {"data": None}, {"data": {}},
+                                       {"data": {"entrustedList": None}},
+                                       {"data": {"entrustedList": []}}])
+def test_plan_order_count_empty_when_data_missing_or_null(response):
+    ex = FakeEx(plans=response)
+    assert BitgetReader(ex).fetch_plan_order_count() == 0
+    assert len(ex.calls) == 3
+
+
 def test_usdt_available_selects_margin_coin():
     ex = FakeEx(accounts={"code": "00000", "data": [
         {"marginCoin": "USDC", "available": "999"},

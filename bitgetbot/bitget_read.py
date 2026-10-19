@@ -85,6 +85,17 @@ class BitgetReader:
         data = response.get("data") or {}
         return len(data.get("entrustedList") or [])
 
+    def fetch_plan_order_count(self, symbol: str | None = None) -> int:
+        count = 0
+        for plan_type in ("normal_plan", "track_plan", "profit_loss"):
+            params = {"productType": "USDT-FUTURES", "planType": plan_type}
+            if symbol is not None:
+                params["symbol"] = symbol
+            response = self.exchange.privateMixGetV2MixOrderOrdersPlanPending(params)
+            data = response.get("data") or {}
+            count += len(data.get("entrustedList") or [])
+        return count
+
     def fetch_usdt_available(self) -> float:
         response = self.exchange.privateMixGetV2MixAccountAccounts({
             "productType": "USDT-FUTURES",

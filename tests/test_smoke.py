@@ -112,6 +112,7 @@ class FakeReader:
         self.plans = [PlanOrder("BTCUSDT", "pos_loss", 107900, "mark_price", None, "s1")]
         self.balance = 50.0
         self.orders = 0
+        self.plan_orders = 0
 
     def fetch_contract(self, symbol):
         self.calls.append("contract")
@@ -142,6 +143,10 @@ class FakeReader:
     def fetch_open_order_count(self):
         self.calls.append("orders")
         return self.orders
+
+    def fetch_plan_order_count(self, symbol=None):
+        self.calls.append(("plan_orders", symbol))
+        return self.plan_orders
 
     def fetch_usdt_available(self):
         self.calls.append("balance")
@@ -239,6 +244,7 @@ def cli(monkeypatch, tmp_path):
 
 def test_cli_dry_run_roundtrip_uses_no_private_bitget(cli, capsys, tmp_path, monkeypatch):
     _, reader, ft, keys, _ = cli
+    reader.plan_orders = 99
     monkeypatch.setattr("builtins.input", lambda _: pytest.fail("dry-run asked for LIVE"))
     assert smoke.main(["preflight"]) == 0
     assert capsys.readouterr().out.splitlines()[0] == "=== 모드: 모의(DRY-RUN) ==="
@@ -254,6 +260,111 @@ def test_cli_dry_run_roundtrip_uses_no_private_bitget(cli, capsys, tmp_path, mon
     assert "dry-run: 거래소 손절 확인은 실전에서만 합니다" in capsys.readouterr().out
     assert set(reader.calls) <= {"contract", "mark"}
     assert all(k == ("", "", "") for k in keys)
+
+
+@pytest.mark.parametrize("count,expected", [(0, 0), (1, 1), (3, 1)])
+def test_cli_live_preflight_rejects_leftover_plan_orders(cli, monkeypatch, capsys, count, expected):
+    settings, reader, ft, _, _ = cli
+    ft.dry_run = False
+    reader.plan_orders = count
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    assert smoke.main(["preflight"]) == expected
+    assert ("plan_orders", None) in reader.calls
+    output = capsys.readouterr().out
+    if count:
+        assert f"미체결 예약(트리거·손절) 주문이 {count}개 있습니다" in output
+    else:
+        assert "문제 0개" in output
+
+
+def test_cli_live_enter_rejects_plan_orders_before_confirmation(cli, monkeypatch, capsys):
+    settings, reader, ft, _, _ = cli
+    ft.dry_run = False
+    reader.plan_orders = 1
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("leftover trigger must block entry"))
+    assert smoke.main(["enter"]) == 1
+    assert "미체결 예약(트리거·손절) 주문이 1개 있습니다" in capsys.readouterr().out
+    assert "start" not in ft.calls
+    assert not any(isinstance(call, tuple) and call[0] == "enter" for call in ft.calls)
+
+
+@pytest.mark.parametrize("missing", [False, True])
+def test_cli_dry_check_unknown_liquidation_warns_and_succeeds(cli, capsys, missing):
+    _, reader, ft, _, _ = cli
+    trade = {**TRADE, "liquidation_price": None}
+    if missing:
+        trade.pop("liquidation_price")
+    ft.trades = [trade]
+    assert smoke.main(["check"]) == 0
+    output = capsys.readouterr().out
+    assert "UNKNOWN" in output and "경고" in output and "청산가" in output
+    assert EXIT_WARNING not in output
+    assert reader.calls == []
+
+
+def test_cli_dry_check_fail_still_fails_with_unknown_liquidation(cli, capsys):
+    _, reader, ft, _, _ = cli
+    ft.trades = [{**TRADE, "liquidation_price": None, "stop_loss_abs": 120000}]
+    assert smoke.main(["check"]) == 1
+    output = capsys.readouterr().out
+    assert "FAIL" in output and EXIT_WARNING in output
+    assert reader.calls == []
+
+
+def test_cli_live_check_unknown_liquidation_still_fails(cli, monkeypatch, capsys):
+    settings, reader, ft, _, t = cli
+    ft.dry_run = False
+    reader.position = replace(POS, liq_price=None)
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    assert smoke.main(["check"]) == 1
+    output = capsys.readouterr().out
+    assert "UNKNOWN" in output and EXIT_WARNING in output
+    assert t[0] == 120
+
+
+def test_cli_enter_never_orders_if_start_stays_stopped(cli, monkeypatch, tmp_path, capsys):
+    _, _, ft, _, t = cli
+
+    def start_without_ready():
+        ft.calls.append("start")
+        return {"status": "starting"}
+
+    monkeypatch.setattr(ft, "start", start_without_ready)
+    assert smoke.main(["enter"]) == 1
+    assert t[0] == 10
+    assert "start" in ft.calls
+    assert not any(isinstance(call, tuple) and call[0] == "enter" for call in ft.calls)
+    assert not (tmp_path / ".smoke_state.json").exists()
+    assert "10초" in capsys.readouterr().out
+
+
+def test_cli_enter_waits_for_running_at_one_second_intervals(cli, monkeypatch):
+    _, _, ft, _, t = cli
+    config = ft.show_config
+    enter = ft.force_enter
+    polls = []
+
+    def start_without_ready():
+        ft.calls.append("start")
+        return {"status": "starting"}
+
+    def delayed_config():
+        if "start" in ft.calls:
+            polls.append(t[0])
+            if t[0] >= 3:
+                ft.state = "running"
+        return config()
+
+    def enter_when_ready(*args):
+        assert ft.state == "running" and t[0] == 3
+        return enter(*args)
+
+    monkeypatch.setattr(ft, "start", start_without_ready)
+    monkeypatch.setattr(ft, "show_config", delayed_config)
+    monkeypatch.setattr(ft, "force_enter", enter_when_ready)
+    assert smoke.main(["enter"]) == 0
+    assert polls == [0, 1, 2, 3]
 
 
 def test_cli_live_balance_missing_is_preflight_problem(cli, monkeypatch, capsys):
