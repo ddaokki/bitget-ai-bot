@@ -67,6 +67,8 @@ def test_force_exit_payload(trade_id, ordertype):
 
 @pytest.mark.parametrize("method, verb, payload", [
     ("show_config", "GET", {"state": "stopped"}),
+    ("health", "GET", {"bot_startup_ts": 1792396800}),
+    ("health", "GET", {"bot_startup_ts": None}),
     ("status", "GET", [{"trade_id": 5}]),
     ("start", "POST", {"status": "starting trader ..."}),
     ("stop", "POST", {"status": "stopping trader ..."}),

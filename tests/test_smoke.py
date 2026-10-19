@@ -4,7 +4,7 @@ from dataclasses import replace
 import pytest
 
 from bitgetbot import smoke
-from bitgetbot.ftclient import FreqtradeUnreachable
+from bitgetbot.ftclient import FreqtradeError, FreqtradeUnreachable
 from bitgetbot.models import ContractSpec, PlanOrder, PositionSnapshot
 from bitgetbot.privcfg import Settings
 from bitgetbot.smoke import (
@@ -126,7 +126,7 @@ class FakeReader:
 
     def account_mode_report(self):
         self.calls.append("account")
-        return {"v2_ok": True, "v3_ok": False}
+        return {"v2_ok": True, "v3_ok": False, "v3_error": "Exception: 40084"}
 
     def fetch_positions(self):
         self.calls.append("positions")
@@ -196,6 +196,11 @@ class FakeFT:
         self.trades = []
         self.calls = []
         self.reachable = True
+        self.bot_startup_ts = 100
+
+    def health(self):
+        self.calls.append("health")
+        return {"bot_startup_ts": self.bot_startup_ts}
 
     def ping(self):
         self.calls.append("ping")
@@ -251,12 +256,14 @@ def test_cli_dry_run_roundtrip_uses_no_private_bitget(cli, capsys, tmp_path, mon
     assert smoke.main(["enter"]) == 0
     state = json.loads((tmp_path / ".smoke_state.json").read_text())
     assert state["trade_id"] == 7 and state["started_ms"] > 0
+    assert state["mode"] == "dry"
     assert ("enter", ("BTC/USDT:USDT", "long", 7.29, 2, "market", "smoke")) in ft.calls
     assert ft.calls.index("start") < ft.calls.index(("enter", ("BTC/USDT:USDT", "long", 7.29, 2, "market", "smoke")))
     assert smoke.main(["check"]) == 0
     assert smoke.main(["exit"]) == 0
     assert ("exit", (7, "market")) in ft.calls
     assert ft.trades == []
+    assert not (tmp_path / ".smoke_state.json").exists()
     assert "dry-run: 거래소 손절 확인은 실전에서만 합니다" in capsys.readouterr().out
     assert set(reader.calls) <= {"contract", "mark"}
     assert all(k == ("", "", "") for k in keys)
@@ -267,7 +274,7 @@ def test_cli_live_preflight_rejects_leftover_plan_orders(cli, monkeypatch, capsy
     settings, reader, ft, _, _ = cli
     ft.dry_run = False
     reader.plan_orders = count
-    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     assert smoke.main(["preflight"]) == expected
     assert ("plan_orders", None) in reader.calls
     output = capsys.readouterr().out
@@ -281,7 +288,7 @@ def test_cli_live_enter_rejects_plan_orders_before_confirmation(cli, monkeypatch
     settings, reader, ft, _, _ = cli
     ft.dry_run = False
     reader.plan_orders = 1
-    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     monkeypatch.setattr("builtins.input", lambda _: pytest.fail("leftover trigger must block entry"))
     assert smoke.main(["enter"]) == 1
     assert "미체결 예약(트리거·손절) 주문이 1개 있습니다" in capsys.readouterr().out
@@ -316,7 +323,7 @@ def test_cli_live_check_unknown_liquidation_still_fails(cli, monkeypatch, capsys
     settings, reader, ft, _, t = cli
     ft.dry_run = False
     reader.position = replace(POS, liq_price=None)
-    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     assert smoke.main(["check"]) == 1
     output = capsys.readouterr().out
     assert "UNKNOWN" in output and EXIT_WARNING in output
@@ -364,14 +371,14 @@ def test_cli_enter_waits_for_running_at_one_second_intervals(cli, monkeypatch):
     monkeypatch.setattr(ft, "show_config", delayed_config)
     monkeypatch.setattr(ft, "force_enter", enter_when_ready)
     assert smoke.main(["enter"]) == 0
-    assert polls == [0, 1, 2, 3]
+    assert polls == [0, 1, 2, 3, 3]
 
 
 def test_cli_live_balance_missing_is_preflight_problem(cli, monkeypatch, capsys):
     settings, reader, ft, _, _ = cli
     ft.dry_run = False
     reader.balance = None
-    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     assert smoke.main(["preflight"]) == 1
     output = capsys.readouterr().out
     assert output.splitlines()[0] == "=== 모드: 실전(LIVE) ==="
@@ -383,7 +390,7 @@ def test_cli_enter_rechecks_preflight_before_confirmation(cli, monkeypatch):
     settings, reader, ft, _, _ = cli
     ft.dry_run = False
     reader.positions = [POS]
-    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     monkeypatch.setattr("builtins.input", lambda _: pytest.fail("must reject exposure first"))
     assert smoke.main(["enter"]) == 1
     assert "start" not in ft.calls
@@ -393,14 +400,14 @@ def test_cli_enter_rechecks_preflight_before_confirmation(cli, monkeypatch):
 def test_cli_live_confirmation_refusal_never_orders(cli, monkeypatch):
     settings, _, ft, _, _ = cli
     ft.dry_run = False
-    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     monkeypatch.setattr("builtins.input", lambda _: "yes")
     assert smoke.main(["enter"]) == 1
     assert "start" not in ft.calls
     assert not any(isinstance(call, tuple) for call in ft.calls)
 
 
-@pytest.mark.parametrize("cmd", ["preflight", "enter", "exit"])
+@pytest.mark.parametrize("cmd", ["preflight", "enter"])
 def test_cli_mode_mismatch_blocks_order_commands(cli, cmd, capsys):
     _, _, ft, _, _ = cli
     ft.dry_run = False
@@ -420,9 +427,15 @@ def test_cli_unreachable_short_circuits_exchange_reads(cli, capsys):
 def test_cli_restart_waits_for_user_and_preserves_trade_id(cli, monkeypatch, tmp_path, capsys):
     _, reader, ft, _, t = cli
     ft.trades = [dict(TRADE)]
-    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7}))
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "dry"}))
     prompts = []
-    monkeypatch.setattr("builtins.input", lambda prompt: prompts.append(prompt) or "")
+    def restart(prompt):
+        assert ft.calls == ["health"]
+        prompts.append(prompt)
+        ft.bot_startup_ts = 101
+        return ""
+
+    monkeypatch.setattr("builtins.input", restart)
     assert smoke.main(["restart-check"]) == 0
     assert prompts
     output = capsys.readouterr().out
@@ -436,8 +449,8 @@ def test_cli_restart_waits_for_user_and_preserves_trade_id(cli, monkeypatch, tmp
 def test_cli_restart_wrong_trade_is_failure(cli, monkeypatch, tmp_path, capsys):
     _, _, ft, _, _ = cli
     ft.trades = [{**TRADE, "trade_id": 8}]
-    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7}))
-    monkeypatch.setattr("builtins.input", lambda _: "")
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "dry"}))
+    monkeypatch.setattr("builtins.input", lambda _: setattr(ft, "bot_startup_ts", 101) or "")
     assert smoke.main(["restart-check"]) == 1
     assert EXIT_WARNING in capsys.readouterr().out
 
@@ -463,8 +476,8 @@ def test_cli_ledger_live_uses_saved_start_and_is_idempotent(cli, monkeypatch, tm
 
     settings, reader, ft, _, _ = cli
     ft.dry_run = False
-    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
-    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1792396800000, "trade_id": 7}))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1792396800000, "trade_id": 7, "mode": "live"}))
 
     def fills(symbol, start_ms):
         assert (symbol, start_ms) == ("BTCUSDT", 1792396800000)
@@ -503,12 +516,28 @@ def test_cli_enter_recovers_transient_status_read_without_repeating_order(cli, m
     assert len([call for call in ft.calls if isinstance(call, tuple) and call[0] == "enter"]) == 1
 
 
-def test_cli_exit_live_waits_for_both_sources_then_exports(cli, monkeypatch, tmp_path):
+@pytest.fixture
+def live_fills(cli, monkeypatch):
+    _, reader, _, _, _ = cli
+    fill = {"tradeId": "t1", "orderId": "o1", "symbol": "BTCUSDT", "side": "sell",
+            "tradeSide": "close", "price": "111240.5", "baseVolume": "0.0001",
+            "quoteVolume": "11.12405", "profit": "0", "cTime": "1792396800000",
+            "feeDetail": [{"feeCoin": "USDT", "totalFee": "-0.00667443"}]}
+
+    def fills(symbol, start_ms):
+        reader.calls.append(("fills", symbol, start_ms))
+        return [fill]
+
+    monkeypatch.setattr(reader, "fetch_fills", fills)
+    monkeypatch.setattr(smoke, "fetch_krw_per_usdt", lambda: (1390.1, "2026-10-19T10:00:00Z"))
+
+
+def test_cli_exit_live_waits_for_both_sources_then_exports(cli, live_fills, monkeypatch, tmp_path):
     settings, reader, ft, _, t = cli
     ft.dry_run = False
     ft.trades = [dict(TRADE)]
-    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
-    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1792396800000, "trade_id": 7}))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1792396800000, "trade_id": 7, "mode": "live"}))
     queries = [0]
 
     def position(symbol):
@@ -525,7 +554,7 @@ def test_cli_exit_live_waits_for_both_sources_then_exports(cli, monkeypatch, tmp
 def test_cli_exit_timeout_does_not_export_or_repeat_order(cli, monkeypatch, capsys):
     settings, reader, ft, _, t = cli
     ft.dry_run = False
-    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     assert smoke.main(["exit"]) == 1
     assert t[0] == 60
     assert ("exit", ("all", "market")) in ft.calls
@@ -536,7 +565,7 @@ def test_cli_exit_timeout_does_not_export_or_repeat_order(cli, monkeypatch, caps
 def test_cli_restart_ping_timeout_does_not_order(cli, monkeypatch, tmp_path, capsys):
     _, _, ft, _, t = cli
     ft.reachable = False
-    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7}))
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "dry"}))
     monkeypatch.setattr("builtins.input", lambda _: "")
     assert smoke.main(["restart-check"]) == 1
     assert t[0] == 90
@@ -560,7 +589,7 @@ def test_cli_enter_order_error_is_never_retried_and_keeps_start(cli, monkeypatch
     assert "SECRET-SENTINEL" not in output and EXIT_WARNING in output
 
 
-@pytest.mark.parametrize("argv", [["--help"], ["check", "--help"]])
+@pytest.mark.parametrize("argv", [["--help"], ["check", "--help"], ["set-mode", "--help"]])
 def test_cli_help_is_korean(argv, capsys):
     with pytest.raises(SystemExit) as result:
         smoke.main(argv)
@@ -568,11 +597,13 @@ def test_cli_help_is_korean(argv, capsys):
     output = capsys.readouterr().out
     assert "사용법:" in output and "옵션:" in output and "도움말" in output
     assert "show this help message" not in output
+    assert "positional arguments" not in output
 
 
-def test_cli_bad_argument_is_korean_and_does_not_echo_input(capsys):
+@pytest.mark.parametrize("argv", [["SECRET-SENTINEL"], ["set-mode", "SECRET-SENTINEL"]])
+def test_cli_bad_argument_is_korean_and_does_not_echo_input(capsys, argv):
     with pytest.raises(SystemExit) as result:
-        smoke.main(["SECRET-SENTINEL"])
+        smoke.main(argv)
     assert result.value.code == 2
     output = capsys.readouterr().err
     assert "오류:" in output
@@ -585,3 +616,319 @@ def test_cli_init_reports_existing_without_loading_settings(cli, monkeypatch, ca
     assert smoke.main(["init"]) == 0
     output = capsys.readouterr().out
     assert "이미 있음" in output and "exchange.key/secret/password" in output
+
+
+@pytest.mark.parametrize("mode,dry_run,db_url", [
+    ("dry", True, "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite"),
+    ("live", False, "sqlite:////freqtrade/user_data/tradesv3.sqlite"),
+])
+def test_cli_set_mode_changes_private_file_without_clients(cli, tmp_path, monkeypatch, capsys,
+                                                         mode, dry_run, db_url):
+    path = tmp_path / "freqtrade/user_data/config.private.json"
+    path.parent.mkdir(parents=True)
+    original = {"exchange": {"key": "SECRET-SENTINEL"}, "custom": {"keep": True}}
+    path.write_text(json.dumps(original), encoding="utf-8")
+    monkeypatch.setattr(smoke, "load_settings", lambda: pytest.fail("no settings or clients"))
+    assert smoke.main(["set-mode", mode]) == 0
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        **original, "dry_run": dry_run, "db_url": db_url,
+    }
+    output = capsys.readouterr().out
+    assert "설정" in output and ("모의" if dry_run else "실전") in output
+    assert "docker compose -f freqtrade/docker-compose.yml restart freqtrade" in output
+    assert "SECRET-SENTINEL" not in output
+
+
+@pytest.mark.parametrize("dry_run,db_url", [
+    (False, "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite"),
+    (True, "sqlite:////freqtrade/user_data/tradesv3.sqlite"),
+])
+def test_cli_preflight_rejects_mode_database_mismatch(cli, monkeypatch, capsys, dry_run, db_url):
+    settings, _, ft, _, _ = cli
+    ft.dry_run = dry_run
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=dry_run, db_url=db_url))
+    assert smoke.main(["preflight"]) == 1
+    output = capsys.readouterr().out
+    assert "모드" in output and "db_url" in output and "문제" in output
+    assert "SECRET-SENTINEL" not in output
+
+
+@pytest.mark.parametrize("contents", ['{"started_ms":1,"trade_id":7,"mode":"dry"}', "invalid"])
+def test_cli_enter_refuses_any_existing_state(cli, tmp_path, capsys, contents):
+    _, _, ft, _, _ = cli
+    path = tmp_path / ".smoke_state.json"
+    path.write_text(contents, encoding="utf-8")
+    assert smoke.main(["enter"]) == 1
+    output = capsys.readouterr().out
+    assert "이전 스모크 상태 파일이 남아 있습니다. 먼저 exit으로 정리하세요" in output
+    assert path.read_text(encoding="utf-8") == contents
+    assert ft.calls == []
+    assert EXIT_WARNING not in output
+
+
+@pytest.mark.parametrize("cmd", ["check", "restart-check"])
+@pytest.mark.parametrize("saved_mode", ["live", None])
+def test_cli_check_commands_refuse_wrong_or_legacy_state_mode(cli, tmp_path, monkeypatch, capsys,
+                                                            cmd, saved_mode):
+    _, reader, ft, _, _ = cli
+    state = {"started_ms": 1, "trade_id": 7}
+    if saved_mode is not None:
+        state["mode"] = saved_mode
+    (tmp_path / ".smoke_state.json").write_text(json.dumps(state), encoding="utf-8")
+    ft.trades = [dict(TRADE)]
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("no restart prompt on stale state"))
+    assert smoke.main([cmd]) == 1
+    assert "모드" in capsys.readouterr().out
+    assert ft.calls == [] and reader.calls == []
+
+
+@pytest.mark.parametrize("before,after", [(100, 100), (100, 99), (100, None), (None, 101)])
+def test_cli_restart_rejects_unproven_restart(cli, tmp_path, monkeypatch, capsys, before, after):
+    _, _, ft, _, t = cli
+    ft.bot_startup_ts = before
+    ft.trades = [dict(TRADE)]
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "dry",
+    }), encoding="utf-8")
+
+    def no_restart(_):
+        assert "health" in ft.calls
+        ft.bot_startup_ts = after
+        return ""
+
+    monkeypatch.setattr("builtins.input", no_restart)
+    assert smoke.main(["restart-check"]) == 1
+    assert "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요." in capsys.readouterr().out
+    assert "start" not in ft.calls and t[0] == 0
+
+
+@pytest.mark.parametrize("dry_run", [True, False])
+@pytest.mark.parametrize("mismatch", ["freqtrade", "state"])
+def test_cli_exit_mode_mismatch_still_closes_without_exchange_claim(cli, tmp_path, monkeypatch,
+                                                                  capsys, mismatch, dry_run):
+    settings, reader, ft, _, _ = cli
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=dry_run))
+    ft.dry_run = dry_run
+    ft.trades = [dict(TRADE)]
+    state = {"started_ms": 1, "trade_id": 7, "mode": "dry" if dry_run else "live"}
+    if mismatch == "freqtrade":
+        ft.dry_run = not dry_run
+    else:
+        state["mode"] = "live" if dry_run else "dry"
+    (tmp_path / ".smoke_state.json").write_text(json.dumps(state), encoding="utf-8")
+    assert smoke.main(["exit"]) == 1
+    assert [call for call in ft.calls if isinstance(call, tuple)] == [("exit", ("all", "market"))]
+    output = capsys.readouterr().out
+    assert "경고" in output and "모드" in output and "비트겟 웹(PC)" in output
+    assert "거래소 포지션 없음" not in output
+    assert reader.calls == []
+    assert (tmp_path / ".smoke_state.json").exists()
+
+
+@pytest.mark.parametrize("raises", [True, False])
+def test_cli_exit_ledger_failure_reports_closed_without_manual_close(cli, tmp_path, monkeypatch,
+                                                                   capsys, raises):
+    settings, reader, ft, _, _ = cli
+    ft.dry_run = False
+    reader.position = None
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    state = {"started_ms": 1, "trade_id": 7, "mode": "live"}
+    path = tmp_path / ".smoke_state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+
+    def ledger_failure(*_):
+        if raises:
+            raise OSError("SECRET-SENTINEL")
+        return 1
+
+    monkeypatch.setattr(smoke, "_ledger", ledger_failure)
+    assert smoke.main(["exit"]) == 1
+    output = capsys.readouterr().out
+    assert "청산은 완료됐습니다. 장부 저장에 실패했으니 'python -m bitgetbot.smoke ledger'를 다시 실행하세요." in output
+    assert "시장가 청산하세요" not in output and "SECRET-SENTINEL" not in output
+    assert json.loads(path.read_text(encoding="utf-8")) == {**state, "close_confirmed": True}
+
+
+@pytest.mark.parametrize("failure", ["interrupt", "eof", "preflight", "stake", "save"])
+def test_cli_enter_preorder_errors_do_not_print_exit_warning(cli, tmp_path, monkeypatch, capsys, failure):
+    settings, reader, ft, _, _ = cli
+    ft.dry_run = False
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+
+    def prompt(_):
+        if failure == "interrupt":
+            raise KeyboardInterrupt
+        if failure == "eof":
+            raise EOFError("SECRET-SENTINEL")
+        return "LIVE"
+
+    def fail(*_):
+        raise RuntimeError("SECRET-SENTINEL")
+
+    mark = reader.fetch_mark_price
+    queries = [0]
+
+    def mark_failure(symbol):
+        queries[0] += 1
+        if queries[0] == (1 if failure == "preflight" else 2):
+            fail()
+        return mark(symbol)
+
+    monkeypatch.setattr("builtins.input", prompt)
+    if failure in {"preflight", "stake"}:
+        monkeypatch.setattr(reader, "fetch_mark_price", mark_failure)
+    if failure == "save":
+        monkeypatch.setattr(smoke, "_save_state", fail)
+    assert smoke.main(["enter"]) == 1
+    output = capsys.readouterr().out
+    assert "명령 실패" in output
+    assert EXIT_WARNING not in output and "SECRET-SENTINEL" not in output
+    assert not any(isinstance(call, tuple) for call in ft.calls)
+    assert not (tmp_path / ".smoke_state.json").exists()
+
+
+@pytest.mark.parametrize("last_config", [
+    {"state": "running", "dry_run": False},
+    {"state": "stopped", "dry_run": True},
+    {"state": "running"},
+])
+def test_cli_enter_rechecks_running_and_mode_together_before_order(cli, monkeypatch, tmp_path,
+                                                                 capsys, last_config):
+    _, _, ft, _, _ = cli
+    ft.state = "running"
+    config = ft.show_config
+    queries = [0]
+
+    def changed_config():
+        queries[0] += 1
+        return config() if queries[0] == 1 else last_config
+
+    monkeypatch.setattr(ft, "show_config", changed_config)
+    assert smoke.main(["enter"]) == 1
+    assert queries[0] == 2
+    assert not any(isinstance(call, tuple) for call in ft.calls)
+    assert not (tmp_path / ".smoke_state.json").exists()
+    assert "주문하지 않습니다" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("source,error", [
+    ("freqtrade", FreqtradeError(503, "SECRET-SENTINEL")),
+    ("freqtrade", FreqtradeUnreachable("SECRET-SENTINEL")),
+    ("bitget", RuntimeError("SECRET-SENTINEL")),
+])
+@pytest.mark.parametrize("recovers", [True, False])
+def test_cli_exit_polls_through_transient_read_errors(cli, live_fills, monkeypatch, tmp_path, capsys,
+                                                    source, error, recovers):
+    settings, reader, ft, _, t = cli
+    ft.dry_run = False
+    reader.position = None
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "live",
+    }), encoding="utf-8")
+    reads = [0]
+    original = ft.status if source == "freqtrade" else reader.fetch_position
+
+    def flaky(*args):
+        reads[0] += 1
+        if not recovers or reads[0] == 1:
+            raise error
+        return original(*args)
+
+    monkeypatch.setattr(ft if source == "freqtrade" else reader,
+                        "status" if source == "freqtrade" else "fetch_position", flaky)
+    assert smoke.main(["exit"]) == (0 if recovers else 1)
+    assert t[0] == (5 if recovers else 60)
+    assert [call for call in ft.calls if isinstance(call, tuple)] == [("exit", (7, "market"))]
+    assert "SECRET-SENTINEL" not in capsys.readouterr().out
+    assert (tmp_path / ".smoke_state.json").exists() is (not recovers)
+
+
+@pytest.mark.parametrize("command", ["ledger", "exit"])
+def test_cli_empty_live_fills_fail_without_losing_ledger_start(cli, monkeypatch, tmp_path,
+                                                            capsys, command):
+    settings, reader, ft, _, _ = cli
+    ft.dry_run = False
+    reader.position = None
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    path = tmp_path / ".smoke_state.json"
+    state = {"started_ms": 1, "trade_id": 7, "mode": "live"}
+    path.write_text(json.dumps(state), encoding="utf-8")
+    assert smoke.main([command]) == 1
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        **state, **({"close_confirmed": True} if command == "exit" else {}),
+    }
+    output = capsys.readouterr().out
+    assert "체결이 없습니다" in output
+    assert "시장가 청산하세요" not in output
+
+
+def test_cli_live_enter_saves_live_mode_before_single_order(cli, monkeypatch, tmp_path, capsys):
+    settings, _, ft, _, _ = cli
+    ft.dry_run = False
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    monkeypatch.setattr("builtins.input", lambda _: "LIVE")
+    original = ft.force_enter
+
+    def order(*args):
+        state = json.loads((tmp_path / ".smoke_state.json").read_text(encoding="utf-8"))
+        assert state["mode"] == "live" and state["trade_id"] is None
+        return original(*args)
+
+    monkeypatch.setattr(ft, "force_enter", order)
+    assert smoke.main(["enter"]) == 0
+    state = json.loads((tmp_path / ".smoke_state.json").read_text(encoding="utf-8"))
+    assert state["mode"] == "live" and state["trade_id"] == 7
+    assert len([call for call in ft.calls if isinstance(call, tuple) and call[0] == "enter"]) == 1
+    assert "SECRET-SENTINEL" not in capsys.readouterr().out
+
+
+def test_cli_ledger_retry_cleans_closed_state_without_another_exit(cli, live_fills, monkeypatch,
+                                                                tmp_path, capsys):
+    settings, reader, ft, _, _ = cli
+    ft.dry_run = False
+    reader.position = None
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    path = tmp_path / ".smoke_state.json"
+    path.write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "live"}), encoding="utf-8")
+
+    def unavailable_fx():
+        raise RuntimeError("SECRET-SENTINEL")
+
+    monkeypatch.setattr(smoke, "fetch_krw_per_usdt", unavailable_fx)
+    assert smoke.main(["exit"]) == 1
+    assert json.loads(path.read_text(encoding="utf-8"))["close_confirmed"] is True
+    monkeypatch.setattr(smoke, "fetch_krw_per_usdt", lambda: (1390.1, "2026-10-19T10:00:00Z"))
+    assert smoke.main(["ledger"]) == 0
+    assert not path.exists()
+    assert [call for call in ft.calls if isinstance(call, tuple)] == [("exit", (7, "market"))]
+    assert "SECRET-SENTINEL" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("saved_mode", ["dry", None])
+def test_cli_live_ledger_refuses_stale_state_mode(cli, monkeypatch, tmp_path, capsys, saved_mode):
+    settings, reader, _, _, _ = cli
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    state = {"started_ms": 1, "trade_id": 7, "close_confirmed": True}
+    if saved_mode is not None:
+        state["mode"] = saved_mode
+    path = tmp_path / ".smoke_state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+    assert smoke.main(["ledger"]) == 1
+    assert reader.calls == []
+    assert "모드" in capsys.readouterr().out
+    assert path.exists()

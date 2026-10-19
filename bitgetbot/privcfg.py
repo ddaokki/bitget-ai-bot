@@ -10,6 +10,8 @@ from typing import Any
 
 PRIVATE_PATH = Path("freqtrade/user_data/config.private.json")
 EXAMPLE_PATH = Path("freqtrade/user_data/config.private.example.json")
+DRY_DB_URL = "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite"
+LIVE_DB_URL = "sqlite:////freqtrade/user_data/tradesv3.sqlite"
 
 
 @dataclass(frozen=True, repr=False)
@@ -21,6 +23,7 @@ class Settings:
     key: str
     secret: str
     password: str
+    db_url: str = DRY_DB_URL
 
     def __repr__(self) -> str:
         return (
@@ -51,6 +54,16 @@ def init_private(path: Path = PRIVATE_PATH, example: Path = EXAMPLE_PATH) -> boo
     return True
 
 
+def set_mode(mode: str, path: Path = PRIVATE_PATH) -> None:
+    """Change only mode and its database; never expose private settings."""
+    if mode not in {"dry", "live"}:
+        raise ValueError("모드는 dry 또는 live여야 합니다")
+    config = json.loads(path.read_text(encoding="utf-8"))
+    config["dry_run"] = mode == "dry"
+    config["db_url"] = DRY_DB_URL if mode == "dry" else LIVE_DB_URL
+    path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 def _merge_config(base: dict[str, Any], private: dict[str, Any]) -> dict[str, Any]:
     """Merge nested dictionaries with private values taking precedence."""
     for name, value in private.items():
@@ -73,6 +86,7 @@ def load_settings(
     exchange = config["exchange"]
     return Settings(
         dry_run=config["dry_run"],
+        db_url=config.get("db_url", DRY_DB_URL),
         api_url="http://127.0.0.1:8080",
         api_user=api["username"],
         api_pass=api["password"],

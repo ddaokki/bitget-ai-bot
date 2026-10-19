@@ -2,6 +2,9 @@ import json
 import re
 from pathlib import Path
 
+import pytest
+
+from bitgetbot import privcfg
 from bitgetbot.privcfg import EXAMPLE_PATH, PRIVATE_PATH, Settings, init_private, load_settings
 
 
@@ -94,3 +97,47 @@ def test_settings_repr_hides_secrets():
     assert "dry_run=True" in rendered
     assert "http://127.0.0.1:8080" in rendered
     assert str(settings) == rendered
+
+
+@pytest.mark.parametrize("mode,dry_run,db_url", [
+    ("dry", True, "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite"),
+    ("live", False, "sqlite:////freqtrade/user_data/tradesv3.sqlite"),
+])
+def test_set_mode_preserves_every_other_private_key(tmp_path, capsys, mode, dry_run, db_url):
+    path = tmp_path / "config.private.json"
+    original = {
+        "dry_run": not dry_run, "db_url": "old",
+        "exchange": {"key": "SECRET-SENTINEL", "options": {"uta": False}},
+        "api_server": {"password": "SECRET-SENTINEL"},
+        "custom": [1, {"keep": "한글"}],
+    }
+    path.write_text(json.dumps(original), encoding="utf-8")
+    privcfg.set_mode(mode, path)
+    updated = json.loads(path.read_text(encoding="utf-8"))
+    assert updated == {**original, "dry_run": dry_run, "db_url": db_url}
+    assert capsys.readouterr().out == ""
+
+
+def test_set_mode_rejects_invalid_mode_without_changing_file(tmp_path):
+    path = tmp_path / "config.private.json"
+    path.write_text('{"dry_run":true}', encoding="utf-8")
+    original = path.read_bytes()
+    with pytest.raises(ValueError):
+        privcfg.set_mode("invalid", path)
+    assert path.read_bytes() == original
+
+
+def test_load_settings_exposes_merged_db_url(tmp_path):
+    base = tmp_path / "base.json"
+    private = tmp_path / "private.json"
+    base.write_text(json.dumps({
+        "dry_run": True, "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite",
+        "api_server": {"username": "u", "password": "p"},
+        "exchange": {"key": "", "secret": "", "password": ""},
+    }), encoding="utf-8")
+    private.write_text(json.dumps({
+        "dry_run": False, "db_url": "sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    }), encoding="utf-8")
+    assert load_settings(private, base).db_url == "sqlite:////freqtrade/user_data/tradesv3.sqlite"
+    private.write_text("{}", encoding="utf-8")
+    assert load_settings(private, base).db_url == "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite"

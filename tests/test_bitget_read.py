@@ -260,8 +260,19 @@ def test_usdt_available_missing_coin_raises():
 ])
 def test_classify_account(v2_ok, v3_ok, expected):
     assert classify_account({
-        "v2_ok": v2_ok, "v3_ok": v3_ok, "v3_data": None, "v3_error": None,
+        "v2_ok": v2_ok, "v3_ok": v3_ok, "v3_data": None, "v3_error": "Exception: 40084",
     }) == expected
+
+
+@pytest.mark.parametrize("error", [None, "RequestTimeout", "NetworkError", "Exception"])
+def test_classify_account_v3_failure_without_numeric_code_is_unknown(error):
+    assert classify_account({"v2_ok": True, "v3_ok": False, "v3_error": error}) == "unknown"
+
+
+@pytest.mark.parametrize("error", [TimeoutError("timeout"), ConnectionError("network")])
+def test_account_probe_network_error_is_not_classic(error):
+    report = BitgetReader(FakeEx(v3_raises=error)).account_mode_report()
+    assert classify_account(report) == "unknown"
 
 
 def test_account_report_success():

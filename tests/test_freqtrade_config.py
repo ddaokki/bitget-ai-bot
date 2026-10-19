@@ -19,6 +19,7 @@ def test_safety_invariants():
     assert config["margin_mode"] == "isolated"
     assert config["initial_state"] == "stopped"
     assert config["dry_run"] is True
+    assert config["db_url"] == "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite"
     assert config["dry_run_wallet"] == 100
     assert config["max_open_trades"] == 1
     assert config["stake_currency"] == "USDT"
@@ -76,7 +77,6 @@ def test_compose_publishes_only_localhost_and_pins_digest():
     assert service["volumes"] == ["./user_data:/freqtrade/user_data"]
     assert shlex.split(service["command"]) == [
         "trade", "--logfile", "/freqtrade/user_data/logs/freqtrade.log",
-        "--db-url", "sqlite:////freqtrade/user_data/tradesv3.sqlite",
         "--config", "/freqtrade/user_data/config.json",
         "--config", "/freqtrade/user_data/config.private.json",
         "--strategy", "SmokeTest",
@@ -86,6 +86,7 @@ def test_compose_publishes_only_localhost_and_pins_digest():
 def test_private_example_defaults_to_dry_run():
     assert load_json(USER_DATA / "config.private.example.json") == {
         "dry_run": True,
+        "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite",
         "exchange": {"key": "", "secret": "", "password": ""},
         "api_server": {"username": "", "password": "", "jwt_secret_key": ""},
     }

@@ -1,5 +1,6 @@
 {
   "dry_run": true,
+  "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite",
   "exchange": {"key": "", "secret": "", "password": ""},
   "api_server": {"username": "", "password": "", "jwt_secret_key": ""}
 }

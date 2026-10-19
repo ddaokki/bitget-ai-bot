@@ -166,7 +166,8 @@ class BitgetReader:
 
 
 def classify_account(report: dict) -> Literal["classic", "uta", "unknown"]:
-    if report["v2_ok"] and not report["v3_ok"]:
+    if (report["v2_ok"] and not report["v3_ok"]
+            and re.fullmatch(r"(?:\w+: )?[0-9]+", report.get("v3_error") or "")):
         return "classic"
     if not report["v2_ok"] and report["v3_ok"]:
         return "uta"

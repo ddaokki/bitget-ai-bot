@@ -57,6 +57,9 @@ class FreqtradeClient:
             return False
         return True
 
+    def health(self) -> dict:
+        return self._request("GET", "health").json()
+
     def show_config(self) -> dict:
         return self._request("GET", "show_config").json()
 

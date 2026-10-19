@@ -14,7 +14,9 @@ from bitgetbot.bitget_read import BitgetReader, classify_account, make_exchange,
 from bitgetbot.ftclient import FreqtradeClient, FreqtradeError, FreqtradeUnreachable
 from bitgetbot.ledger import append_csv, fetch_krw_per_usdt, fills_to_rows
 from bitgetbot.models import Check, ContractSpec, PositionSnapshot
-from bitgetbot.privcfg import PRIVATE_PATH, Settings, init_private, load_settings
+from bitgetbot.privcfg import (
+    DRY_DB_URL, LIVE_DB_URL, PRIVATE_PATH, Settings, init_private, load_settings, set_mode,
+)
 from bitgetbot.stopcheck import MAX_LIQ_FRACTION, evaluate_protection, overall
 
 
@@ -181,6 +183,10 @@ def _preflight(settings: Settings, reader, ft) -> tuple[bool, dict]:
         return False, {}
     if not _mode_matches(settings, config):
         return False, config
+    expected_db = DRY_DB_URL if settings.dry_run else LIVE_DB_URL
+    if settings.db_url != expected_db:
+        print("문제: 설정 모드와 db_url이 일치하지 않습니다. set-mode로 모드와 DB를 함께 설정하세요.")
+        return False, config
     account_kind, positions, orders, balance = "unknown", [], 0, None
     plan_orders = 0
     if not settings.dry_run:
@@ -228,11 +234,21 @@ def _save_state(state: dict) -> None:
     STATE_PATH.write_text(json.dumps(state) + "\n", encoding="utf-8")
 
 
+def _state_mode_matches(settings: Settings, state: dict) -> bool:
+    if state and state.get("mode") != ("dry" if settings.dry_run else "live"):
+        print("경고: 스모크 상태 파일의 모드가 현재 모드와 다르거나 확인되지 않았습니다. 먼저 exit으로 정리하세요.")
+        return False
+    return True
+
+
 def _same_trade(trade: dict, trade_id) -> bool:
     return trade_id is not None and str(trade.get("trade_id")) == str(trade_id)
 
 
 def _enter(settings: Settings, reader, ft) -> int:
+    if STATE_PATH.exists():
+        print("이전 스모크 상태 파일이 남아 있습니다. 먼저 exit으로 정리하세요")
+        return 1
     ready, config = _preflight(settings, reader, ft)
     if not ready:
         return 1
@@ -250,38 +266,53 @@ def _enter(settings: Settings, reader, ft) -> int:
     elif config.get("state") != "running":
         print("Freqtrade 실행 상태를 확인할 수 없습니다. 주문하지 않습니다.")
         return 1
-    state = {"started_ms": time.time_ns() // 1_000_000, "trade_id": None}
+    current_config = ft.show_config()
+    if not _mode_matches(settings, current_config):
+        return 1
+    if current_config.get("state") != "running":
+        print("Freqtrade 실행 상태가 running이 아닙니다. 주문하지 않습니다.")
+        return 1
+    state = {"started_ms": time.time_ns() // 1_000_000, "trade_id": None,
+             "mode": "dry" if settings.dry_run else "live"}
     _save_state(state)
-    result = ft.force_enter(PAIR, "long", stake, 2, "market", "smoke")
-    response_id = result.get("trade_id")
+    try:
+        result = ft.force_enter(PAIR, "long", stake, 2, "market", "smoke")
+        response_id = result.get("trade_id")
 
-    def visible():
-        trades = ft.status()
-        candidates = [trade for trade in trades if trade.get("pair") == PAIR
-                      and (_same_trade(trade, response_id) if response_id is not None
-                           else trade.get("enter_tag") == "smoke")]
-        if len(candidates) != 1 or candidates[0].get("trade_id") is None:
-            return False
-        state["trade_id"] = candidates[0]["trade_id"]
-        return True
+        def visible():
+            trades = ft.status()
+            candidates = [trade for trade in trades if trade.get("pair") == PAIR
+                          and (_same_trade(trade, response_id) if response_id is not None
+                               else trade.get("enter_tag") == "smoke")]
+            if len(candidates) != 1 or candidates[0].get("trade_id") is None:
+                return False
+            state["trade_id"] = candidates[0]["trade_id"]
+            return True
 
-    if not _wait(visible, 60):
-        print("60초 내 거래를 확인하지 못했습니다. enter를 반복하지 마세요.")
+        if not _wait(visible, 60):
+            print("60초 내 거래를 확인하지 못했습니다. enter를 반복하지 마세요.")
+            print(EXIT_WARNING)
+            return 1
+        _save_state(state)
+        print(f"진입 확인: 거래 번호 {state['trade_id']}, 증거금 {stake:.2f} USDT")
+        return 0
+    except (Exception, KeyboardInterrupt):
+        # The saved attempt marks the boundary after which the POST may have reached Freqtrade.
+        print("진입 확인 실패: 비밀값 보호를 위해 오류 원문은 표시하지 않습니다.")
         print(EXIT_WARNING)
         return 1
-    _save_state(state)
-    print(f"진입 확인: 거래 번호 {state['trade_id']}, 증거금 {stake:.2f} USDT")
-    return 0
 
 
 def _check(settings: Settings, reader, ft) -> int:
+    state = _load_state()
+    if not _state_mode_matches(settings, state):
+        return 1
     if not _mode_matches(settings, ft.show_config()):
         print(EXIT_WARNING)
         return 1
     if not settings.dry_run:
         return run_check(reader, SYMBOL, 120, 5, time.sleep, time.monotonic, print)
     print(DRY_NOTICE)
-    state = _load_state()
     trades = [trade for trade in ft.status() if trade.get("pair") == PAIR
               and (not state.get("trade_id") or _same_trade(trade, state["trade_id"]))]
     if len(trades) != 1:
@@ -301,16 +332,24 @@ def _check(settings: Settings, reader, ft) -> int:
 
 def _restart_check(settings: Settings, reader, ft) -> int:
     state = _load_state()
+    if not _state_mode_matches(settings, state):
+        return 1
     trade_id = state.get("trade_id")
     if trade_id is None:
         print("저장된 거래 번호가 없습니다.")
         print(EXIT_WARNING)
         return 1
+    startup_before = ft.health().get("bot_startup_ts")
     print("다음 명령을 직접 실행하세요: docker compose -f freqtrade/docker-compose.yml restart freqtrade")
     input("재시작 명령 실행 후 Enter를 누르세요: ")
     if not _wait(ft.ping, 90):
         print(FT_UNREACHABLE)
         print(EXIT_WARNING)
+        return 1
+    startup_after = ft.health().get("bot_startup_ts")
+    if (type(startup_before) is not int or type(startup_after) is not int
+            or startup_after <= startup_before):
+        print("재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요.")
         return 1
     config = ft.show_config()
     if not _mode_matches(settings, config):
@@ -335,36 +374,66 @@ def _ledger(settings: Settings, reader) -> int:
     if not state:
         print("장부 시작 시각이 없습니다. .smoke_state.json을 확인하세요.")
         return 1
+    if not _state_mode_matches(settings, state):
+        return 1
     fills = reader.fetch_fills(SYMBOL, state["started_ms"])
     if not fills:
         print("조회된 체결이 없습니다. 잠시 후 ledger를 다시 실행하세요.")
-        return 0
+        return 1
     rate, at = fetch_krw_per_usdt()
     rows = fills_to_rows(fills, rate, at)
     date = datetime.fromtimestamp(state["started_ms"] / 1000, timezone.utc).strftime("%Y%m%d")
     path = Path("ledger") / f"smoke-{date}.csv"
     count = append_csv(rows, path)
     print(f"장부 저장: {path.as_posix()}, 새 체결 {count}개")
+    if state.get("close_confirmed") is True:
+        STATE_PATH.unlink(missing_ok=True)
     return 0
 
 
 def _exit(settings: Settings, reader, ft) -> int:
-    if not _mode_matches(settings, ft.show_config()):
-        print("exit 실패 시 비트겟 웹(PC)에서 서브계정 선물 포지션을 직접 시장가 청산하세요.")
-        return 1
+    config = ft.show_config()
     state = _load_state()
-    ft.force_exit(state.get("trade_id") or "all", "market")
+    state_matches = _state_mode_matches(settings, state)
+    mode_matches = (type(config.get("dry_run")) is bool
+                    and config["dry_run"] == settings.dry_run and state_matches)
+    if not mode_matches:
+        print("경고: 모드가 다르거나 확인되지 않았습니다. Freqtrade의 열린 거래를 청산하고 비트겟 웹(PC)에서 포지션을 직접 확인하세요.")
+    # A trade ID from another mode's database must not select a trade in this database.
+    ft.force_exit((state.get("trade_id") if mode_matches else None) or "all", "market")
 
     def closed():
-        ft_empty = not ft.status()
-        exchange_empty = True if settings.dry_run else reader.fetch_position(SYMBOL) is None
-        return ft_empty and exchange_empty
+        try:
+            ft_empty = not ft.status()
+            exchange_empty = (True if settings.dry_run or not mode_matches
+                              else reader.fetch_position(SYMBOL) is None)
+            return ft_empty and exchange_empty
+        except Exception:
+            # Observation only: retry transient GET errors, never the force_exit POST.
+            print("청산 조회 실패: 제한 시간 안에서 다시 확인합니다. 오류 원문은 표시하지 않습니다.")
+            return False
 
     if not _wait(closed, 60):
         print("60초 내 청산을 확인하지 못했습니다. 비트겟 웹(PC)에서 포지션을 직접 확인하고 시장가 청산하세요.")
         return 1
-    print("청산 확인: Freqtrade 열린 거래 0개" + ("" if settings.dry_run else ", 거래소 포지션 없음"))
-    return _ledger(settings, reader)
+    print("청산 확인: Freqtrade 열린 거래 0개" + (
+        ", 거래소 포지션 없음" if not settings.dry_run and mode_matches else ""
+    ))
+    if not mode_matches:
+        print("모드 불일치로 거래소 청산 여부는 확인하지 않았습니다. 비트겟 웹(PC)에서 직접 확인하세요.")
+        return 1
+    try:
+        if state:
+            state["close_confirmed"] = True
+            _save_state(state)
+        if _ledger(settings, reader) != 0:
+            raise ValueError("장부 저장 실패")
+    except (Exception, KeyboardInterrupt):
+        # Keep the saved start time so the standalone ledger command remains usable.
+        print("청산은 완료됐습니다. 장부 저장에 실패했으니 'python -m bitgetbot.smoke ledger'를 다시 실행하세요.")
+        return 1
+    STATE_PATH.unlink(missing_ok=True)
+    return 0
 
 
 class _KoreanHelpFormatter(argparse.HelpFormatter):
@@ -397,11 +466,21 @@ def main(argv: list[str] | None = None) -> int:
         ("exit", "시장가 청산 후 장부 저장"), ("ledger", "체결 장부 저장"),
     ):
         commands.add_parser(name, help=help_text, description=help_text)
-    command = parser.parse_args(argv).command
+    mode_parser = commands.add_parser("set-mode", help="모드와 거래 DB 설정", description="모드와 거래 DB 설정")
+    mode_parser.add_argument_group("인수").add_argument(
+        "mode", choices=("dry", "live"), help="dry: 모의, live: 실전",
+    )
+    args = parser.parse_args(argv)
+    command = args.command
     try:
+        if command == "set-mode":
+            set_mode(args.mode)
+            print("모드 설정 완료: " + ("모의(DRY-RUN)" if args.mode == "dry" else "실전(LIVE)"))
+            print("변경 적용에 필요합니다: docker compose -f freqtrade/docker-compose.yml restart freqtrade")
+            return 0
         if command == "init":
             print(f"{PRIVATE_PATH}: " + ("생성 완료" if init_private() else "이미 있음"))
-            print("exchange.key/secret/password를 채우세요. 실전은 dry_run=false, 모의는 dry_run=true입니다.")
+            print("exchange.key/secret/password를 채우세요. 모드는 set-mode dry 또는 set-mode live로 설정하세요.")
             print("자동 생성된 api_server 인증값은 유지하세요. 비밀값을 화면·로그·깃에 남기지 마세요.")
             return 0
         settings = load_settings()
@@ -422,7 +501,7 @@ def main(argv: list[str] | None = None) -> int:
     except (Exception, KeyboardInterrupt):
         # Upstream exceptions and configs may include credentials. Never print their repr/body.
         print("명령 실패: 설정·연결·응답을 확인하세요. 비밀값 보호를 위해 오류 원문은 표시하지 않습니다.")
-        if command in {"enter", "check", "restart-check"}:
+        if command in {"check", "restart-check"}:
             print(EXIT_WARNING)
         if command == "exit":
             print("비트겟 웹(PC)에서 서브계정 선물 포지션을 직접 확인하고 시장가 청산하세요.")

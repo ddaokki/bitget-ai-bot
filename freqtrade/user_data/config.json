@@ -4,6 +4,7 @@
   "stake_amount": 7,
   "tradable_balance_ratio": 0.99,
   "dry_run": true,
+  "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite",
   "dry_run_wallet": 100,
   "trading_mode": "futures",
   "margin_mode": "isolated",
