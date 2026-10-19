@@ -1,0 +1,1 @@
+"""Bitget futures protection checks."""
