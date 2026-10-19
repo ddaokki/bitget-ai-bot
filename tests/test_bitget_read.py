@@ -48,6 +48,70 @@ class FakeEx:
         return self.v3 or {"code": "00000", "data": {}}
 
 
+class FillPriceEx:
+    def __init__(self, fills=None, prices=None, last="112050", price_error=False):
+        self.fills = fills
+        self.prices = prices
+        self.last = last
+        self.price_error = price_error
+        self.calls = []
+
+    def privateMixGetV2MixOrderFills(self, params):
+        self.calls.append(("fills", params))
+        return {"data": self.fills}
+
+    def publicMixGetV2MixMarketSymbolPrice(self, params):
+        self.calls.append(("price", params))
+        if self.price_error:
+            raise RuntimeError("secret in upstream error")
+        return {"data": self.prices}
+
+    def fetch_ticker(self, pair):
+        self.calls.append(("ticker", pair))
+        return {"last": self.last}
+
+
+def test_fetch_fills_parameters_and_rows():
+    rows = [{"tradeId": "t1"}]
+    ex = FillPriceEx(fills={"fillList": rows})
+    assert BitgetReader(ex).fetch_fills("BTCUSDT", 1792396800000) == rows
+    assert ex.calls == [("fills", {
+        "productType": "USDT-FUTURES", "symbol": "BTCUSDT",
+        "startTime": "1792396800000",
+    })]
+
+
+@pytest.mark.parametrize("data", [None, {}, {"fillList": None}, {"fillList": []}])
+def test_fetch_fills_empty_when_missing(data):
+    assert BitgetReader(FillPriceEx(fills=data)).fetch_fills("BTCUSDT", 1) == []
+
+
+def test_fetch_mark_price_prefers_public_mark():
+    ex = FillPriceEx(prices=[{"markPrice": "112050.5"}])
+    assert BitgetReader(ex).fetch_mark_price("BTCUSDT") == 112050.5
+    assert ex.calls == [("price", {"productType": "USDT-FUTURES", "symbol": "BTCUSDT"})]
+
+
+@pytest.mark.parametrize("data", [None, [], [{}], [{"markPrice": "nan"}],
+                                  [{"markPrice": "inf"}], [{"markPrice": "0"}],
+                                  [{"markPrice": "-2"}], [{"markPrice": "bad"}]])
+def test_fetch_mark_price_falls_back_to_last(data):
+    ex = FillPriceEx(prices=data)
+    assert BitgetReader(ex).fetch_mark_price("BTCUSDT") == 112050.0
+    assert ex.calls[-1] == ("ticker", "BTC/USDT:USDT")
+
+
+def test_fetch_mark_price_falls_back_after_public_error():
+    ex = FillPriceEx(price_error=True)
+    assert BitgetReader(ex).fetch_mark_price("BTCUSDT") == 112050.0
+
+
+@pytest.mark.parametrize("last", [None, "nan", "inf", 0, -1, "bad"])
+def test_fetch_mark_price_raises_if_both_invalid(last):
+    with pytest.raises(ValueError):
+        BitgetReader(FillPriceEx(prices=[], last=last)).fetch_mark_price("BTCUSDT")
+
+
 def test_make_exchange_uses_classic_swap_options():
     exchange = make_exchange("test-key", "test-secret", "test-password")
     assert exchange.apiKey == "test-key"

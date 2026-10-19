@@ -1,5 +1,6 @@
 """Read-only access to classic Bitget USDT futures account snapshots."""
 
+import math
 import re
 from typing import Literal, cast
 
@@ -106,6 +107,31 @@ class BitgetReader:
                     min_notional_usdt=float(row["minTradeUSDT"]),
                 )
         raise ValueError("요청한 심볼의 계약 정보를 찾을 수 없습니다")
+
+    def fetch_fills(self, symbol: str, start_ms: int) -> list[dict]:
+        response = self.exchange.privateMixGetV2MixOrderFills({
+            "productType": "USDT-FUTURES", "symbol": symbol, "startTime": str(start_ms),
+        })
+        return (response.get("data") or {}).get("fillList") or []
+
+    def fetch_mark_price(self, symbol: str) -> float:
+        try:
+            response = self.exchange.publicMixGetV2MixMarketSymbolPrice({
+                "productType": "USDT-FUTURES", "symbol": symbol,
+            })
+            price = num((response.get("data") or [{}])[0].get("markPrice"))
+            if price is not None and math.isfinite(price) and price > 0:
+                return price
+        except Exception:
+            pass
+        try:
+            base = symbol.removesuffix("USDT")
+            price = num(self.exchange.fetch_ticker(f"{base}/USDT:USDT").get("last"))
+            if price is not None and math.isfinite(price) and price > 0:
+                return price
+        except Exception:
+            pass
+        raise ValueError("유효한 표시가격 또는 최근 체결가를 조회할 수 없습니다")
 
     def account_mode_report(self) -> dict:
         report = {"v2_ok": False, "v3_ok": False, "v3_data": None, "v3_error": None}
