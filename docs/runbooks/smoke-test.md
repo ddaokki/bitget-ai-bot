@@ -31,6 +31,7 @@ python -m bitgetbot.smoke init
 python -m bitgetbot.smoke set-mode dry
 docker compose -f freqtrade/docker-compose.yml run --rm freqtrade list-strategies --config /freqtrade/user_data/config.json --config /freqtrade/user_data/config.private.json
 docker compose -f freqtrade/docker-compose.yml up -d
+# Freqtrade 시작에는 1–2분이 걸리며 preflight는 최대 3분 기다립니다.
 docker compose -f freqtrade/docker-compose.yml restart freqtrade
 python -m bitgetbot.smoke preflight
 python -m bitgetbot.smoke enter
@@ -117,6 +118,7 @@ docker compose -f freqtrade/docker-compose.yml restart freqtrade
 
 ```powershell
 docker compose -f freqtrade/docker-compose.yml up -d
+# Freqtrade 시작에는 1–2분이 걸리며 preflight는 최대 3분 기다립니다.
 python -m bitgetbot.smoke preflight
 ```
 

@@ -298,13 +298,51 @@ def test_cli_live_enter_rejects_plan_orders_before_confirmation(cli, monkeypatch
     assert not any(isinstance(call, tuple) and call[0] == "enter" for call in ft.calls)
 
 
+@pytest.mark.parametrize("command", ["check", "restart-check"])
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_cli_check_without_state_has_no_exit_warning(cli, monkeypatch, capsys, command, dry_run):
+    settings, reader, ft, _, t = cli
+    ft.dry_run = dry_run
+    ft.trades = [dict(TRADE)]
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=dry_run))
+    assert smoke.main([command]) == 1
+    output = capsys.readouterr().out
+    assert "검사할 스모크 거래가 없습니다. enter를 먼저 실행했는지 확인하세요." in output
+    assert EXIT_WARNING not in output
+    assert ft.calls == [] and reader.calls == [] and t[0] == 0
+
+
+@pytest.mark.parametrize("command", ["check", "restart-check"])
+@pytest.mark.parametrize("dry_run", [True, False])
+@pytest.mark.parametrize("trades", [[], [{**TRADE, "trade_id": 8}], [{**TRADE, "pair": "ETH/USDT:USDT"}]])
+def test_cli_check_without_matching_trade_has_no_exit_warning(cli, tmp_path, monkeypatch, capsys,
+                                                           command, dry_run, trades):
+    settings, reader, ft, _, _ = cli
+    ft.dry_run = dry_run
+    ft.trades = trades
+    ft.state = "running"
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("no restart without a smoke trade"))
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=dry_run))
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "dry" if dry_run else "live",
+    }), encoding="utf-8")
+    assert smoke.main([command]) == 1
+    output = capsys.readouterr().out
+    assert "검사할 스모크 거래가 없습니다. enter를 먼저 실행했는지 확인하세요." in output
+    assert EXIT_WARNING not in output
+    assert reader.calls == []
+
+
 @pytest.mark.parametrize("missing", [False, True])
-def test_cli_dry_check_unknown_liquidation_warns_and_succeeds(cli, capsys, missing):
+def test_cli_dry_check_unknown_liquidation_warns_and_succeeds(cli, capsys, tmp_path, missing):
     _, reader, ft, _, _ = cli
     trade = {**TRADE, "liquidation_price": None}
     if missing:
         trade.pop("liquidation_price")
     ft.trades = [trade]
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "dry",
+    }), encoding="utf-8")
     assert smoke.main(["check"]) == 0
     output = capsys.readouterr().out
     assert "UNKNOWN" in output and "경고" in output and "청산가" in output
@@ -312,8 +350,11 @@ def test_cli_dry_check_unknown_liquidation_warns_and_succeeds(cli, capsys, missi
     assert reader.calls == []
 
 
-def test_cli_dry_check_fail_still_fails_with_unknown_liquidation(cli, capsys):
+def test_cli_dry_check_fail_still_fails_with_unknown_liquidation(cli, capsys, tmp_path):
     _, reader, ft, _, _ = cli
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "dry",
+    }), encoding="utf-8")
     ft.trades = [{**TRADE, "liquidation_price": None, "stop_loss_abs": 120000}]
     assert smoke.main(["check"]) == 1
     output = capsys.readouterr().out
@@ -321,9 +362,13 @@ def test_cli_dry_check_fail_still_fails_with_unknown_liquidation(cli, capsys):
     assert reader.calls == []
 
 
-def test_cli_live_check_unknown_liquidation_still_fails(cli, monkeypatch, capsys):
+def test_cli_live_check_unknown_liquidation_still_fails(cli, monkeypatch, capsys, tmp_path):
     settings, reader, ft, _, t = cli
     ft.dry_run = False
+    ft.trades = [dict(TRADE)]
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "live",
+    }), encoding="utf-8")
     reader.position = replace(POS, liq_price=None)
     monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     assert smoke.main(["check"]) == 1
@@ -418,12 +463,56 @@ def test_cli_mode_mismatch_blocks_order_commands(cli, cmd, capsys):
     assert "모드" in capsys.readouterr().out
 
 
-def test_cli_unreachable_short_circuits_exchange_reads(cli, capsys):
-    _, reader, ft, _, _ = cli
-    ft.reachable = False
-    assert smoke.main(["preflight"]) == 1
-    assert reader.calls == []
-    assert "Freqtrade에 연결할 수 없습니다" in capsys.readouterr().out
+@pytest.mark.parametrize("command", ["preflight", "enter"])
+@pytest.mark.parametrize("raises", [False, True])
+@pytest.mark.parametrize("ready_at", [90, 180])
+def test_cli_startup_waits_for_ping_before_preflight_and_single_order(cli, monkeypatch, capsys,
+                                                                  command, raises, ready_at):
+    _, reader, ft, _, t = cli
+    polls = []
+
+    def delayed_ping():
+        polls.append(t[0])
+        if t[0] < ready_at:
+            assert reader.calls == [] and ft.calls == []
+            if raises:
+                raise FreqtradeUnreachable("SECRET-SENTINEL")
+            return False
+        return True
+
+    monkeypatch.setattr(ft, "ping", delayed_ping)
+    assert smoke.main([command]) == 0
+    assert polls == list(range(0, ready_at + 1, 3))
+    assert t[0] == ready_at
+    output = capsys.readouterr().out
+    assert output.count("Freqtrade 시작을 기다리는 중입니다 (최대 3분)…") == 1
+    assert "SECRET-SENTINEL" not in output
+    orders = [call for call in ft.calls if isinstance(call, tuple) and call[0] == "enter"]
+    assert len(orders) == (1 if command == "enter" else 0)
+
+
+@pytest.mark.parametrize("command", ["preflight", "enter"])
+@pytest.mark.parametrize("raises", [False, True])
+def test_cli_unreachable_short_circuits_exchange_reads(cli, monkeypatch, capsys, tmp_path,
+                                                     command, raises):
+    _, reader, ft, _, t = cli
+    polls = []
+
+    def unreachable_ping():
+        polls.append(t[0])
+        if raises:
+            raise FreqtradeUnreachable("SECRET-SENTINEL")
+        return False
+
+    monkeypatch.setattr(ft, "ping", unreachable_ping)
+    assert smoke.main([command]) == 1
+    assert polls == list(range(0, 181, 3)) and t[0] == 180
+    assert reader.calls == [] and ft.calls == []
+    assert not (tmp_path / ".smoke_state.json").exists()
+    output = capsys.readouterr().out
+    assert output.count("Freqtrade 시작을 기다리는 중입니다 (최대 3분)…") == 1
+    assert "Freqtrade에 연결할 수 없습니다 (Docker Desktop과 `docker compose up -d` 확인)" in output
+    assert "SECRET-SENTINEL" not in output and EXIT_WARNING not in output
 
 
 def test_cli_restart_waits_for_user_and_preserves_trade_id(cli, monkeypatch, tmp_path, capsys):
@@ -434,7 +523,7 @@ def test_cli_restart_waits_for_user_and_preserves_trade_id(cli, monkeypatch, tmp
     prompts = []
 
     def restart(prompt):
-        assert ft.calls == ["config", "health"]
+        assert ft.calls == ["config", "health", "status"]
         prompts.append(prompt)
         ft.state = "stopped"
         assert ft.bot_startup_ts == 100
@@ -446,7 +535,7 @@ def test_cli_restart_waits_for_user_and_preserves_trade_id(cli, monkeypatch, tmp
     output = capsys.readouterr().out
     assert "docker compose -f freqtrade/docker-compose.yml restart freqtrade" in output
     assert "7" in output and "PASS" in output
-    assert ft.calls[:7] == ["config", "health", "ping", "config", "start", "config", "health"]
+    assert ft.calls[:8] == ["config", "health", "status", "ping", "config", "start", "config", "health"]
     assert ft.calls.count("start") == 1
     assert t[0] == 30
     assert reader.calls == []
@@ -455,13 +544,19 @@ def test_cli_restart_waits_for_user_and_preserves_trade_id(cli, monkeypatch, tmp
 def test_cli_restart_wrong_trade_is_failure(cli, monkeypatch, tmp_path, capsys):
     _, _, ft, _, _ = cli
     ft.state = "running"
-    ft.trades = [{**TRADE, "trade_id": 8}]
+    ft.trades = [dict(TRADE)]
     (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "dry"}))
-    monkeypatch.setattr("builtins.input", lambda _: setattr(ft, "state", "stopped") or "")
+
+    def restart(_):
+        ft.state = "stopped"
+        ft.trades = [{**TRADE, "trade_id": 8}]
+        return ""
+
+    monkeypatch.setattr("builtins.input", restart)
     assert smoke.main(["restart-check"]) == 1
     output = capsys.readouterr().out
-    assert "재시작 후 같은 거래 번호 7를 찾을 수 없습니다." in output
-    assert EXIT_WARNING in output
+    assert "검사할 스모크 거래가 없습니다. enter를 먼저 실행했는지 확인하세요." in output
+    assert EXIT_WARNING not in output
 
 
 def test_cli_error_does_not_print_secret_or_traceback(cli, monkeypatch, capsys):
@@ -571,16 +666,48 @@ def test_cli_exit_timeout_does_not_export_or_repeat_order(cli, monkeypatch, caps
     assert not any(isinstance(call, tuple) for call in reader.calls)
 
 
+@pytest.mark.parametrize("command,method", [
+    ("check", "show_config"), ("check", "status"),
+    ("restart-check", "show_config"), ("restart-check", "health"),
+    ("restart-check", "status"),
+])
+def test_cli_check_unreachable_directs_manual_close_without_exit(cli, monkeypatch, tmp_path,
+                                                               capsys, command, method):
+    _, _, ft, _, _ = cli
+    ft.state = "running"
+    ft.trades = [dict(TRADE)]
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "dry",
+    }), encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: setattr(ft, "state", "stopped") or "")
+
+    def unreachable():
+        raise FreqtradeUnreachable("SECRET-SENTINEL")
+
+    monkeypatch.setattr(ft, method, unreachable)
+    assert smoke.main([command]) == 1
+    output = capsys.readouterr().out
+    assert ("Freqtrade에 연결할 수 없습니다. Docker Desktop과 컨테이너를 확인하세요. "
+            "복구가 안 되면 비트겟 웹(PC)에서 포지션을 직접 시장가 청산하세요.") in output
+    assert EXIT_WARNING not in output
+    assert "명령 실패" not in output and "SECRET-SENTINEL" not in output
+    assert not any(isinstance(call, tuple) for call in ft.calls)
+
+
 def test_cli_restart_ping_timeout_does_not_order(cli, monkeypatch, tmp_path, capsys):
     _, _, ft, _, t = cli
     ft.state = "running"
+    ft.trades = [dict(TRADE)]
     ft.reachable = False
     (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "dry"}))
     monkeypatch.setattr("builtins.input", lambda _: "")
     assert smoke.main(["restart-check"]) == 1
     assert t[0] == 90
     assert "start" not in ft.calls
-    assert EXIT_WARNING in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert ("Freqtrade에 연결할 수 없습니다. Docker Desktop과 컨테이너를 확인하세요. "
+            "복구가 안 되면 비트겟 웹(PC)에서 포지션을 직접 시장가 청산하세요.") in output
+    assert EXIT_WARNING not in output and "SECRET-SENTINEL" not in output
 
 
 def test_cli_enter_order_error_is_never_retried_and_keeps_start(cli, monkeypatch, tmp_path, capsys):
@@ -703,7 +830,7 @@ def test_cli_restart_enter_without_restart_fails(cli, tmp_path, monkeypatch, cap
     assert smoke.main(["restart-check"]) == 1
     assert "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요." in capsys.readouterr().out
     assert "start" not in ft.calls and t[0] == 0
-    assert "status" not in ft.calls
+    assert ft.calls.count("status") == 1
 
 
 @pytest.mark.parametrize("state", ["stopped", "paused", None])
@@ -756,7 +883,7 @@ def test_cli_restart_waits_for_start_timestamp_increase(cli, tmp_path, monkeypat
     assert "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요." in capsys.readouterr().out
     assert ft.calls.count("start") == 1 and t[0] == 15
     assert polls == [0] + list(range(16))
-    assert "status" not in ft.calls
+    assert ft.calls.count("status") == 1
 
 
 def test_cli_restart_waits_for_running_before_polling_health(cli, tmp_path, monkeypatch, capsys):
@@ -803,6 +930,7 @@ def test_cli_restart_waits_for_running_before_polling_health(cli, tmp_path, monk
 def test_cli_restart_start_stays_stopped_times_out(cli, tmp_path, monkeypatch, capsys):
     _, _, ft, _, t = cli
     ft.state = "running"
+    ft.trades = [dict(TRADE)]
     (tmp_path / ".smoke_state.json").write_text(json.dumps({
         "started_ms": 1, "trade_id": 7, "mode": "dry",
     }), encoding="utf-8")
@@ -812,7 +940,7 @@ def test_cli_restart_start_stays_stopped_times_out(cli, tmp_path, monkeypatch, c
     assert "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요." in capsys.readouterr().out
     assert t[0] == 10 and ft.calls.count("start") == 1
     assert ft.calls.count("health") == 1
-    assert "status" not in ft.calls
+    assert ft.calls.count("status") == 1
 
 
 @pytest.mark.parametrize("dry_run", [True, False])

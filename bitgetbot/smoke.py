@@ -25,7 +25,12 @@ PAIR = "BTC/USDT:USDT"
 STATE_PATH = Path(".smoke_state.json")
 EXIT_WARNING = "손절 확인 실패. 지금 바로 'python -m bitgetbot.smoke exit'을 실행하세요."
 FT_UNREACHABLE = "Freqtrade에 연결할 수 없습니다 (Docker Desktop과 `docker compose up -d` 확인)"
+FT_MANUAL_CLOSE = (
+    "Freqtrade에 연결할 수 없습니다. Docker Desktop과 컨테이너를 확인하세요. "
+    "복구가 안 되면 비트겟 웹(PC)에서 포지션을 직접 시장가 청산하세요."
+)
 DRY_NOTICE = "dry-run: 거래소 손절 확인은 실전에서만 합니다"
+NO_SMOKE_TRADE = "검사할 스모크 거래가 없습니다. enter를 먼저 실행했는지 확인하세요."
 
 
 def _positive(value) -> bool:
@@ -172,8 +177,9 @@ def _mode_matches(settings: Settings, config: dict) -> bool:
 
 
 def _preflight(settings: Settings, reader, ft) -> tuple[bool, dict]:
+    print("Freqtrade 시작을 기다리는 중입니다 (최대 3분)…")
     try:
-        if not ft.ping():
+        if not _wait(ft.ping, 180, 3):
             print(FT_UNREACHABLE)
             return False, {}
         config = ft.show_config()
@@ -307,20 +313,26 @@ def _enter(settings: Settings, reader, ft) -> int:
 
 def _check(settings: Settings, reader, ft) -> int:
     state = _load_state()
+    if not state:
+        print(NO_SMOKE_TRADE)
+        return 1
     if not _state_mode_matches(settings, state):
         return 1
     if not _mode_matches(settings, ft.show_config()):
         print(EXIT_WARNING)
         return 1
+    trades = [trade for trade in ft.status() if trade.get("pair") == PAIR
+              and (not state.get("trade_id") or _same_trade(trade, state["trade_id"]))]
+    if not trades:
+        print(NO_SMOKE_TRADE)
+        return 1
+    if len(trades) != 1:
+        print("검사할 스모크 거래를 하나로 확인할 수 없습니다.")
+        print(EXIT_WARNING)
+        return 1
     if not settings.dry_run:
         return run_check(reader, SYMBOL, 120, 5, time.sleep, time.monotonic, print)
     print(DRY_NOTICE)
-    trades = [trade for trade in ft.status() if trade.get("pair") == PAIR
-              and (not state.get("trade_id") or _same_trade(trade, state["trade_id"]))]
-    if len(trades) != 1:
-        print("검사할 스모크 거래를 찾을 수 없습니다.")
-        print(EXIT_WARNING)
-        return 1
     checks = ft_trade_checks(trades[0])
     _print_checks(checks)
     result = overall(checks)
@@ -334,6 +346,9 @@ def _check(settings: Settings, reader, ft) -> int:
 
 def _restart_check(settings: Settings, reader, ft) -> int:
     state = _load_state()
+    if not state:
+        print(NO_SMOKE_TRADE)
+        return 1
     if not _state_mode_matches(settings, state):
         return 1
     trade_id = state.get("trade_id")
@@ -353,11 +368,13 @@ def _restart_check(settings: Settings, reader, ft) -> int:
     if type(startup_before) is not int:
         print(unconfirmed)
         return 1
+    if not any(_same_trade(trade, trade_id) and trade.get("pair") == PAIR for trade in ft.status()):
+        print(NO_SMOKE_TRADE)
+        return 1
     print("다음 명령을 직접 실행하세요: docker compose -f freqtrade/docker-compose.yml restart freqtrade")
     input("재시작 명령 실행 후 Enter를 누르세요: ")
     if not _wait(ft.ping, 90):
-        print(FT_UNREACHABLE)
-        print(EXIT_WARNING)
+        print(FT_MANUAL_CLOSE)
         return 1
     config = ft.show_config()
     if config.get("state") != "stopped":
@@ -380,8 +397,7 @@ def _restart_check(settings: Settings, reader, ft) -> int:
         return 1
     time.sleep(30)
     if not any(_same_trade(trade, trade_id) and trade.get("pair") == PAIR for trade in ft.status()):
-        print(f"재시작 후 같은 거래 번호 {trade_id}를 찾을 수 없습니다.")
-        print(EXIT_WARNING)
+        print(NO_SMOKE_TRADE)
         return 1
     print(f"재시작 후 같은 거래 번호 확인: {trade_id}")
     return _check(settings, reader, ft)
@@ -522,8 +538,12 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if _preflight(settings, reader, ft)[0] else 1
         handlers = {"enter": _enter, "check": _check, "restart-check": _restart_check, "exit": _exit}
         return handlers[command](settings, reader, ft)
-    except (Exception, KeyboardInterrupt):
+    except (Exception, KeyboardInterrupt) as error:
         # Upstream exceptions and configs may include credentials. Never print their repr/body.
+        if (isinstance(error, FreqtradeUnreachable)
+                and command in {"check", "restart-check"} and STATE_PATH.exists()):
+            print(FT_MANUAL_CLOSE)
+            return 1
         print("명령 실패: 설정·연결·응답을 확인하세요. 비밀값 보호를 위해 오류 원문은 표시하지 않습니다.")
         if command in {"check", "restart-check"}:
             print(EXIT_WARNING)
