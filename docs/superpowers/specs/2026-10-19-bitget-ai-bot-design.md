@@ -138,11 +138,11 @@
 - 자동 공격 진입: 공격 모드 허용 + 30분 이내 판정이 그 심볼을 공격 OK로 지목 + 안전 모드 신호 발생. 크기·레버리지·손절은 코드가 정함.
 - 물타기(ADD): 공격·수동 포지션에만, 포지션당 1회, LLM `ADD` 판정 필요. Freqtrade `adjust_trade_position`이 유일한 경로(`forceenter`로 물타기 금지). 안전 포지션(`entry_tag`가 safe)에는 증액 거부.
 - 전환(FLIP): 큐의 상태 머신으로 처리 — EXITING(`forceexit`) → 거래소 포지션 수량 0 확인 → rails·잠금·판정 재확인 → ENTERING(`forceenter`). 하루 1회. LLM `FLIP` 판정 필요.
-- 공격 행동(진입·물타기·전환 각각 1회로 셈) 하루 최대 3회 **[Claude]**.
+- 공격 행동(진입·물타기·전환 각각 1회로 셈) 하루 최대 3회 **[Claude]**. 기존 포지션의 손절·익절 조정(§7.5)은 이 횟수에 넣지 않는다 **[사용자]**.
 - LLM이 응답하지 않으면 자동 공격 행동은 전부 중지(fail closed). 수동 주문은 계속 가능.
 
 ### 7.3 수동 주문 **[사용자]**
-- 폰·데스크톱 어디서나 같은 기능 **[사용자]**: 진입(코인, 방향, 레버리지 최대 20배, 증거금, 손절가, 선택적 익절가), 포지션 청산, 공격 모드 켜기/끄기, 봇 일시정지/재개, 긴급 정지.
+- 폰·데스크톱 어디서나 같은 기능 **[사용자]**: 진입(코인, 방향, 레버리지 최대 20배, 증거금, 손절가, 선택적 익절가), 포지션 청산, 손절 조이기·익절 목표 변경(§7.5), 공격 모드 켜기/끄기, 봇 일시정지/재개, 긴급 정지.
 - 수동 진입은 공격 자금에서 나간다(공격 모드를 켜지 않았어도 같은 주간 공격 자금 장부 사용). 대상 목록 안 종목만.
 - 손절가 필수. 비워 두면 코드가 계산. 청산가 70% 규칙을 못 지키면 거부하고 이유를 보여 줌.
 - 손절가 전달: companion이 `entry_tag`(예: `manual|sl=108900`)나 companion 테이블에 담고, 전략이 체결 시 `trade.set_custom_data`로 옮겨 `custom_stoploss(after_fill=True)`에서 반영. Freqtrade REST API로는 custom data를 쓸 수 없다. 진입 후 손절을 넓히는 변경은 지원하지 않는다(좁히기만).
@@ -173,6 +173,23 @@
 - 긴급 정지 → `/forceexit all`(시장가) → `/status`가 빌 때까지 확인 → `/stop`. `order_types.force_exit="market"`.
 - Freqtrade `initial_state="stopped"`. 부팅 후 companion이 상태를 보고 `/start` 여부를 결정.
 
+### 7.5 기존 포지션 조정 (손절 조이기, 익절 목표 조정) **[사용자]**
+- 상황이 바뀌면 열린 포지션의 손절을 더 타이트하게 잡거나, 익절 목표를 늘리거나 줄인다. 이 조정은 공격 행동 하루 3회 상한에 넣지 않는다 **[사용자]**. 거래 체결이 아니라 수수료가 들지 않는다.
+- 대상: 안전·공격·수동 모든 포지션.
+- 조정 주체:
+  1. 코드 규칙: 안전 모드 추적 손절(§7.1). 수익이 1×ATR을 넘으면 손절을 본전(진입가 + 왕복 수수료)으로 올림 **[Claude]**.
+  2. LLM 판정 `TIGHTEN_STOP`, `EXTEND_TP`, `REDUCE_TP`(§8.4). LLM은 방향만 정하고 가격은 코드가 계산 **[Claude]**: TIGHTEN_STOP은 손절을 현재 mark에서 1×ATR(4h) 거리와 본전 중 현재가에 더 가까운 쪽으로, EXTEND_TP는 익절 목표 +1×ATR, REDUCE_TP는 익절 목표 −1×ATR(현재가보다 유리한 쪽은 유지).
+  3. 사용자: 앱의 포지션 카드에서 직접(폰·데스크톱 동일).
+- 규칙(코드 강제):
+  - **손절은 조이기만 한다. 넓히기는 누구도 못 한다(사용자 포함).** Freqtrade `custom_stoploss`도 조이기만 반영한다.
+  - 조인 손절은 현재 mark에서 최소 0.3×ATR(4h) 밖이어야 한다. 너무 붙여서 바로 털리지 않게 **[Claude]**.
+  - EXTEND_TP는 손절이 본전 이상일 때만 허용. 이미 확보한 구간을 지키면서 더 가져가기 위함 **[Claude]**.
+  - 같은 포지션 조정은 15분에 1번까지 **[Claude]**(Freqtrade가 거래소 손절을 다시 거는 주기와 API 한도 고려).
+  - LLM의 조정 판정은 수동 포지션에는 반영하지 않고 알림만 보낸다(수동 포지션은 사용자가 정함) **[Claude]**.
+  - TIGHTEN_STOP은 위험을 줄이는 판정이라 즉시 반영. EXTEND_TP·REDUCE_TP는 노출을 늘리지 않으므로 출처 규칙(§8.5) 대신 히스테리시스만 적용 **[Claude]**.
+- 익절은 봇 쪽에서 판단한다(Freqtrade `custom_exit`). Freqtrade는 거래소에 손절만 걸기 때문에, 봇이 멈추면 익절은 작동하지 않고 거래소 손절만 포지션을 보호한다.
+- 구현 메모: 목표 손절가·익절가는 companion DB에 두고(Freqtrade REST로는 trade custom data를 쓸 수 없음), 전략 콜백(`custom_stoploss` → `stoploss_from_absolute`, `custom_exit`)이 companion에서 읽는다. 읽기 실패 시 직전 값을 유지한다. 모든 조정은 감사 로그와 거래기록에 남긴다.
+
 ## 8. LLM 판정기
 
 ### 8.1 역할
@@ -199,7 +216,7 @@
   - `entry_gate`: ALLOW | REDUCE | BLOCK (안전 모드 신규 진입)
   - `volatility_override`: { `symbols`: [..] } (대기 신호 중 들어갈 만한 것)
   - `aggressive`: { `stance`: NONE | OK, `symbols`: [..] }
-  - `position_actions`: [{ `symbol`, `action`: HOLD | ADD | FLIP | CLOSE }] (공격·수동 포지션만)
+  - `position_actions`: [{ `symbol`, `action`: HOLD | ADD | FLIP | CLOSE | TIGHTEN_STOP | EXTEND_TP | REDUCE_TP }] (ADD·FLIP·CLOSE는 공격·수동 포지션만, 손절·익절 조정은 모든 포지션 — §7.5)
   - `cited_ids`: [..], `reason_ko`: 한두 문장, `expires_in_min`: ≤ 240
 
 ### 8.5 코드 검증과 반영
@@ -207,6 +224,7 @@
 - **줄이는 판정**(BLOCK, REDUCE)은 즉시 반영.
 - **늘리는 판정**(override, 공격 OK, ADD, FLIP)은: 인용 항목이 6시간 이내 실제 수집 항목이고, **서로 다른 출처 2곳 이상, 또는 공식 출처 1곳**(SEC, CFTC, 연준, BLS, 금융위, 금감원, FIU, 비트겟 공지) 이상일 때만 **[Claude]**. 뉴스 한 건에 심어진 문장 하나로 노출이 늘지 않게.
 - **CLOSE**: 봇이 연 공격 포지션에는 반영. 사용자가 직접 연 수동 포지션에는 반영하지 않고 "AI가 청산을 권함" 알림만 **[Claude]**.
+- **TIGHTEN_STOP·EXTEND_TP·REDUCE_TP**: §7.5 규칙대로 반영. 수동 포지션에는 알림만.
 - 히스테리시스: 늘리는 판정은 직전 판정과 같은 방향이 연속 2회일 때만(정기+에스컬레이션 합산). Claude 5.5는 temperature 조절이 안 됨.
 - 판정 없음일 때: 안전 모드는 결정론 규칙대로(override 없음), 자동 공격 행동 중지.
 - override·공격 진입은 companion이 큐를 통해 `forceenter`로 낸다(Freqtrade 신호 루프는 같은 4h 신호를 다시 내지 않으므로).
@@ -242,7 +260,7 @@
 - 총자산: **원화 크게, 달러 아래 작게**. 오늘 수익도 원화 크게 + 달러 작게 **[사용자]**.
 - 내 자산 그래프 **[사용자]**: 1일/1주/1달/3달/전체, 시작 금액 기준선, 시작 대비 수익률.
 - AI 한 줄: 최신 판정 + 이유. 누르면 AI 판단 탭.
-- 포지션 카드: **전부 달러** **[사용자]** — 진입가, 현재가, 손절가, 청산가, 미실현 손익, 증거금, 누적 펀딩비, 레버리지, 모드(안전/공격/수동).
+- 포지션 카드: **전부 달러** **[사용자]** — 진입가, 현재가, 손절가, 익절 목표, 청산가, 미실현 손익, 증거금, 누적 펀딩비, 레버리지, 모드(안전/공격/수동). 카드에 "손절 조이기"(현재보다 넓은 값은 거부)와 "익절 목표 변경" 버튼(§7.5).
 - 대기 신호 줄(예: "SOLUSDT 진입 신호, AI 보류로 대기").
 - 탭: 홈 / 거래기록 / AI 판단 / 설정. 주문 버튼(수동 진입), 긴급 정지 버튼.
 - 원화 환산: 업비트 KRW-USDT 시세 기준 **[Claude]**. 기록 시점 환율로 저장.
@@ -273,7 +291,7 @@
   "spark": [ { "t": "ISO", "krw": 100000 } ],
   "positions": [ { "symbol": "BTCUSDT", "side": "long", "mode": "safe | aggressive | manual",
                    "leverage": 2, "entry": 111240.5, "mark": 112050.0, "stopLoss": 108900.0,
-                   "liqPrice": 56300.0, "marginUsdt": 25.0, "uPnlUsdt": 0.73, "uPnlPct": 1.46 } ],
+                   "takeProfit": 118000.0, "liqPrice": 56300.0, "marginUsdt": 25.0, "uPnlUsdt": 0.73, "uPnlPct": 1.46 } ],
   "pending": [ { "symbol": "SOLUSDT", "text": "진입 신호, AI 보류" } ],
   "ai": { "verdict": "ALLOW | REDUCE | BLOCK", "reason": "string", "at": "ISO", "expiresAt": "ISO" },
   "alerts": [ { "level": "critical | warn", "text": "string" } ]
@@ -332,7 +350,7 @@
 
 ## 14. 테스트
 
-- 단위: rails(크기 계산, 최소 주문 1.5배 규칙, 손절-청산 70% 규칙, 레버리지 선택, 장부·주간 스냅샷·잠금, 입출금 보정, 횟수 상한, KST 경계, 대상 목록은 증가 행동에만), 큐(심볼 뮤텍스, FLIP 상태 머신, 멱등 키), 판정 검증(스키마, 인용 ID, 만료, 출처 2곳/공식 1곳, CLOSE 범위, 히스테리시스, fail closed), 위험 이벤트, 원화 환산, 펀딩 환산, 위젯 계약(스냅샷).
+- 단위: rails(크기 계산, 최소 주문 1.5배 규칙, 손절-청산 70% 규칙, 레버리지 선택, 장부·주간 스냅샷·잠금, 입출금 보정, 횟수 상한, KST 경계, 대상 목록은 증가 행동에만), 큐(심볼 뮤텍스, FLIP 상태 머신, 멱등 키), 판정 검증(스키마, 인용 ID, 만료, 출처 2곳/공식 1곳, CLOSE 범위, 히스테리시스, fail closed), 포지션 조정(손절은 조이기만, mark와 최소 거리, EXTEND_TP는 손절 본전 이상일 때만, 포지션당 15분 간격, 공격 3회 상한에 미포함, 수동 포지션은 알림만), 위험 이벤트, 원화 환산, 펀딩 환산, 위젯 계약(스냅샷).
 - 통합: Freqtrade dry-run에서 신호 → 예약 → 진입 → 손절 → watchdog 청산. companion을 죽였을 때 전략 콜백이 거부하는지. 재시작 복구. 대조 불일치 → close_only.
 - 보안: Freqtrade API가 tailnet에서 안 보이는지, 비밀값 grep, llm-runner의 도구가 비었는지(`--tools ""`) 확인.
 - 실전 스모크 테스트 체크리스트(§13-2).
