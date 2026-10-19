@@ -3,6 +3,7 @@
 import json
 import os
 import secrets
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -61,7 +62,19 @@ def set_mode(mode: str, path: Path = PRIVATE_PATH) -> None:
     config = json.loads(path.read_text(encoding="utf-8"))
     config["dry_run"] = mode == "dry"
     config["db_url"] = DRY_DB_URL if mode == "dry" else LIVE_DB_URL
-    path.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent,
+            prefix=f".{path.name}.", suffix=".tmp", delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            json.dump(config, temporary, indent=2, ensure_ascii=False)
+            temporary.write("\n")
+        os.replace(temporary_path, path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
 def _merge_config(base: dict[str, Any], private: dict[str, Any]) -> dict[str, Any]:

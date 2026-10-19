@@ -234,9 +234,11 @@ def _save_state(state: dict) -> None:
     STATE_PATH.write_text(json.dumps(state) + "\n", encoding="utf-8")
 
 
-def _state_mode_matches(settings: Settings, state: dict) -> bool:
+def _state_mode_matches(settings: Settings, state: dict, *, exiting: bool = False) -> bool:
     if state and state.get("mode") != ("dry" if settings.dry_run else "live"):
-        print("경고: 스모크 상태 파일의 모드가 현재 모드와 다르거나 확인되지 않았습니다. 먼저 exit으로 정리하세요.")
+        next_step = ("Freqtrade 청산을 계속하고 비트겟 웹(PC)에서 포지션을 직접 확인하세요."
+                     if exiting else "먼저 exit으로 정리하세요.")
+        print("경고: 스모크 상태 파일의 모드가 현재 모드와 다르거나 확인되지 않았습니다. " + next_step)
         return False
     return True
 
@@ -339,24 +341,43 @@ def _restart_check(settings: Settings, reader, ft) -> int:
         print("저장된 거래 번호가 없습니다.")
         print(EXIT_WARNING)
         return 1
+    config = ft.show_config()
+    if config.get("state") != "running":
+        print("재시작 점검 전 Freqtrade 실행 상태가 running이어야 합니다.")
+        return 1
+    if not _mode_matches(settings, config):
+        print(EXIT_WARNING)
+        return 1
+    unconfirmed = "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요."
     startup_before = ft.health().get("bot_startup_ts")
+    if type(startup_before) is not int:
+        print(unconfirmed)
+        return 1
     print("다음 명령을 직접 실행하세요: docker compose -f freqtrade/docker-compose.yml restart freqtrade")
     input("재시작 명령 실행 후 Enter를 누르세요: ")
     if not _wait(ft.ping, 90):
         print(FT_UNREACHABLE)
         print(EXIT_WARNING)
         return 1
-    startup_after = ft.health().get("bot_startup_ts")
-    if (type(startup_before) is not int or type(startup_after) is not int
-            or startup_after <= startup_before):
-        print("재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요.")
-        return 1
     config = ft.show_config()
+    if config.get("state") != "stopped":
+        print(unconfirmed)
+        return 1
     if not _mode_matches(settings, config):
         print(EXIT_WARNING)
         return 1
-    if config.get("state") == "stopped":
-        ft.start()
+    ft.start()
+    if not _wait(lambda: ft.show_config().get("state") == "running", 10, 1):
+        print(unconfirmed)
+        return 1
+
+    def startup_advanced():
+        startup_after = ft.health().get("bot_startup_ts")
+        return type(startup_after) is int and startup_after > startup_before
+
+    if not _wait(startup_advanced, 15, 1):
+        print(unconfirmed)
+        return 1
     time.sleep(30)
     if not any(_same_trade(trade, trade_id) and trade.get("pair") == PAIR for trade in ft.status()):
         print(f"재시작 후 같은 거래 번호 {trade_id}를 찾을 수 없습니다.")
@@ -394,7 +415,7 @@ def _ledger(settings: Settings, reader) -> int:
 def _exit(settings: Settings, reader, ft) -> int:
     config = ft.show_config()
     state = _load_state()
-    state_matches = _state_mode_matches(settings, state)
+    state_matches = _state_mode_matches(settings, state, exiting=True)
     mode_matches = (type(config.get("dry_run")) is bool
                     and config["dry_run"] == settings.dry_run and state_matches)
     if not mode_matches:
@@ -421,6 +442,9 @@ def _exit(settings: Settings, reader, ft) -> int:
     ))
     if not mode_matches:
         print("모드 불일치로 거래소 청산 여부는 확인하지 않았습니다. 비트겟 웹(PC)에서 직접 확인하세요.")
+        return 1
+    if not settings.dry_run and not state:
+        print("청산은 완료됐습니다. 장부 시작 시각이 없어 장부를 저장하지 않았습니다. 비트겟 웹(PC)에서 체결 내역을 확인하세요.")
         return 1
     try:
         if state:
