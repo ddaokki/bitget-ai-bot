@@ -1,0 +1,5 @@
+{
+  "dry_run": true,
+  "exchange": {"key": "", "secret": "", "password": ""},
+  "api_server": {"username": "", "password": "", "jwt_secret_key": ""}
+}
