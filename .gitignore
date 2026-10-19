@@ -1,0 +1,12 @@
+# secrets and runtime data
+.env
+*.env
+secrets/
+*.sqlite
+*.sqlite-*
+user_data/data/
+user_data/logs/
+__pycache__/
+.venv/
+node_modules/
+.superpowers/
