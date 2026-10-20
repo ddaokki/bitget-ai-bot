@@ -1118,3 +1118,17 @@ def test_autotrade_blocked_while_a_job_runs(panel):
     assert panel.entered.wait(5)
     assert panel.local.post("/api/autotrade", json={"action": "start"}, headers=PANEL_HEADER).status_code == 409
     panel.release.set()
+
+
+def test_mode_switch_pauses_automatic_entries_before_checking_open_trades(panel):
+    local_login(panel)
+    assert panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER).status_code == 200
+    assert panel.ft.calls[0] == ("pause",)
+
+
+def test_mode_switch_still_works_when_pause_fails(panel):
+    local_login(panel)
+    panel.ft.error = FreqtradeUnreachable("SECRET-SENTINEL")
+    response = panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER)
+    assert response.status_code == 200
+    assert "SECRET-SENTINEL" not in response.text

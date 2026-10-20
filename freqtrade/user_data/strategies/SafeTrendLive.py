@@ -37,6 +37,7 @@ import live_rules as rules  # noqa: E402
 logger = logging.getLogger(__name__)
 ENTRY_TAG = "safe_long"
 EXIT_TAG = "opposite_donchian_10"
+CHANDELIER_EXIT = "chandelier_stop"
 BLACKOUT_CATEGORIES = {"FOMC", "CPI", "PPI", "NFP"}
 
 
@@ -230,10 +231,16 @@ class SafeTrendLive(IStrategy):
             logger.info("Entry blocked for %s: %s", pair, reason)
         return ok
 
+    @staticmethod
+    def _entry_candle(trade) -> pd.Timestamp:
+        """Open time of the 1h candle the trade entered in. Live fills land seconds after the
+        candle open; flooring keeps live, restart and backtest on the same rows."""
+        return pd.Timestamp(trade.open_date_utc).floor("1h")
+
     def _entry_atr(self, trade, history: DataFrame) -> float | None:
         value = trade.get_custom_data("entry_atr")
         if value is None:
-            before = history.loc[history.date < pd.Timestamp(trade.open_date_utc)]
+            before = history.loc[history.date < self._entry_candle(trade)]
             if before.empty:
                 return None
             value = float(before.iloc[-1].atr_4h)
@@ -257,13 +264,29 @@ class SafeTrendLive(IStrategy):
         if entry is None:
             entry = float(trade.open_rate)
             trade.set_custom_data("entry_open", entry)
-        since = history.loc[history.date >= pd.Timestamp(trade.open_date_utc)]
+        since = history.loc[history.date >= self._entry_candle(trade)]
         highest = float(since.high.max()) if not since.empty else None
         previous = trade.get_custom_data("stop_ratchet")
         stop = rules.chandelier_stop(float(entry), entry_atr, highest, float(history.iloc[-1].atr_4h),
                                      None if previous is None else float(previous))
         trade.set_custom_data("stop_ratchet", float(stop))
         return stoploss_from_absolute(stop, current_rate=current_rate, is_short=False, leverage=trade.leverage)
+
+    def custom_exit(self, pair: str, trade, current_time: datetime, current_rate: float, current_profit: float, **kwargs):
+        # A chandelier level computed from closed candles can already sit above the price (spike,
+        # then a close well below). Freqtrade ignores a stop above the price (stoploss_from_absolute
+        # returns 0), so exit here instead of leaving the older, lower exchange stop in place.
+        if not rules.is_strategy_tag(trade.enter_tag):
+            return None
+        stop = trade.get_custom_data("stop_ratchet")
+        if stop is None:
+            return None
+        # Only when the stop could not be moved up to the computed level (it was above the
+        # price); otherwise the regular stop handles the exit at its own price.
+        rejected = trade.stop_loss is None or float(trade.stop_loss) < float(stop) * (1 - 1e-9)
+        if rejected and current_rate <= float(stop):
+            return CHANDELIER_EXIT
+        return None
 
     def confirm_trade_exit(self, pair: str, trade, order_type: str, amount: float, rate: float, time_in_force: str,
                            exit_reason: str, current_time: datetime, **kwargs) -> bool:

@@ -17,7 +17,7 @@ def test_safety_invariants():
     config = load_json(USER_DATA / "config.json")
     assert config["trading_mode"] == "futures"
     assert config["margin_mode"] == "isolated"
-    assert config["initial_state"] == "stopped"
+    assert config["initial_state"] == "paused"
     assert config["dry_run"] is True
     assert config["db_url"] == "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite"
     assert config["dry_run_wallet"] == 114

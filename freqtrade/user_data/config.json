@@ -8,7 +8,7 @@
   "dry_run_wallet": 114,
   "trading_mode": "futures",
   "margin_mode": "isolated",
-  "initial_state": "stopped",
+  "initial_state": "paused",
   "force_entry_enable": true,
   "timeframe": "1h",
   "entry_pricing": {

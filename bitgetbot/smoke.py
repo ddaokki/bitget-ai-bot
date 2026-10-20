@@ -38,6 +38,11 @@ FT_MANUAL_CLOSE = (
 )
 DRY_NOTICE = "dry-run: 거래소 손절 확인은 실전에서만 합니다"
 NO_SMOKE_TRADE = "검사할 스모크 거래가 없습니다. enter를 먼저 실행했는지 확인하세요."
+# Freqtrade states that manage open trades and accept force entries/exits.
+# "paused" blocks automatic entries; "running" also enters automatically.
+ACTIVE_STATES = ("running", "paused")
+AUTOTRADE_PAUSED = '재시작 후 자동매매는 꺼진(paused) 상태입니다. 다시 켜려면 "자동매매 켜기"를 누르세요.'
+AUTOTRADE_STILL_ON = '경고: 거래 봇을 "새 진입 멈춤"으로 되돌리지 못했습니다. 자동매매가 켜져 있을 수 있습니다. 패널에서 "자동매매 멈추기"를 누르세요.'
 
 
 @dataclass
@@ -306,14 +311,36 @@ def _enter(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
         return 1
     # Re-read public data immediately before entry; never exceed the stake cap.
     stake = smoke_stake(reader.fetch_contract(SYMBOL), reader.fetch_mark_price(SYMBOL), 2)
-    if config.get("state") == "stopped":
+    # Freqtrade accepts force entries only while "running", and "running" also lets the
+    # strategy enter on its own. Run only for this order, then restore "paused" (finally
+    # below), so the smoke test never leaves automatic entries switched on.
+    prior = config.get("state")
+    if prior not in ("running", "paused", "stopped"):
+        io.out("Freqtrade 실행 상태를 확인할 수 없습니다. 주문하지 않습니다.")
+        return 1
+    try:
+        return _enter_running(settings, ft, stake, prior, io)
+    finally:
+        if prior != "running":
+            _restore_paused(ft, io)
+
+
+def _restore_paused(ft, io: SmokeIO) -> None:
+    try:
+        ft.pause()
+        if _wait(lambda: ft.show_config().get("state") == "paused", 10, 1):
+            return
+    except Exception:
+        pass
+    io.out(AUTOTRADE_STILL_ON)
+
+
+def _enter_running(settings: Settings, ft, stake: float, prior, io: SmokeIO) -> int:
+    if prior != "running":
         ft.start()
         if not _wait(lambda: ft.show_config().get("state") == "running", 10, 1):
             io.out("10초 내 Freqtrade 실행 상태가 running이 되지 않았습니다. 주문하지 않습니다.")
             return 1
-    elif config.get("state") != "running":
-        io.out("Freqtrade 실행 상태를 확인할 수 없습니다. 주문하지 않습니다.")
-        return 1
     current_config = ft.show_config()
     if not _mode_matches(settings, current_config, io=io):
         return 1
@@ -399,8 +426,9 @@ def _restart_check(settings: Settings, reader, ft, *, io: SmokeIO | None = None)
         io.out(_exit_warning(io))
         return 1
     config = ft.show_config()
-    if config.get("state") != "running":
-        io.out("재시작 점검 전 Freqtrade 실행 상태가 running이어야 합니다.")
+    state_before = config.get("state")
+    if state_before not in ACTIVE_STATES:
+        io.out("재시작 점검 전 Freqtrade 실행 상태가 running 또는 paused여야 합니다.")
         return 1
     if not _mode_matches(settings, config, io=io):
         io.out(_exit_warning(io))
@@ -428,16 +456,16 @@ def _restart_check(settings: Settings, reader, ft, *, io: SmokeIO | None = None)
         io.out(FT_MANUAL_CLOSE)
         return 1
     config = ft.show_config()
-    if config.get("state") != "stopped":
+    # initial_state is "paused": a restarted bot manages trades and stops but never
+    # enters automatically. Never call start() here; only the user switches autotrade on.
+    if config.get("state") != "paused":
         io.out(unconfirmed)
         return 1
     if not _mode_matches(settings, config, io=io):
         io.out(_exit_warning(io))
         return 1
-    ft.start()
-    if not _wait(lambda: ft.show_config().get("state") == "running", 10, 1):
-        io.out(unconfirmed)
-        return 1
+    if state_before == "running":
+        io.out(AUTOTRADE_PAUSED)
 
     def startup_advanced():
         startup_after = ft.health().get("bot_startup_ts")

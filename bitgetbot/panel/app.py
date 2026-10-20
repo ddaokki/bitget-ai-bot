@@ -404,6 +404,12 @@ def create_app(deps: PanelDeps) -> FastAPI:
                 raise _PanelError(400, "모드는 dry 또는 live로 입력하세요")
             if value == "live" and body.get("confirm") != "LIVE":
                 raise _PanelError(400, "실전 전환에는 LIVE 확인이 필요합니다")
+            # Stop automatic entries first, so no trade can open between this check and the switch.
+            try:
+                settings = _settings(deps)
+                deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass).pause()
+            except Exception:
+                pass  # unreachable bot: the open-trade check below still decides
             if _open_trade_blocks_mode(deps):
                 raise _PanelError(409, OPEN_TRADE)
             deps.mode_setter(value)
