@@ -11,4 +11,4 @@ services:
       --logfile /freqtrade/user_data/logs/freqtrade.log
       --config /freqtrade/user_data/config.json
       --config /freqtrade/user_data/config.private.json
-      --strategy SmokeTest
+      --strategy SafeTrendLive

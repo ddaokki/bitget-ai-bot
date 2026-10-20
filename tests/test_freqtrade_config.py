@@ -20,7 +20,7 @@ def test_safety_invariants():
     assert config["initial_state"] == "stopped"
     assert config["dry_run"] is True
     assert config["db_url"] == "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite"
-    assert config["dry_run_wallet"] == 100
+    assert config["dry_run_wallet"] == 114
     assert config["max_open_trades"] == 1
     assert config["stake_currency"] == "USDT"
     assert config["stake_amount"] == 7
@@ -29,14 +29,14 @@ def test_safety_invariants():
     assert config["timeframe"] == "1h"
     assert config["telegram"] == {"enabled": False, "token": "", "chat_id": ""}
     assert config["order_types"] == {
-        "entry": "limit", "exit": "limit", "emergency_exit": "market",
+        "entry": "market", "exit": "market", "emergency_exit": "market",
         "force_entry": "market", "force_exit": "market", "stoploss": "market",
         "stoploss_on_exchange": True, "stoploss_on_exchange_interval": 60,
         "stoploss_price_type": "mark",
     }
     for pricing in ("entry_pricing", "exit_pricing"):
         assert config[pricing] == {
-            "price_side": "same", "use_order_book": True, "order_book_top": 1,
+            "price_side": "other", "use_order_book": True, "order_book_top": 1,
         }
     exchange = config["exchange"]
     assert exchange["name"] == "bitget"
@@ -79,7 +79,7 @@ def test_compose_publishes_only_localhost_and_pins_digest():
         "trade", "--logfile", "/freqtrade/user_data/logs/freqtrade.log",
         "--config", "/freqtrade/user_data/config.json",
         "--config", "/freqtrade/user_data/config.private.json",
-        "--strategy", "SmokeTest",
+        "--strategy", "SafeTrendLive",
     ]
 
 
@@ -98,3 +98,17 @@ def test_private_file_is_gitignored():
         capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0
+
+
+def test_live_strategy_files_exist_and_upcoming_calendar_has_header():
+    assert (USER_DATA / "strategies" / "SafeTrendLive.py").is_file()
+    assert (USER_DATA / "strategies" / "live_rules.py").is_file()
+    header = (USER_DATA / "events" / "upcoming_us_macro.csv").read_text(encoding="utf-8").splitlines()[0]
+    assert header == "ts_utc,category,title"
+
+
+def test_bitget_daily_candle_limit_matches_the_exchange():
+    # Bitget returns at most 90 daily candles per call; Freqtrade assumes 200 and would
+    # leave 110-day holes in the daily history used for the EMA200 trend filter.
+    exchange = load_json(USER_DATA / "config.json")["exchange"]
+    assert exchange["_ft_has_params"] == {"ohlcv_candle_limit_per_timeframe": {"1d": 90}}
