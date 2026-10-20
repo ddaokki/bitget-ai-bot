@@ -53,9 +53,21 @@ def load_events(path: str | Path) -> pd.DataFrame:
     missing = {"ts_utc", "time_known", "region", "category", "scheduled", "importance"} - set(raw.columns)
     if missing:
         raise ValueError(f"events CSV missing columns: {sorted(missing)}")
+    ts = pd.to_datetime(raw.ts_utc, utc=True)
+    flags = raw.time_known.astype(str).str.strip().str.lower()
+    if len(raw) and flags.isin({"true", "false", "1", "0", "nan", ""}).all():
+        # Verified calendar format (phase B): time_known is a boolean "exact time known" flag.
+        # Date-only rows are treated as happening at date 00:00Z + 24h (no intraday
+        # look-ahead); scheduled rows are known 14 days before that time.
+        exact = flags.isin({"true", "1"})
+        scheduled = raw.scheduled.map(_as_bool)
+        ts = ts.where(exact, ts.dt.floor("D") + pd.Timedelta(hours=24))
+        known = ts.where(~scheduled, ts - pd.Timedelta(days=14))
+    else:
+        known = pd.to_datetime(raw.time_known, utc=True, errors="coerce")
     events = pd.DataFrame({
-        "ts_utc": pd.to_datetime(raw.ts_utc, utc=True),
-        "time_known": pd.to_datetime(raw.time_known, utc=True, errors="coerce"),
+        "ts_utc": ts,
+        "time_known": known,
         "group": raw.region.astype(str).str.strip().str.upper().map(GROUPS),
         "category": raw.category.astype(str),
         "scheduled": raw.scheduled.map(_as_bool),

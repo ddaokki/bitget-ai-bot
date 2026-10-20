@@ -1,0 +1,6 @@
+{
+  "freqai": {
+    "identifier": "spike-p2-lookahead-aiv0",
+    "spike_model": {"calibrate": true, "event_weights": false, "holdout_frac": 0.25, "purge_rows": 12}
+  }
+}

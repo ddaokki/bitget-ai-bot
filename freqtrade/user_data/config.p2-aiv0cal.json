@@ -1,0 +1,11 @@
+{
+  "freqai": {
+    "identifier": "spike-p2-aiv0-cal",
+    "spike_model": {
+      "calibrate": true,
+      "event_weights": false,
+      "holdout_frac": 0.25,
+      "purge_rows": 12
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "freqai": {
+    "identifier": "spike-p2-aiv1-raw",
+    "spike_model": {"calibrate": false, "event_weights": true}
+  }
+}
