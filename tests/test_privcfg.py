@@ -210,3 +210,97 @@ def test_load_settings_exposes_merged_db_url(tmp_path):
     assert load_settings(private, base).db_url == "sqlite:////freqtrade/user_data/tradesv3.sqlite"
     private.write_text("{}", encoding="utf-8")
     assert load_settings(private, base).db_url == "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite"
+
+
+def test_set_exchange_keys_preserves_other_fields_atomically(tmp_path, monkeypatch, capsys):
+    path = tmp_path / "private.json"
+    original = {
+        "dry_run": True, "db_url": "keep-db",
+        "exchange": {"key": "old", "secret": "old", "password": "old", "options": {"uta": False}},
+        "api_server": {"password": "SECRET-SENTINEL"}, "custom": ["한글"],
+    }
+    path.write_text(json.dumps(original), encoding="utf-8")
+    before = path.read_bytes()
+    expected = {**original, "exchange": {**original["exchange"], "key": "new-key", "secret": "new-secret", "password": "new-password"}}
+    replace_file = privcfg.os.replace
+    calls = []
+
+    def checked_replace(source, destination):
+        assert Path(source).parent == path.parent
+        assert destination == path
+        assert path.read_bytes() == before
+        assert json.loads(Path(source).read_text(encoding="utf-8")) == expected
+        calls.append(source)
+        return replace_file(source, destination)
+
+    monkeypatch.setattr(privcfg.os, "replace", checked_replace)
+    privcfg.set_exchange_keys("new-key", "new-secret", "new-password", path)
+    assert len(calls) == 1
+    assert json.loads(path.read_text(encoding="utf-8")) == expected
+    assert set(tmp_path.iterdir()) == {path}
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ""
+
+
+@pytest.mark.parametrize("name", ["key", "secret", "password"])
+@pytest.mark.parametrize("bad", ["", " ", "with space", "leading\t", "line\nbreak", "unicode space", None, 1])
+def test_set_exchange_keys_rejects_invalid_values_without_writing(tmp_path, name, bad):
+    path = tmp_path / "private.json"
+    path.write_text('{"exchange":{"key":"old"}}', encoding="utf-8")
+    original = path.read_bytes()
+    values = {"key": "valid-key", "secret": "valid-secret", "password": "valid-password"}
+    values[name] = bad
+    with pytest.raises(ValueError):
+        privcfg.set_exchange_keys(**values, path=path)
+    assert path.read_bytes() == original
+    assert set(tmp_path.iterdir()) == {path}
+
+
+@pytest.mark.parametrize("failure", ["write", "replace"])
+def test_set_exchange_keys_failure_preserves_original(tmp_path, monkeypatch, capsys, failure):
+    path = tmp_path / "private.json"
+    path.write_text('{"exchange":{"key":"old"},"custom":"keep"}\n', encoding="utf-8")
+    original = path.read_bytes()
+
+    def failed_write(config, stream, **kwargs):
+        stream.write("partial")
+        raise OSError("SECRET-SENTINEL")
+
+    def failed_replace(*args):
+        raise OSError("SECRET-SENTINEL")
+
+    if failure == "write":
+        monkeypatch.setattr(privcfg.json, "dump", failed_write)
+    else:
+        monkeypatch.setattr(privcfg.os, "replace", failed_replace)
+    with pytest.raises(OSError):
+        privcfg.set_exchange_keys("key", "secret", "password", path)
+    assert path.read_bytes() == original
+    assert set(tmp_path.iterdir()) == {path}
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ""
+
+
+@pytest.mark.parametrize("content,want", [
+    ('{"exchange":{"key":"SECRET-SENTINEL","secret":"","password":"pass"}}',
+     {"key": True, "secret": False, "password": True}),
+    ('{"exchange":{"key":"with space","secret":null,"password":true}}',
+     {"key": False, "secret": False, "password": False}),
+    ('{}', {"key": False, "secret": False, "password": False}),
+    ('{"exchange":null}', {"key": False, "secret": False, "password": False}),
+    ('broken SECRET-SENTINEL', {"key": False, "secret": False, "password": False}),
+    ('[]', {"key": False, "secret": False, "password": False}),
+])
+def test_keys_configured_only_returns_booleans(tmp_path, content, want):
+    path = tmp_path / "private.json"
+    path.write_text(content, encoding="utf-8")
+    result = privcfg.keys_configured(path)
+    assert result == want
+    assert all(type(value) is bool for value in result.values())
+    assert "SECRET-SENTINEL" not in repr(result)
+
+
+def test_keys_configured_missing_file_is_false(tmp_path):
+    assert privcfg.keys_configured(tmp_path / "missing.json") == {
+        "key": False, "secret": False, "password": False,
+    }
