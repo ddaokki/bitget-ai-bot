@@ -1,0 +1,19 @@
+{
+  "spike": {
+    "entry_start": "2026-09-01T00:00:00+00:00"
+  },
+  "event_features": {
+    "enabled": true,
+    "path": "/freqtrade/user_data/events/events.synthetic.csv"
+  },
+  "exchange": {
+    "pair_whitelist": [
+      "BTC/USDT:USDT"
+    ]
+  },
+  "freqai": {
+    "identifier": "spike-events-synthetic-smoke",
+    "train_period_days": 60,
+    "backtest_period_days": 30
+  }
+}

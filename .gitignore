@@ -17,3 +17,8 @@ node_modules/
 ledger/
 .smoke_state.json
 .panel/
+
+# research spike outputs (reproducible; not committed)
+**/user_data/models/
+**/user_data/backtest_results/
+**/user_data/plot/

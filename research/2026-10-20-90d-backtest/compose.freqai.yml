@@ -1,0 +1,11 @@
+# Research-only service. Merge AFTER freqtrade/docker-compose.yml and use with `run --rm` only:
+#   docker compose -p bitget-spike -f freqtrade/docker-compose.yml \
+#     -f research/2026-10-20-90d-backtest/compose.freqai.yml run --rm freqai backtesting ...
+# No private configuration, restart policy, published ports, or trade command.
+services:
+  freqai:
+    profiles: [research]
+    image: freqtradeorg/freqtrade:2026.9_freqai
+    volumes:
+      - ./user_data:/freqtrade/user_data
+    command: ["--version"]

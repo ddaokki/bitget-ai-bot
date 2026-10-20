@@ -1,0 +1,109 @@
+{
+  "$schema": "https://schema.freqtrade.io/schema.json",
+  "dry_run": true,
+  "dry_run_wallet": 105,
+  "trading_mode": "futures",
+  "margin_mode": "isolated",
+  "stake_currency": "USDT",
+  "stake_amount": "unlimited",
+  "tradable_balance_ratio": 1.0,
+  "max_open_trades": 2,
+  "timeframe": "1h",
+  "fee": 0.0006,
+  "futures_funding_rate": 0.0001,
+  "dataformat_ohlcv": "feather",
+  "datadir": "/freqtrade/user_data/data/bitget",
+  "exchange": {
+    "name": "bitget",
+    "ccxt_config": {
+      "enableRateLimit": true,
+      "rateLimit": 350,
+      "options": {
+        "uta": false
+      }
+    },
+    "ccxt_async_config": {
+      "enableRateLimit": true,
+      "rateLimit": 350,
+      "options": {
+        "uta": false
+      }
+    },
+    "pair_whitelist": [
+      "BTC/USDT:USDT",
+      "ETH/USDT:USDT",
+      "SOL/USDT:USDT",
+      "XRP/USDT:USDT",
+      "NEAR/USDT:USDT"
+    ],
+    "pair_blacklist": []
+  },
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ],
+  "order_types": {
+    "entry": "market",
+    "exit": "market",
+    "stoploss": "market",
+    "stoploss_on_exchange": false
+  },
+  "entry_pricing": {
+    "price_side": "other",
+    "use_order_book": false
+  },
+  "exit_pricing": {
+    "price_side": "other",
+    "use_order_book": false
+  },
+  "freqai": {
+    "enabled": true,
+    "identifier": "spike-safetrend-4y-v1",
+    "train_period_days": 365,
+    "backtest_period_days": 90,
+    "purge_old_models": 2,
+    "save_backtest_models": false,
+    "activate_tensorboard": false,
+    "write_metrics_to_disk": true,
+    "feature_parameters": {
+      "include_timeframes": [
+        "1h"
+      ],
+      "include_corr_pairlist": [],
+      "label_period_candles": 48,
+      "include_shifted_candles": 0,
+      "indicator_periods_candles": [
+        4800
+      ],
+      "shuffle_after_split": false,
+      "DI_threshold": 0,
+      "use_SVM_to_remove_outliers": false,
+      "use_DBSCAN_to_remove_outliers": false,
+      "principal_component_analysis": false
+    },
+    "data_split_parameters": {
+      "test_size": 0,
+      "shuffle": false
+    },
+    "model_training_parameters": {
+      "device_type": "cpu",
+      "n_estimators": 100,
+      "num_leaves": 15,
+      "max_depth": 5,
+      "learning_rate": 0.05,
+      "min_child_samples": 40,
+      "n_jobs": 2,
+      "random_state": 81,
+      "verbosity": -1
+    },
+    "_comment": "indicator_periods_candles=[4800] only tells FreqAI the longest lookback (daily EMA200 = 200 days of 1h bars) so it loads enough warmup before each training window; no expand_all features are defined."
+  },
+  "spike": {
+    "entry_start": "2023-10-01T00:00:00+00:00"
+  },
+  "event_features": {
+    "enabled": false,
+    "path": "/freqtrade/user_data/events/events.csv"
+  }
+}
