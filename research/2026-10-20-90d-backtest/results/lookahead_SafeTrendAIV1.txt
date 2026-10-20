@@ -1,0 +1,1176 @@
+ Container bitget-spike-freqai-run-3772c45964c6 Creating 
+ Container bitget-spike-freqai-run-3772c45964c6 Created 
+2026-10-20 11:04:19,824 - freqtrade - INFO - freqtrade 2026.9
+2026-10-20 11:04:20,185 - numexpr.utils - INFO - NumExpr defaulting to 12 threads.
+2026-10-20 11:04:21,992 - freqtrade.configuration.load_config - INFO - Using config: /freqtrade/user_data/config.backtest-ai.json ...
+2026-10-20 11:04:21,995 - freqtrade.configuration.load_config - INFO - Using config: /freqtrade/user_data/config.phase-b.json ...
+2026-10-20 11:04:21,997 - freqtrade.configuration.load_config - INFO - Using config: /freqtrade/user_data/config.p2-lookahead-aiv1.json ...
+2026-10-20 11:04:22,001 - freqtrade.loggers - INFO - Enabling colorized output.
+2026-10-20 11:04:22,002 - freqtrade.loggers - INFO - Logfile configured
+2026-10-20 11:04:22,002 - freqtrade.loggers - INFO - Verbosity set to 0
+2026-10-20 11:04:22,003 - freqtrade.configuration.configuration - INFO - Parameter --timerange detected: 20231001-20261020 ...
+2026-10-20 11:04:24,607 - freqtrade.configuration.configuration - INFO - Using user-data directory: /freqtrade/user_data ...
+2026-10-20 11:04:24,609 - freqtrade.configuration.configuration - INFO - Using data directory: /freqtrade/user_data/data/bitget_synth_funding_zero ...
+2026-10-20 11:04:24,609 - freqtrade.configuration.configuration - INFO - Saving lookahead analysis results into /research/results/lookahead_SafeTrendAIV1.csv ...
+2026-10-20 11:04:24,610 - freqtrade.configuration.configuration - INFO - Filter trades by timerange: 20231001-20261020
+2026-10-20 11:04:24,610 - freqtrade.configuration.configuration - INFO - Targeted Trade amount: 12
+2026-10-20 11:04:24,610 - freqtrade.configuration.configuration - INFO - Minimum Trade amount: 3
+2026-10-20 11:04:24,611 - freqtrade.configuration.configuration - INFO - Path to store lookahead-analysis-results: /research/results/lookahead_SafeTrendAIV1.csv
+2026-10-20 11:04:24,611 - freqtrade.configuration.configuration - INFO - Using freqaimodel class name: SpikeCalibratedLGBM
+2026-10-20 11:04:24,612 - freqtrade.exchange.check_exchange - INFO - Checking exchange...
+2026-10-20 11:04:24,620 - freqtrade.exchange.check_exchange - INFO - Exchange "bitget" is officially supported by the Freqtrade development team.
+2026-10-20 11:04:24,621 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.
+2026-10-20 11:04:24,621 - freqtrade.configuration.config_validation - INFO - Validating configuration ...
+2026-10-20 11:04:24,623 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced order_types to market orders.
+2026-10-20 11:04:24,623 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced max_open_trades to -1 (same amount as there are pairs)
+2026-10-20 11:04:24,624 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Dry run wallet was not set to 1 billion, pushing it up there just to avoid false positives
+2026-10-20 11:04:24,624 - freqtrade.optimize.analysis.lookahead_helpers - INFO - fixing stake_amount to 10k
+2026-10-20 11:04:24,962 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Bias test of SafeTrendPhaseB.py started.
+2026-10-20 11:04:25,086 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled
+2026-10-20 11:04:25,086 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.84
+2026-10-20 11:04:25,087 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap', 'uta': False}, 'enableRateLimit': True, 'rateLimit': 350}
+2026-10-20 11:04:25,092 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap', 'uta': False}, 'enableRateLimit': True, 'rateLimit': 350}
+2026-10-20 11:04:25,098 - freqtrade.exchange.exchange - INFO - Using Exchange "Bitget"
+2026-10-20 11:04:30,952 - freqtrade.exchange.exchange - INFO - Using cached leverage_tiers.
+2026-10-20 11:04:30,953 - freqtrade.exchange.exchange - INFO - Done initializing 845 markets.
+2026-10-20 11:04:30,959 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange class 'Bitget' ...
+2026-10-20 11:04:30,986 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy SafeTrendAIV1 from '/freqtrade/user_data/strategies/SafeTrendPhaseB.py'...
+2026-10-20 11:04:30,987 - freqtrade.strategy.hyper - INFO - Found no parameter file.
+2026-10-20 11:04:30,988 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'timeframe' with value from the configuration: 1h.
+2026-10-20 11:04:30,988 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'order_types' with value from the configuration: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', 
+'stoploss_on_exchange': False}.
+2026-10-20 11:04:30,989 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.
+2026-10-20 11:04:30,989 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 10000.
+2026-10-20 11:04:30,989 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: -1.
+2026-10-20 11:04:30,989 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {}
+2026-10-20 11:04:30,990 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h
+2026-10-20 11:04:30,990 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.5
+2026-10-20 11:04:30,990 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: False
+2026-10-20 11:04:30,991 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.0
+2026-10-20 11:04:30,991 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: False
+2026-10-20 11:04:30,991 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: True
+2026-10-20 11:04:30,991 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True
+2026-10-20 11:04:30,992 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', 'stoploss_on_exchange': False}
+2026-10-20 11:04:30,992 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}
+2026-10-20 11:04:30,992 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT
+2026-10-20 11:04:30,992 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 10000
+2026-10-20 11:04:30,993 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 990
+2026-10-20 11:04:30,993 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: True
+2026-10-20 11:04:30,993 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: False
+2026-10-20 11:04:30,993 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False
+2026-10-20 11:04:30,994 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.0
+2026-10-20 11:04:30,994 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False
+2026-10-20 11:04:30,994 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0
+2026-10-20 11:04:30,994 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False
+2026-10-20 11:04:30,995 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1
+2026-10-20 11:04:30,995 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: -1
+2026-10-20 11:04:30,996 - freqtrade.configuration.config_validation - INFO - Validating configuration ...
+2026-10-20 11:04:31,000 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...
+2026-10-20 11:04:31,008 - freqtrade.optimize.backtesting - INFO - Using fee 0.0600% from config.
+2026-10-20 11:04:31,008 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 1h to 15312
+2026-10-20 11:04:31,157 - freqtrade.resolvers.iresolver - INFO - Using resolved freqaimodel SpikeCalibratedLGBM from '/freqtrade/user_data/freqaimodels/SpikeCalibratedLGBM.py'...
+2026-10-20 11:04:31,160 - freqtrade.freqai.data_drawer - INFO - Could not find existing datadrawer, starting from scratch
+2026-10-20 11:04:31,161 - freqtrade.freqai.data_drawer - INFO - Could not find existing historic_predictions, starting from scratch
+2026-10-20 11:04:31,162 - freqtrade.freqai.data_drawer - INFO - Could not find existing metric tracker, starting from scratch
+2026-10-20 11:04:31,162 - freqtrade.freqai.freqai_interface - INFO - Set fresh train queue from whitelist. Queue: ['BTC/USDT:USDT', 'ETH/USDT:USDT', 'SOL/USDT:USDT', 'XRP/USDT:USDT', 'NEAR/USDT:USDT']
+2026-10-20 11:04:31,167 - freqtrade.strategy.hyper - INFO - No params for buy found, using default values.
+2026-10-20 11:04:31,168 - freqtrade.strategy.hyper - INFO - Strategy Parameter(default): use_event_features = False
+2026-10-20 11:04:31,394 - freqtrade.optimize.backtesting - INFO - Loading data from 2022-01-01 00:00:00 up to 2026-10-20 00:00:00 (1753 days).
+2026-10-20 11:04:33,182 - freqtrade.freqai.freqai_interface - INFO - Training 13 timeranges
+2026-10-20 11:04:33,184 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2022-10-01 00:00:00 to 2023-10-01 00:00:00, 1/13 trains
+2026-10-20 11:04:33,187 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1696118400_prediction.feather
+2026-10-20 11:04:33,397 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1696118400/cb_btc_1696118400
+2026-10-20 11:04:33,958 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2022-10-01..2023-10-01: 10 kept event groups ['CRYPTO:EXCHANGE_INCIDENT', 'KR:REG_KR', 'RU_UA:GEOPOLITICAL', 
+'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PCE', 'US:PPI']
+2026-10-20 11:04:33,958 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:33,961 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:33,961 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-10-01 to 2023-09-30 --------------------
+2026-10-20 11:04:33,970 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:33,971 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:34,012 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:04:34,024 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:34,066 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:34,109 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2022-12-30 00:00:00 to 2023-12-30 00:00:00, 2/13 trains
+2026-10-20 11:04:34,114 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1703894400_prediction.feather
+2026-10-20 11:04:34,205 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1703894400/cb_btc_1703894400
+2026-10-20 11:04:34,699 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2022-12-30..2023-12-30: 7 kept event groups ['KR:REG_KR', 'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 
+'US:PPI']
+2026-10-20 11:04:34,700 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:34,702 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:34,703 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-12-30 to 2023-12-29 --------------------
+2026-10-20 11:04:34,705 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:34,705 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:34,748 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:04:34,756 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:34,776 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:34,807 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2023-03-30 00:00:00 to 2024-03-29 00:00:00, 3/13 trains
+2026-10-20 11:04:34,809 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1711670400_prediction.feather
+2026-10-20 11:04:34,909 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1711670400/cb_btc_1711670400
+2026-10-20 11:04:35,360 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2023-03-30..2024-03-29: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:04:35,361 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:35,363 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:35,364 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-03-30 to 2024-03-28 --------------------
+2026-10-20 11:04:35,366 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:35,366 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:35,397 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:35,404 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:35,426 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:35,456 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2023-06-28 00:00:00 to 2024-06-27 00:00:00, 4/13 trains
+2026-10-20 11:04:35,460 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1719446400_prediction.feather
+2026-10-20 11:04:35,580 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1719446400/cb_btc_1719446400
+2026-10-20 11:04:36,107 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2023-06-28..2024-06-27: 4 kept event groups ['JP:CENTRAL_BANK', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:04:36,108 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:36,112 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:36,114 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-06-28 to 2024-06-26 --------------------
+2026-10-20 11:04:36,119 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:36,119 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:36,161 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:04:36,171 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:36,195 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:36,231 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2023-09-26 00:00:00 to 2024-09-25 00:00:00, 5/13 trains
+2026-10-20 11:04:36,235 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1727222400_prediction.feather
+2026-10-20 11:04:36,366 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1727222400/cb_btc_1727222400
+2026-10-20 11:04:37,010 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2023-09-26..2024-09-25: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC']
+2026-10-20 11:04:37,010 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:37,013 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:37,013 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-09-26 to 2024-09-24 --------------------
+2026-10-20 11:04:37,015 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:37,015 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:37,054 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:37,064 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:37,102 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:37,138 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2023-12-25 00:00:00 to 2024-12-24 00:00:00, 6/13 trains
+2026-10-20 11:04:37,143 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1734998400_prediction.feather
+2026-10-20 11:04:37,258 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1734998400/cb_btc_1734998400
+2026-10-20 11:04:37,817 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2023-12-25..2024-12-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:04:37,817 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:37,821 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:37,822 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-12-25 to 2024-12-23 --------------------
+2026-10-20 11:04:37,824 - datasieve.pipeline - INFO - VarianceThreshold will remove 1 features from the dataset.on transform. ['%-trend_side']
+2026-10-20 11:04:37,825 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 16 features
+2026-10-20 11:04:37,825 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:37,860 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:37,868 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:37,889 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:37,920 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2024-03-24 00:00:00 to 2025-03-24 00:00:00, 7/13 trains
+2026-10-20 11:04:37,924 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1742774400_prediction.feather
+2026-10-20 11:04:38,058 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1742774400/cb_btc_1742774400
+2026-10-20 11:04:38,573 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2024-03-24..2025-03-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:04:38,574 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:38,576 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:38,577 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-03-24 to 2025-03-23 --------------------
+2026-10-20 11:04:38,578 - datasieve.pipeline - INFO - VarianceThreshold will remove 1 features from the dataset.on transform. ['%-trend_side']
+2026-10-20 11:04:38,580 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 16 features
+2026-10-20 11:04:38,580 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:38,616 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:38,624 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:38,651 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:38,690 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2024-06-22 00:00:00 to 2025-06-22 00:00:00, 8/13 trains
+2026-10-20 11:04:38,695 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1750550400_prediction.feather
+2026-10-20 11:04:38,838 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1750550400/cb_btc_1750550400
+2026-10-20 11:04:39,358 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2024-06-22..2025-06-22: 6 kept event groups ['JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 'US:NFP', 
+'US:TARIFF']
+2026-10-20 11:04:39,358 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:39,361 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:39,362 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-06-22 to 2025-06-21 --------------------
+2026-10-20 11:04:39,363 - datasieve.pipeline - INFO - VarianceThreshold will remove 1 features from the dataset.on transform. ['%-trend_side']
+2026-10-20 11:04:39,364 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 16 features
+2026-10-20 11:04:39,364 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:39,401 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:39,417 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:39,442 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:39,477 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2024-09-20 00:00:00 to 2025-09-20 00:00:00, 9/13 trains
+2026-10-20 11:04:39,481 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1758326400_prediction.feather
+2026-10-20 11:04:39,618 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1758326400/cb_btc_1758326400
+2026-10-20 11:04:40,105 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2024-09-20..2025-09-20: 10 kept event groups ['GLOBAL:GEOPOLITICAL', 'JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PCE', 'US:PPI', 'US:REG_US', 'US:TARIFF']
+2026-10-20 11:04:40,105 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:40,109 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:40,109 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-09-20 to 2025-09-19 --------------------
+2026-10-20 11:04:40,110 - datasieve.pipeline - INFO - VarianceThreshold will remove 1 features from the dataset.on transform. ['%-trend_side']
+2026-10-20 11:04:40,112 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 16 features
+2026-10-20 11:04:40,113 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:40,168 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.06 secs) --------------------
+2026-10-20 11:04:40,176 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:40,214 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:40,251 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2024-12-19 00:00:00 to 2025-12-19 00:00:00, 10/13 trains
+2026-10-20 11:04:40,255 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1766102400_prediction.feather
+2026-10-20 11:04:40,409 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1766102400/cb_btc_1766102400
+2026-10-20 11:04:40,977 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2024-12-19..2025-12-19: 9 kept event groups ['CN:TARIFF', 'EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 
+'US:CPI', 'US:FOMC', 'US:NFP', 'US:PCE', 'US:TARIFF']
+2026-10-20 11:04:40,977 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:40,981 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:40,982 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-12-19 to 2025-12-18 --------------------
+2026-10-20 11:04:40,985 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:40,985 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:41,021 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:41,035 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:41,061 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:41,096 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2025-03-19 00:00:00 to 2026-03-19 00:00:00, 11/13 trains
+2026-10-20 11:04:41,101 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1773878400_prediction.feather
+2026-10-20 11:04:41,312 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1773878400/cb_btc_1773878400
+2026-10-20 11:04:41,871 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2025-03-19..2026-03-19: 9 kept event groups ['EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PPI', 'US:TARIFF']
+2026-10-20 11:04:41,871 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:41,874 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:41,875 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-03-19 to 2026-03-18 --------------------
+2026-10-20 11:04:41,876 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:41,877 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:41,913 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:41,922 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:41,950 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:41,990 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2025-06-17 00:00:00 to 2026-06-17 00:00:00, 12/13 trains
+2026-10-20 11:04:41,995 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1781654400_prediction.feather
+2026-10-20 11:04:42,204 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1781654400/cb_btc_1781654400
+2026-10-20 11:04:42,862 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2025-06-17..2026-06-17: 7 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PPI']
+2026-10-20 11:04:42,862 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:42,866 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:42,867 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-06-17 to 2026-06-16 --------------------
+2026-10-20 11:04:42,870 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:42,870 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:42,936 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.07 secs) --------------------
+2026-10-20 11:04:42,946 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:43,001 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:43,044 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/5 pairs from 2025-09-15 00:00:00 to 2026-09-15 00:00:00, 13/13 trains
+2026-10-20 11:04:43,051 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1789430400_prediction.feather
+2026-10-20 11:04:43,383 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1789430400/cb_btc_1789430400
+2026-10-20 11:04:44,098 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2025-09-15..2026-09-15: 9 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:GDP', 'US:NFP', 'US:OTHER', 'US:PCE']
+2026-10-20 11:04:44,098 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:04:44,102 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:44,103 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-09-15 to 2026-09-14 --------------------
+2026-10-20 11:04:44,105 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:44,105 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:44,135 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:44,142 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:44,161 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:44,284 - freqtrade.freqai.freqai_interface - INFO - Training 13 timeranges
+2026-10-20 11:04:44,286 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2022-10-01 00:00:00 to 2023-10-01 00:00:00, 1/13 trains
+2026-10-20 11:04:44,290 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1696118400_prediction.feather
+2026-10-20 11:04:44,414 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1696118400/cb_eth_1696118400
+2026-10-20 11:04:44,888 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2022-10-01..2023-10-01: 10 kept event groups ['CRYPTO:EXCHANGE_INCIDENT', 'KR:REG_KR', 'RU_UA:GEOPOLITICAL', 
+'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PCE', 'US:PPI']
+2026-10-20 11:04:44,888 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:44,891 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:44,892 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-10-01 to 2023-09-30 --------------------
+2026-10-20 11:04:44,894 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:44,895 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:44,935 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:04:44,942 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:44,970 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:45,009 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2022-12-30 00:00:00 to 2023-12-30 00:00:00, 2/13 trains
+2026-10-20 11:04:45,015 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1703894400_prediction.feather
+2026-10-20 11:04:45,114 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1703894400/cb_eth_1703894400
+2026-10-20 11:04:45,637 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2022-12-30..2023-12-30: 7 kept event groups ['KR:REG_KR', 'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 
+'US:PPI']
+2026-10-20 11:04:45,638 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:45,645 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:45,646 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-12-30 to 2023-12-29 --------------------
+2026-10-20 11:04:45,648 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:45,649 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:45,712 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.07 secs) --------------------
+2026-10-20 11:04:45,722 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:45,751 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:45,793 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2023-03-30 00:00:00 to 2024-03-29 00:00:00, 3/13 trains
+2026-10-20 11:04:45,797 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1711670400_prediction.feather
+2026-10-20 11:04:45,923 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1711670400/cb_eth_1711670400
+2026-10-20 11:04:46,382 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2023-03-30..2024-03-29: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:04:46,382 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:46,385 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:46,386 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-03-30 to 2024-03-28 --------------------
+2026-10-20 11:04:46,389 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:46,390 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:46,420 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:46,429 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:46,450 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:46,483 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2023-06-28 00:00:00 to 2024-06-27 00:00:00, 4/13 trains
+2026-10-20 11:04:46,488 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1719446400_prediction.feather
+2026-10-20 11:04:46,588 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1719446400/cb_eth_1719446400
+2026-10-20 11:04:47,159 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2023-06-28..2024-06-27: 4 kept event groups ['JP:CENTRAL_BANK', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:04:47,160 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:47,164 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:47,165 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-06-28 to 2024-06-26 --------------------
+2026-10-20 11:04:47,168 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:47,168 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:47,203 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:47,213 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:47,246 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:47,284 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2023-09-26 00:00:00 to 2024-09-25 00:00:00, 5/13 trains
+2026-10-20 11:04:47,290 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1727222400_prediction.feather
+2026-10-20 11:04:47,408 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1727222400/cb_eth_1727222400
+2026-10-20 11:04:47,894 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2023-09-26..2024-09-25: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC']
+2026-10-20 11:04:47,894 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:47,898 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:47,899 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-09-26 to 2024-09-24 --------------------
+2026-10-20 11:04:47,901 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:47,901 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:47,935 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:47,944 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:47,969 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:48,011 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2023-12-25 00:00:00 to 2024-12-24 00:00:00, 6/13 trains
+2026-10-20 11:04:48,016 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1734998400_prediction.feather
+2026-10-20 11:04:48,138 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1734998400/cb_eth_1734998400
+2026-10-20 11:04:48,713 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2023-12-25..2024-12-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:04:48,713 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:48,720 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:48,721 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-12-25 to 2024-12-23 --------------------
+2026-10-20 11:04:48,724 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:48,725 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:48,773 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.06 secs) --------------------
+2026-10-20 11:04:48,782 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:48,813 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:48,868 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2024-03-24 00:00:00 to 2025-03-24 00:00:00, 7/13 trains
+2026-10-20 11:04:48,877 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1742774400_prediction.feather
+2026-10-20 11:04:49,017 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1742774400/cb_eth_1742774400
+2026-10-20 11:04:49,648 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2024-03-24..2025-03-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:04:49,649 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:49,653 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:49,654 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-03-24 to 2025-03-23 --------------------
+2026-10-20 11:04:49,656 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:49,657 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:49,824 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.17 secs) --------------------
+2026-10-20 11:04:49,835 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:49,895 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:49,939 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2024-06-22 00:00:00 to 2025-06-22 00:00:00, 8/13 trains
+2026-10-20 11:04:49,947 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1750550400_prediction.feather
+2026-10-20 11:04:50,091 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1750550400/cb_eth_1750550400
+2026-10-20 11:04:50,684 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2024-06-22..2025-06-22: 6 kept event groups ['JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 'US:NFP', 
+'US:TARIFF']
+2026-10-20 11:04:50,685 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:50,690 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:50,690 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-06-22 to 2025-06-21 --------------------
+2026-10-20 11:04:50,693 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:50,693 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:50,727 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:50,736 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:50,763 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:50,808 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2024-09-20 00:00:00 to 2025-09-20 00:00:00, 9/13 trains
+2026-10-20 11:04:50,813 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1758326400_prediction.feather
+2026-10-20 11:04:50,992 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1758326400/cb_eth_1758326400
+2026-10-20 11:04:51,513 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2024-09-20..2025-09-20: 10 kept event groups ['GLOBAL:GEOPOLITICAL', 'JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PCE', 'US:PPI', 'US:REG_US', 'US:TARIFF']
+2026-10-20 11:04:51,513 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:51,516 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:51,516 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-09-20 to 2025-09-19 --------------------
+2026-10-20 11:04:51,518 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:51,518 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:51,558 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:51,567 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:51,590 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:51,621 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2024-12-19 00:00:00 to 2025-12-19 00:00:00, 10/13 trains
+2026-10-20 11:04:51,624 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1766102400_prediction.feather
+2026-10-20 11:04:51,794 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1766102400/cb_eth_1766102400
+2026-10-20 11:04:52,370 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2024-12-19..2025-12-19: 9 kept event groups ['CN:TARIFF', 'EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 
+'US:CPI', 'US:FOMC', 'US:NFP', 'US:PCE', 'US:TARIFF']
+2026-10-20 11:04:52,371 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:52,375 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:52,376 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-12-19 to 2025-12-18 --------------------
+2026-10-20 11:04:52,378 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:52,379 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:52,416 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:52,424 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:52,447 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:52,476 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2025-03-19 00:00:00 to 2026-03-19 00:00:00, 11/13 trains
+2026-10-20 11:04:52,481 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1773878400_prediction.feather
+2026-10-20 11:04:52,638 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1773878400/cb_eth_1773878400
+2026-10-20 11:04:53,218 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2025-03-19..2026-03-19: 9 kept event groups ['EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PPI', 'US:TARIFF']
+2026-10-20 11:04:53,218 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:53,221 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:53,222 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-03-19 to 2026-03-18 --------------------
+2026-10-20 11:04:53,224 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:53,224 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:53,258 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:53,266 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:53,287 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:53,320 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2025-06-17 00:00:00 to 2026-06-17 00:00:00, 12/13 trains
+2026-10-20 11:04:53,324 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1781654400_prediction.feather
+2026-10-20 11:04:53,487 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1781654400/cb_eth_1781654400
+2026-10-20 11:04:54,027 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2025-06-17..2026-06-17: 7 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PPI']
+2026-10-20 11:04:54,027 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:54,029 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:54,030 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-06-17 to 2026-06-16 --------------------
+2026-10-20 11:04:54,032 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:54,032 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:54,068 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:54,077 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:54,114 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:54,152 - freqtrade.freqai.freqai_interface - INFO - Training ETH/USDT:USDT, 2/5 pairs from 2025-09-15 00:00:00 to 2026-09-15 00:00:00, 13/13 trains
+2026-10-20 11:04:54,156 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_eth_1789430400_prediction.feather
+2026-10-20 11:04:54,360 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-ETH_1789430400/cb_eth_1789430400
+2026-10-20 11:04:54,865 - SpikeCalibratedLGBM - INFO - ETH/USDT:USDT window 2025-09-15..2026-09-15: 9 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:GDP', 'US:NFP', 'US:OTHER', 'US:PCE']
+2026-10-20 11:04:54,865 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training ETH/USDT:USDT --------------------
+2026-10-20 11:04:54,869 - freqtrade.freqai.data_kitchen - INFO - ETH/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:54,869 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-09-15 to 2026-09-14 --------------------
+2026-10-20 11:04:54,871 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:54,871 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:54,909 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training ETH/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:54,916 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:54,936 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:55,030 - freqtrade.freqai.freqai_interface - INFO - Training 13 timeranges
+2026-10-20 11:04:55,032 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2022-10-01 00:00:00 to 2023-10-01 00:00:00, 1/13 trains
+2026-10-20 11:04:55,036 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1696118400_prediction.feather
+2026-10-20 11:04:55,191 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1696118400/cb_sol_1696118400
+2026-10-20 11:04:55,720 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2022-10-01..2023-10-01: 10 kept event groups ['CRYPTO:EXCHANGE_INCIDENT', 'KR:REG_KR', 'RU_UA:GEOPOLITICAL', 
+'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PCE', 'US:PPI']
+2026-10-20 11:04:55,721 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:04:55,726 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:55,727 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-10-01 to 2023-09-30 --------------------
+2026-10-20 11:04:55,729 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:55,729 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:55,774 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:04:55,792 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:55,825 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:55,870 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2022-12-30 00:00:00 to 2023-12-30 00:00:00, 2/13 trains
+2026-10-20 11:04:55,875 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1703894400_prediction.feather
+2026-10-20 11:04:55,990 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1703894400/cb_sol_1703894400
+2026-10-20 11:04:56,648 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2022-12-30..2023-12-30: 7 kept event groups ['KR:REG_KR', 'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 
+'US:PPI']
+2026-10-20 11:04:56,649 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:04:56,653 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:56,654 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-12-30 to 2023-12-29 --------------------
+2026-10-20 11:04:56,656 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:56,657 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:56,696 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:04:56,705 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:56,737 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:56,779 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2023-03-30 00:00:00 to 2024-03-29 00:00:00, 3/13 trains
+2026-10-20 11:04:56,785 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1711670400_prediction.feather
+2026-10-20 11:04:56,892 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1711670400/cb_sol_1711670400
+2026-10-20 11:04:57,408 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2023-03-30..2024-03-29: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:04:57,409 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:04:57,413 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:57,413 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-03-30 to 2024-03-28 --------------------
+2026-10-20 11:04:57,416 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:57,416 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:57,465 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.06 secs) --------------------
+2026-10-20 11:04:57,475 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:57,500 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:57,535 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2023-06-28 00:00:00 to 2024-06-27 00:00:00, 4/13 trains
+2026-10-20 11:04:57,540 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1719446400_prediction.feather
+2026-10-20 11:04:57,685 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1719446400/cb_sol_1719446400
+2026-10-20 11:04:58,155 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2023-06-28..2024-06-27: 4 kept event groups ['JP:CENTRAL_BANK', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:04:58,156 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:04:58,160 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:58,160 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-06-28 to 2024-06-26 --------------------
+2026-10-20 11:04:58,163 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:58,163 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:58,204 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:04:58,211 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:58,240 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:58,288 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2023-09-26 00:00:00 to 2024-09-25 00:00:00, 5/13 trains
+2026-10-20 11:04:58,292 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1727222400_prediction.feather
+2026-10-20 11:04:58,415 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1727222400/cb_sol_1727222400
+2026-10-20 11:04:59,032 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2023-09-26..2024-09-25: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC']
+2026-10-20 11:04:59,032 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:04:59,036 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:59,036 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-09-26 to 2024-09-24 --------------------
+2026-10-20 11:04:59,038 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:04:59,039 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:59,091 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.06 secs) --------------------
+2026-10-20 11:04:59,099 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:59,128 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:59,159 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2023-12-25 00:00:00 to 2024-12-24 00:00:00, 6/13 trains
+2026-10-20 11:04:59,163 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1734998400_prediction.feather
+2026-10-20 11:04:59,283 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1734998400/cb_sol_1734998400
+2026-10-20 11:04:59,753 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2023-12-25..2024-12-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:04:59,754 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:04:59,758 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:04:59,759 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-12-25 to 2024-12-23 --------------------
+2026-10-20 11:04:59,761 - datasieve.pipeline - INFO - VarianceThreshold will remove 1 features from the dataset.on transform. ['%-trend_side']
+2026-10-20 11:04:59,762 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 16 features
+2026-10-20 11:04:59,763 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:04:59,799 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:04:59,810 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:04:59,837 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:04:59,878 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2024-03-24 00:00:00 to 2025-03-24 00:00:00, 7/13 trains
+2026-10-20 11:04:59,883 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1742774400_prediction.feather
+2026-10-20 11:05:00,021 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1742774400/cb_sol_1742774400
+2026-10-20 11:05:00,571 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2024-03-24..2025-03-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:05:00,571 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:00,575 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:00,575 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-03-24 to 2025-03-23 --------------------
+2026-10-20 11:05:00,577 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:00,578 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:00,613 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:00,623 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:00,647 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:00,682 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2024-06-22 00:00:00 to 2025-06-22 00:00:00, 8/13 trains
+2026-10-20 11:05:00,685 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1750550400_prediction.feather
+2026-10-20 11:05:00,835 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1750550400/cb_sol_1750550400
+2026-10-20 11:05:01,489 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2024-06-22..2025-06-22: 6 kept event groups ['JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 'US:NFP', 
+'US:TARIFF']
+2026-10-20 11:05:01,489 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:01,493 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:01,496 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-06-22 to 2025-06-21 --------------------
+2026-10-20 11:05:01,499 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:01,499 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:01,534 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:01,541 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:01,566 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:01,603 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2024-09-20 00:00:00 to 2025-09-20 00:00:00, 9/13 trains
+2026-10-20 11:05:01,608 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1758326400_prediction.feather
+2026-10-20 11:05:01,784 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1758326400/cb_sol_1758326400
+2026-10-20 11:05:02,347 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2024-09-20..2025-09-20: 10 kept event groups ['GLOBAL:GEOPOLITICAL', 'JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PCE', 'US:PPI', 'US:REG_US', 'US:TARIFF']
+2026-10-20 11:05:02,347 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:02,352 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:02,353 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-09-20 to 2025-09-19 --------------------
+2026-10-20 11:05:02,356 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:02,356 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:02,395 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:05:02,403 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:02,431 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:02,471 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2024-12-19 00:00:00 to 2025-12-19 00:00:00, 10/13 trains
+2026-10-20 11:05:02,476 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1766102400_prediction.feather
+2026-10-20 11:05:02,637 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1766102400/cb_sol_1766102400
+2026-10-20 11:05:03,337 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2024-12-19..2025-12-19: 9 kept event groups ['CN:TARIFF', 'EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 
+'US:CPI', 'US:FOMC', 'US:NFP', 'US:PCE', 'US:TARIFF']
+2026-10-20 11:05:03,338 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:03,341 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:03,341 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-12-19 to 2025-12-18 --------------------
+2026-10-20 11:05:03,344 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:03,345 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:03,381 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:03,389 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:03,411 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:03,443 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2025-03-19 00:00:00 to 2026-03-19 00:00:00, 11/13 trains
+2026-10-20 11:05:03,449 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1773878400_prediction.feather
+2026-10-20 11:05:03,634 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1773878400/cb_sol_1773878400
+2026-10-20 11:05:04,219 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2025-03-19..2026-03-19: 9 kept event groups ['EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PPI', 'US:TARIFF']
+2026-10-20 11:05:04,219 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:04,223 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:04,223 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-03-19 to 2026-03-18 --------------------
+2026-10-20 11:05:04,225 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:04,225 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:04,255 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:04,262 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:04,289 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:04,324 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2025-06-17 00:00:00 to 2026-06-17 00:00:00, 12/13 trains
+2026-10-20 11:05:04,327 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1781654400_prediction.feather
+2026-10-20 11:05:04,509 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1781654400/cb_sol_1781654400
+2026-10-20 11:05:04,992 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2025-06-17..2026-06-17: 7 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PPI']
+2026-10-20 11:05:04,992 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:04,996 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:04,997 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-06-17 to 2026-06-16 --------------------
+2026-10-20 11:05:04,999 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:04,999 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:05,032 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:05,050 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:05,071 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:05,098 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 3/5 pairs from 2025-09-15 00:00:00 to 2026-09-15 00:00:00, 13/13 trains
+2026-10-20 11:05:05,102 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1789430400_prediction.feather
+2026-10-20 11:05:05,285 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1789430400/cb_sol_1789430400
+2026-10-20 11:05:05,754 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2025-09-15..2026-09-15: 9 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:GDP', 'US:NFP', 'US:OTHER', 'US:PCE']
+2026-10-20 11:05:05,754 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:05,759 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:05,759 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-09-15 to 2026-09-14 --------------------
+2026-10-20 11:05:05,762 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:05,762 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:05,792 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:05,799 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:05,816 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:05,909 - freqtrade.freqai.freqai_interface - INFO - Training 13 timeranges
+2026-10-20 11:05:05,911 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2022-10-01 00:00:00 to 2023-10-01 00:00:00, 1/13 trains
+2026-10-20 11:05:05,915 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1696118400_prediction.feather
+2026-10-20 11:05:06,032 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1696118400/cb_xrp_1696118400
+2026-10-20 11:05:06,476 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2022-10-01..2023-10-01: 10 kept event groups ['CRYPTO:EXCHANGE_INCIDENT', 'KR:REG_KR', 'RU_UA:GEOPOLITICAL', 
+'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PCE', 'US:PPI']
+2026-10-20 11:05:06,476 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:06,479 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:06,479 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-10-01 to 2023-09-30 --------------------
+2026-10-20 11:05:06,482 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:06,482 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:06,519 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:06,526 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:06,549 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:06,580 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2022-12-30 00:00:00 to 2023-12-30 00:00:00, 2/13 trains
+2026-10-20 11:05:06,584 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1703894400_prediction.feather
+2026-10-20 11:05:06,659 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1703894400/cb_xrp_1703894400
+2026-10-20 11:05:07,131 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2022-12-30..2023-12-30: 7 kept event groups ['KR:REG_KR', 'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 
+'US:PPI']
+2026-10-20 11:05:07,131 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:07,135 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:07,135 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-12-30 to 2023-12-29 --------------------
+2026-10-20 11:05:07,137 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:07,138 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:07,177 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:05:07,185 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:07,218 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:07,269 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2023-03-30 00:00:00 to 2024-03-29 00:00:00, 3/13 trains
+2026-10-20 11:05:07,274 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1711670400_prediction.feather
+2026-10-20 11:05:07,357 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1711670400/cb_xrp_1711670400
+2026-10-20 11:05:07,757 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2023-03-30..2024-03-29: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:05:07,757 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:07,761 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:07,761 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-03-30 to 2024-03-28 --------------------
+2026-10-20 11:05:07,764 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:07,764 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:07,797 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:07,807 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:07,832 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:07,867 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2023-06-28 00:00:00 to 2024-06-27 00:00:00, 4/13 trains
+2026-10-20 11:05:07,872 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1719446400_prediction.feather
+2026-10-20 11:05:07,967 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1719446400/cb_xrp_1719446400
+2026-10-20 11:05:08,394 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2023-06-28..2024-06-27: 4 kept event groups ['JP:CENTRAL_BANK', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:05:08,395 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:08,399 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:08,400 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-06-28 to 2024-06-26 --------------------
+2026-10-20 11:05:08,402 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:08,402 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:08,443 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:05:08,452 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:08,476 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:08,507 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2023-09-26 00:00:00 to 2024-09-25 00:00:00, 5/13 trains
+2026-10-20 11:05:08,512 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1727222400_prediction.feather
+2026-10-20 11:05:08,622 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1727222400/cb_xrp_1727222400
+2026-10-20 11:05:09,161 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2023-09-26..2024-09-25: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC']
+2026-10-20 11:05:09,161 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:09,168 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:09,169 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-09-26 to 2024-09-24 --------------------
+2026-10-20 11:05:09,173 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:09,174 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:09,233 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.07 secs) --------------------
+2026-10-20 11:05:09,247 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:09,303 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:09,414 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2023-12-25 00:00:00 to 2024-12-24 00:00:00, 6/13 trains
+2026-10-20 11:05:09,430 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1734998400_prediction.feather
+2026-10-20 11:05:09,615 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1734998400/cb_xrp_1734998400
+2026-10-20 11:05:10,108 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2023-12-25..2024-12-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:05:10,109 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:10,112 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:10,112 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-12-25 to 2024-12-23 --------------------
+2026-10-20 11:05:10,115 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:10,115 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:10,151 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:10,160 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:10,185 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:10,218 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2024-03-24 00:00:00 to 2025-03-24 00:00:00, 7/13 trains
+2026-10-20 11:05:10,223 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1742774400_prediction.feather
+2026-10-20 11:05:10,360 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1742774400/cb_xrp_1742774400
+2026-10-20 11:05:10,829 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2024-03-24..2025-03-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:05:10,829 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:10,832 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:10,833 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-03-24 to 2025-03-23 --------------------
+2026-10-20 11:05:10,835 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:10,835 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:10,870 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:10,877 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:10,904 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:10,941 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2024-06-22 00:00:00 to 2025-06-22 00:00:00, 8/13 trains
+2026-10-20 11:05:10,945 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1750550400_prediction.feather
+2026-10-20 11:05:11,075 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1750550400/cb_xrp_1750550400
+2026-10-20 11:05:11,525 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2024-06-22..2025-06-22: 6 kept event groups ['JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 'US:NFP', 
+'US:TARIFF']
+2026-10-20 11:05:11,525 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:11,528 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:11,529 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-06-22 to 2025-06-21 --------------------
+2026-10-20 11:05:11,530 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:11,531 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:11,564 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:11,572 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:11,594 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:11,623 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2024-09-20 00:00:00 to 2025-09-20 00:00:00, 9/13 trains
+2026-10-20 11:05:11,626 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1758326400_prediction.feather
+2026-10-20 11:05:11,759 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1758326400/cb_xrp_1758326400
+2026-10-20 11:05:12,230 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2024-09-20..2025-09-20: 10 kept event groups ['GLOBAL:GEOPOLITICAL', 'JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PCE', 'US:PPI', 'US:REG_US', 'US:TARIFF']
+2026-10-20 11:05:12,230 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:12,234 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:12,235 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-09-20 to 2025-09-19 --------------------
+2026-10-20 11:05:12,238 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:12,238 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:12,270 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:12,277 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:12,296 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:12,325 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2024-12-19 00:00:00 to 2025-12-19 00:00:00, 10/13 trains
+2026-10-20 11:05:12,329 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1766102400_prediction.feather
+2026-10-20 11:05:12,479 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1766102400/cb_xrp_1766102400
+2026-10-20 11:05:12,957 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2024-12-19..2025-12-19: 9 kept event groups ['CN:TARIFF', 'EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 
+'US:CPI', 'US:FOMC', 'US:NFP', 'US:PCE', 'US:TARIFF']
+2026-10-20 11:05:12,957 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:12,960 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:12,960 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-12-19 to 2025-12-18 --------------------
+2026-10-20 11:05:12,962 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:12,962 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:12,992 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.03 secs) --------------------
+2026-10-20 11:05:12,999 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:13,017 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:13,044 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2025-03-19 00:00:00 to 2026-03-19 00:00:00, 11/13 trains
+2026-10-20 11:05:13,048 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1773878400_prediction.feather
+2026-10-20 11:05:13,199 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1773878400/cb_xrp_1773878400
+2026-10-20 11:05:13,657 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2025-03-19..2026-03-19: 9 kept event groups ['EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PPI', 'US:TARIFF']
+2026-10-20 11:05:13,657 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:13,661 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:13,661 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-03-19 to 2026-03-18 --------------------
+2026-10-20 11:05:13,663 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:13,663 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:13,691 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.03 secs) --------------------
+2026-10-20 11:05:13,697 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:13,715 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:13,742 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2025-06-17 00:00:00 to 2026-06-17 00:00:00, 12/13 trains
+2026-10-20 11:05:13,746 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1781654400_prediction.feather
+2026-10-20 11:05:13,897 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1781654400/cb_xrp_1781654400
+2026-10-20 11:05:14,339 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2025-06-17..2026-06-17: 7 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PPI']
+2026-10-20 11:05:14,339 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:14,342 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:14,343 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-06-17 to 2026-06-16 --------------------
+2026-10-20 11:05:14,345 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:14,345 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:14,376 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:14,383 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:14,401 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:14,427 - freqtrade.freqai.freqai_interface - INFO - Training XRP/USDT:USDT, 4/5 pairs from 2025-09-15 00:00:00 to 2026-09-15 00:00:00, 13/13 trains
+2026-10-20 11:05:14,430 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_xrp_1789430400_prediction.feather
+2026-10-20 11:05:14,604 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-XRP_1789430400/cb_xrp_1789430400
+2026-10-20 11:05:15,035 - SpikeCalibratedLGBM - INFO - XRP/USDT:USDT window 2025-09-15..2026-09-15: 9 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:GDP', 'US:NFP', 'US:OTHER', 'US:PCE']
+2026-10-20 11:05:15,036 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training XRP/USDT:USDT --------------------
+2026-10-20 11:05:15,039 - freqtrade.freqai.data_kitchen - INFO - XRP/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:15,039 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-09-15 to 2026-09-14 --------------------
+2026-10-20 11:05:15,041 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:15,041 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:15,071 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training XRP/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:15,079 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:15,096 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:15,177 - freqtrade.freqai.freqai_interface - INFO - Training 13 timeranges
+2026-10-20 11:05:15,179 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2022-10-01 00:00:00 to 2023-10-01 00:00:00, 1/13 trains
+2026-10-20 11:05:15,183 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1696118400_prediction.feather
+2026-10-20 11:05:15,298 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1696118400/cb_near_1696118400
+2026-10-20 11:05:15,834 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2022-10-01..2023-10-01: 10 kept event groups ['CRYPTO:EXCHANGE_INCIDENT', 'KR:REG_KR', 'RU_UA:GEOPOLITICAL', 
+'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PCE', 'US:PPI']
+2026-10-20 11:05:15,834 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:15,838 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:15,839 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-10-01 to 2023-09-30 --------------------
+2026-10-20 11:05:15,840 - datasieve.pipeline - INFO - VarianceThreshold will remove 1 features from the dataset.on transform. ['%-trend_side']
+2026-10-20 11:05:15,842 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 16 features
+2026-10-20 11:05:15,842 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:15,871 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:15,880 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:15,902 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:15,934 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2022-12-30 00:00:00 to 2023-12-30 00:00:00, 2/13 trains
+2026-10-20 11:05:15,938 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1703894400_prediction.feather
+2026-10-20 11:05:16,019 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1703894400/cb_near_1703894400
+2026-10-20 11:05:16,458 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2022-12-30..2023-12-30: 7 kept event groups ['KR:REG_KR', 'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 
+'US:PPI']
+2026-10-20 11:05:16,458 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:16,461 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:16,461 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-12-30 to 2023-12-29 --------------------
+2026-10-20 11:05:16,463 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:16,463 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:16,496 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:16,503 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:16,526 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:16,556 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2023-03-30 00:00:00 to 2024-03-29 00:00:00, 3/13 trains
+2026-10-20 11:05:16,560 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1711670400_prediction.feather
+2026-10-20 11:05:16,637 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1711670400/cb_near_1711670400
+2026-10-20 11:05:17,002 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2023-03-30..2024-03-29: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:05:17,002 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:17,005 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:17,005 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-03-30 to 2024-03-28 --------------------
+2026-10-20 11:05:17,007 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:17,007 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:17,040 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:17,046 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:17,065 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:17,092 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2023-06-28 00:00:00 to 2024-06-27 00:00:00, 4/13 trains
+2026-10-20 11:05:17,096 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1719446400_prediction.feather
+2026-10-20 11:05:17,180 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1719446400/cb_near_1719446400
+2026-10-20 11:05:17,562 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2023-06-28..2024-06-27: 4 kept event groups ['JP:CENTRAL_BANK', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:05:17,563 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:17,565 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:17,566 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-06-28 to 2024-06-26 --------------------
+2026-10-20 11:05:17,568 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:17,568 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:17,600 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:17,610 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:17,634 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:17,663 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2023-09-26 00:00:00 to 2024-09-25 00:00:00, 5/13 trains
+2026-10-20 11:05:17,667 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1727222400_prediction.feather
+2026-10-20 11:05:17,758 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1727222400/cb_near_1727222400
+2026-10-20 11:05:18,136 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2023-09-26..2024-09-25: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC']
+2026-10-20 11:05:18,137 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:18,141 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:18,142 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-09-26 to 2024-09-24 --------------------
+2026-10-20 11:05:18,145 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:18,145 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:18,177 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:18,184 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:18,207 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:18,242 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2023-12-25 00:00:00 to 2024-12-24 00:00:00, 6/13 trains
+2026-10-20 11:05:18,247 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1734998400_prediction.feather
+2026-10-20 11:05:18,346 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1734998400/cb_near_1734998400
+2026-10-20 11:05:18,755 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2023-12-25..2024-12-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:05:18,755 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:18,758 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:18,759 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-12-25 to 2024-12-23 --------------------
+2026-10-20 11:05:18,761 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:18,761 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:18,792 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:18,800 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:18,820 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:18,849 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2024-03-24 00:00:00 to 2025-03-24 00:00:00, 7/13 trains
+2026-10-20 11:05:18,853 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1742774400_prediction.feather
+2026-10-20 11:05:18,958 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1742774400/cb_near_1742774400
+2026-10-20 11:05:19,372 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2024-03-24..2025-03-24: 6 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 
+'US:NFP']
+2026-10-20 11:05:19,372 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:19,374 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:19,375 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-03-24 to 2025-03-23 --------------------
+2026-10-20 11:05:19,377 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:19,377 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:19,407 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.03 secs) --------------------
+2026-10-20 11:05:19,414 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:19,432 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:19,465 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2024-06-22 00:00:00 to 2025-06-22 00:00:00, 8/13 trains
+2026-10-20 11:05:19,469 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1750550400_prediction.feather
+2026-10-20 11:05:19,591 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1750550400/cb_near_1750550400
+2026-10-20 11:05:20,013 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2024-06-22..2025-06-22: 6 kept event groups ['JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 'US:FOMC', 'US:NFP', 
+'US:TARIFF']
+2026-10-20 11:05:20,014 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:20,016 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:20,016 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-06-22 to 2025-06-21 --------------------
+2026-10-20 11:05:20,018 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:20,018 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:20,048 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.03 secs) --------------------
+2026-10-20 11:05:20,054 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:20,072 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:20,099 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2024-09-20 00:00:00 to 2025-09-20 00:00:00, 9/13 trains
+2026-10-20 11:05:20,103 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1758326400_prediction.feather
+2026-10-20 11:05:20,233 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1758326400/cb_near_1758326400
+2026-10-20 11:05:20,657 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2024-09-20..2025-09-20: 10 kept event groups ['GLOBAL:GEOPOLITICAL', 'JP:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PCE', 'US:PPI', 'US:REG_US', 'US:TARIFF']
+2026-10-20 11:05:20,657 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:20,660 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:20,660 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-09-20 to 2025-09-19 --------------------
+2026-10-20 11:05:20,663 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:20,663 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:20,693 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:20,699 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:20,717 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:20,745 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2024-12-19 00:00:00 to 2025-12-19 00:00:00, 10/13 trains
+2026-10-20 11:05:20,748 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1766102400_prediction.feather
+2026-10-20 11:05:20,886 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1766102400/cb_near_1766102400
+2026-10-20 11:05:21,390 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2024-12-19..2025-12-19: 9 kept event groups ['CN:TARIFF', 'EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 
+'US:CPI', 'US:FOMC', 'US:NFP', 'US:PCE', 'US:TARIFF']
+2026-10-20 11:05:21,390 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:21,393 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:21,394 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2024-12-19 to 2025-12-18 --------------------
+2026-10-20 11:05:21,396 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:21,396 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:21,428 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:21,435 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:21,458 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:21,490 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2025-03-19 00:00:00 to 2026-03-19 00:00:00, 11/13 trains
+2026-10-20 11:05:21,494 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1773878400_prediction.feather
+2026-10-20 11:05:21,650 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1773878400/cb_near_1773878400
+2026-10-20 11:05:22,282 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2025-03-19..2026-03-19: 9 kept event groups ['EU:CENTRAL_BANK', 'MIDEAST:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PPI', 'US:TARIFF']
+2026-10-20 11:05:22,283 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:22,286 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:22,287 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-03-19 to 2026-03-18 --------------------
+2026-10-20 11:05:22,288 - datasieve.pipeline - INFO - VarianceThreshold will remove 1 features from the dataset.on transform. ['%-trend_side']
+2026-10-20 11:05:22,289 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 16 features
+2026-10-20 11:05:22,290 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:22,329 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.05 secs) --------------------
+2026-10-20 11:05:22,336 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:22,357 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:22,388 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2025-06-17 00:00:00 to 2026-06-17 00:00:00, 12/13 trains
+2026-10-20 11:05:22,393 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1781654400_prediction.feather
+2026-10-20 11:05:22,552 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1781654400/cb_near_1781654400
+2026-10-20 11:05:23,005 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2025-06-17..2026-06-17: 7 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:NFP', 'US:PPI']
+2026-10-20 11:05:23,005 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:23,008 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:23,008 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-06-17 to 2026-06-16 --------------------
+2026-10-20 11:05:23,010 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:23,011 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:23,041 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:23,048 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:23,069 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:23,098 - freqtrade.freqai.freqai_interface - INFO - Training NEAR/USDT:USDT, 5/5 pairs from 2025-09-15 00:00:00 to 2026-09-15 00:00:00, 13/13 trains
+2026-10-20 11:05:23,103 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_near_1789430400_prediction.feather
+2026-10-20 11:05:23,260 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-NEAR_1789430400/cb_near_1789430400
+2026-10-20 11:05:23,666 - SpikeCalibratedLGBM - INFO - NEAR/USDT:USDT window 2025-09-15..2026-09-15: 9 kept event groups ['EU:CENTRAL_BANK', 'GLOBAL:GEOPOLITICAL', 'UK:CENTRAL_BANK', 'US:CPI', 
+'US:FOMC', 'US:GDP', 'US:NFP', 'US:OTHER', 'US:PCE']
+2026-10-20 11:05:23,667 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training NEAR/USDT:USDT --------------------
+2026-10-20 11:05:23,670 - freqtrade.freqai.data_kitchen - INFO - NEAR/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:23,670 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2025-09-15 to 2026-09-14 --------------------
+2026-10-20 11:05:23,672 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:23,672 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:23,703 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training NEAR/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:23,710 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:23,726 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:24,999 - freqtrade.loggers.set_log_levels - INFO - Reducing verbosity for bias tester.
+2026-10-20 11:05:25,000 - freqtrade.optimize.analysis.lookahead - INFO - Only found 3 trades. Calculating all available trades.
+2026-10-20 11:05:25,331 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 1h to 15312
+2026-10-20 11:05:25,345 - freqtrade.freqai.data_drawer - INFO - Could not find existing datadrawer, starting from scratch
+2026-10-20 11:05:25,346 - freqtrade.freqai.data_drawer - INFO - Could not find existing historic_predictions, starting from scratch
+2026-10-20 11:05:25,348 - freqtrade.freqai.data_drawer - INFO - Could not find existing metric tracker, starting from scratch
+2026-10-20 11:05:25,348 - freqtrade.freqai.freqai_interface - INFO - Set fresh train queue from whitelist. Queue: ['SOL/USDT:USDT']
+2026-10-20 11:05:25,382 - freqtrade.optimize.backtesting - INFO - Loading data from 2022-01-01 00:00:00 up to 2024-03-15 01:00:00 (804 days).
+2026-10-20 11:05:25,396 - freqtrade.data.history.datahandlers.idatahandler - WARNING - SOL/USDT:USDT, funding_rate, 1h, data ends at 2024-03-15 00:00:00
+2026-10-20 11:05:25,571 - freqtrade.freqai.freqai_interface - INFO - Training 2 timeranges
+2026-10-20 11:05:25,572 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 1/1 pairs from 2022-10-01 00:00:00 to 2023-10-01 00:00:00, 1/2 trains
+2026-10-20 11:05:25,576 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1696118400_prediction.feather
+2026-10-20 11:05:25,663 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1696118400/cb_sol_1696118400
+2026-10-20 11:05:26,101 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2022-10-01..2023-10-01: 10 kept event groups ['CRYPTO:EXCHANGE_INCIDENT', 'KR:REG_KR', 'RU_UA:GEOPOLITICAL', 
+'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PCE', 'US:PPI']
+2026-10-20 11:05:26,102 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:26,105 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:26,105 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-10-01 to 2023-09-30 --------------------
+2026-10-20 11:05:26,107 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:26,107 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:26,136 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.03 secs) --------------------
+2026-10-20 11:05:26,142 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:26,165 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:26,198 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 1/1 pairs from 2022-12-30 00:00:00 to 2023-12-30 00:00:00, 2/2 trains
+2026-10-20 11:05:26,203 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1703894400_prediction.feather
+2026-10-20 11:05:26,268 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1703894400/cb_sol_1703894400
+2026-10-20 11:05:26,650 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2022-12-30..2023-12-30: 7 kept event groups ['KR:REG_KR', 'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 
+'US:PPI']
+2026-10-20 11:05:26,651 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:26,653 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:26,654 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-12-30 to 2023-12-29 --------------------
+2026-10-20 11:05:26,656 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:26,656 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:26,685 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.03 secs) --------------------
+2026-10-20 11:05:26,692 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:26,710 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:26,920 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 1h to 15312
+2026-10-20 11:05:26,934 - freqtrade.freqai.data_drawer - INFO - Could not find existing datadrawer, starting from scratch
+2026-10-20 11:05:26,936 - freqtrade.freqai.data_drawer - INFO - Could not find existing historic_predictions, starting from scratch
+2026-10-20 11:05:26,937 - freqtrade.freqai.data_drawer - INFO - Could not find existing metric tracker, starting from scratch
+2026-10-20 11:05:26,937 - freqtrade.freqai.freqai_interface - INFO - Set fresh train queue from whitelist. Queue: ['SOL/USDT:USDT']
+2026-10-20 11:05:26,967 - freqtrade.optimize.backtesting - INFO - Loading data from 2022-01-01 00:00:00 up to 2024-03-15 10:00:00 (804 days).
+2026-10-20 11:05:26,981 - freqtrade.data.history.datahandlers.idatahandler - WARNING - SOL/USDT:USDT, funding_rate, 1h, data ends at 2024-03-15 08:00:00
+2026-10-20 11:05:27,143 - freqtrade.freqai.freqai_interface - INFO - Training 2 timeranges
+2026-10-20 11:05:27,144 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 1/1 pairs from 2022-10-01 00:00:00 to 2023-10-01 00:00:00, 1/2 trains
+2026-10-20 11:05:27,148 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1696118400_prediction.feather
+2026-10-20 11:05:27,245 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1696118400/cb_sol_1696118400
+2026-10-20 11:05:27,701 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2022-10-01..2023-10-01: 10 kept event groups ['CRYPTO:EXCHANGE_INCIDENT', 'KR:REG_KR', 'RU_UA:GEOPOLITICAL', 
+'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PCE', 'US:PPI']
+2026-10-20 11:05:27,702 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:27,706 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:27,706 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-10-01 to 2023-09-30 --------------------
+2026-10-20 11:05:27,708 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:27,708 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:27,739 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:27,746 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:27,770 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:27,801 - freqtrade.freqai.freqai_interface - INFO - Training SOL/USDT:USDT, 1/1 pairs from 2022-12-30 00:00:00 to 2023-12-30 00:00:00, 2/2 trains
+2026-10-20 11:05:27,805 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_sol_1703894400_prediction.feather
+2026-10-20 11:05:27,878 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-SOL_1703894400/cb_sol_1703894400
+2026-10-20 11:05:28,414 - SpikeCalibratedLGBM - INFO - SOL/USDT:USDT window 2022-12-30..2023-12-30: 7 kept event groups ['KR:REG_KR', 'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 
+'US:PPI']
+2026-10-20 11:05:28,414 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training SOL/USDT:USDT --------------------
+2026-10-20 11:05:28,418 - freqtrade.freqai.data_kitchen - INFO - SOL/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:28,418 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-12-30 to 2023-12-29 --------------------
+2026-10-20 11:05:28,420 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:28,420 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:28,452 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training SOL/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:28,460 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:28,478 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:28,736 - freqtrade.optimize.analysis.lookahead - INFO - => found look ahead bias in column &-barrier. yes != 0
+2026-10-20 11:05:28,736 - freqtrade.optimize.analysis.lookahead - INFO - => found look ahead bias in column no. 0.47583822759811945 != 0.0
+2026-10-20 11:05:28,737 - freqtrade.optimize.analysis.lookahead - INFO - => found look ahead bias in column yes. 0.5241617724018806 != 0.0
+2026-10-20 11:05:28,737 - freqtrade.optimize.analysis.lookahead - INFO - => found look ahead bias in column do_predict. 1.0 != 0.0
+2026-10-20 11:05:28,738 - freqtrade.optimize.analysis.lookahead - INFO - => found look ahead bias in column ai_p. 0.5241617724018806 != nan
+2026-10-20 11:05:28,816 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 1h to 15312
+2026-10-20 11:05:28,831 - freqtrade.freqai.data_drawer - INFO - Could not find existing datadrawer, starting from scratch
+2026-10-20 11:05:28,832 - freqtrade.freqai.data_drawer - INFO - Could not find existing historic_predictions, starting from scratch
+2026-10-20 11:05:28,834 - freqtrade.freqai.data_drawer - INFO - Could not find existing metric tracker, starting from scratch
+2026-10-20 11:05:28,834 - freqtrade.freqai.freqai_interface - INFO - Set fresh train queue from whitelist. Queue: ['BTC/USDT:USDT']
+2026-10-20 11:05:28,866 - freqtrade.optimize.backtesting - INFO - Loading data from 2022-01-01 00:00:00 up to 2024-06-04 17:00:00 (885 days).
+2026-10-20 11:05:28,881 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, funding_rate, 1h, data ends at 2024-06-04 16:00:00
+2026-10-20 11:05:29,050 - freqtrade.freqai.freqai_interface - INFO - Training 3 timeranges
+2026-10-20 11:05:29,051 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/1 pairs from 2022-10-01 00:00:00 to 2023-10-01 00:00:00, 1/3 trains
+2026-10-20 11:05:29,055 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1696118400_prediction.feather
+2026-10-20 11:05:29,151 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1696118400/cb_btc_1696118400
+2026-10-20 11:05:29,630 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2022-10-01..2023-10-01: 10 kept event groups ['CRYPTO:EXCHANGE_INCIDENT', 'KR:REG_KR', 'RU_UA:GEOPOLITICAL', 
+'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PCE', 'US:PPI']
+2026-10-20 11:05:29,631 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:05:29,635 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:29,635 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-10-01 to 2023-09-30 --------------------
+2026-10-20 11:05:29,638 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:29,638 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:29,669 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:29,677 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:29,698 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:29,725 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/1 pairs from 2022-12-30 00:00:00 to 2023-12-30 00:00:00, 2/3 trains
+2026-10-20 11:05:29,729 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1703894400_prediction.feather
+2026-10-20 11:05:29,797 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1703894400/cb_btc_1703894400
+2026-10-20 11:05:30,173 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2022-12-30..2023-12-30: 7 kept event groups ['KR:REG_KR', 'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 
+'US:PPI']
+2026-10-20 11:05:30,174 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:05:30,177 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:30,177 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-12-30 to 2023-12-29 --------------------
+2026-10-20 11:05:30,180 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:30,180 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:30,209 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.03 secs) --------------------
+2026-10-20 11:05:30,215 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:30,232 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:30,260 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/1 pairs from 2023-03-30 00:00:00 to 2024-03-29 00:00:00, 3/3 trains
+2026-10-20 11:05:30,264 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1711670400_prediction.feather
+2026-10-20 11:05:30,365 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1711670400/cb_btc_1711670400
+2026-10-20 11:05:30,747 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2023-03-30..2024-03-29: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:05:30,748 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:05:30,750 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:30,751 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-03-30 to 2024-03-28 --------------------
+2026-10-20 11:05:30,753 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:30,753 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:30,783 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:30,788 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:30,806 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:31,031 - freqtrade.data.dataprovider - INFO - Increasing startup_candle_count for freqai on 1h to 15312
+2026-10-20 11:05:31,046 - freqtrade.freqai.data_drawer - INFO - Could not find existing datadrawer, starting from scratch
+2026-10-20 11:05:31,047 - freqtrade.freqai.data_drawer - INFO - Could not find existing historic_predictions, starting from scratch
+2026-10-20 11:05:31,048 - freqtrade.freqai.data_drawer - INFO - Could not find existing metric tracker, starting from scratch
+2026-10-20 11:05:31,048 - freqtrade.freqai.freqai_interface - INFO - Set fresh train queue from whitelist. Queue: ['BTC/USDT:USDT']
+2026-10-20 11:05:31,080 - freqtrade.optimize.backtesting - INFO - Loading data from 2022-01-01 00:00:00 up to 2024-06-07 18:00:00 (888 days).
+2026-10-20 11:05:31,093 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, funding_rate, 1h, data ends at 2024-06-07 16:00:00
+2026-10-20 11:05:31,255 - freqtrade.freqai.freqai_interface - INFO - Training 3 timeranges
+2026-10-20 11:05:31,256 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/1 pairs from 2022-10-01 00:00:00 to 2023-10-01 00:00:00, 1/3 trains
+2026-10-20 11:05:31,259 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1696118400_prediction.feather
+2026-10-20 11:05:31,355 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1696118400/cb_btc_1696118400
+2026-10-20 11:05:31,805 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2022-10-01..2023-10-01: 10 kept event groups ['CRYPTO:EXCHANGE_INCIDENT', 'KR:REG_KR', 'RU_UA:GEOPOLITICAL', 
+'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 'US:PCE', 'US:PPI']
+2026-10-20 11:05:31,805 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:05:31,809 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:31,809 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-10-01 to 2023-09-30 --------------------
+2026-10-20 11:05:31,811 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:31,812 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:31,850 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:31,856 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:31,876 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:31,906 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/1 pairs from 2022-12-30 00:00:00 to 2023-12-30 00:00:00, 2/3 trains
+2026-10-20 11:05:31,911 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1703894400_prediction.feather
+2026-10-20 11:05:31,981 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1703894400/cb_btc_1703894400
+2026-10-20 11:05:32,370 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2022-12-30..2023-12-30: 7 kept event groups ['KR:REG_KR', 'UK:CENTRAL_BANK', 'US:CPI', 'US:FOMC', 'US:NFP', 'US:OTHER', 
+'US:PPI']
+2026-10-20 11:05:32,370 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:05:32,373 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:32,373 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2022-12-30 to 2023-12-29 --------------------
+2026-10-20 11:05:32,376 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:32,376 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:32,408 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.04 secs) --------------------
+2026-10-20 11:05:32,415 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:32,435 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:32,461 - freqtrade.freqai.freqai_interface - INFO - Training BTC/USDT:USDT, 1/1 pairs from 2023-03-30 00:00:00 to 2024-03-29 00:00:00, 3/3 trains
+2026-10-20 11:05:32,465 - freqtrade.freqai.data_kitchen - INFO - Could not find backtesting prediction file at 
+/freqtrade/user_data/models/spike-p2-lookahead-aiv1/backtesting_predictions/cb_btc_1711670400_prediction.feather
+2026-10-20 11:05:32,551 - freqtrade.freqai.freqai_interface - INFO - Could not find model at /freqtrade/user_data/models/spike-p2-lookahead-aiv1/sub-train-BTC_1711670400/cb_btc_1711670400
+2026-10-20 11:05:32,895 - SpikeCalibratedLGBM - INFO - BTC/USDT:USDT window 2023-03-30..2024-03-29: 5 kept event groups ['JP:CENTRAL_BANK', 'KR:REG_KR', 'US:CPI', 'US:ETF', 'US:FOMC']
+2026-10-20 11:05:32,895 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Starting training BTC/USDT:USDT --------------------
+2026-10-20 11:05:32,898 - freqtrade.freqai.data_kitchen - INFO - BTC/USDT:USDT: dropped 6582 training points due to NaNs in populated dataset 8760.
+2026-10-20 11:05:32,898 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Training on data from 2023-03-30 to 2024-03-28 --------------------
+2026-10-20 11:05:32,900 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 17 features
+2026-10-20 11:05:32,900 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - Training model on 2178 data points
+2026-10-20 11:05:32,928 - freqtrade.freqai.base_models.BaseClassifierModel - INFO - -------------------- Done training BTC/USDT:USDT (0.03 secs) --------------------
+2026-10-20 11:05:32,934 - freqtrade.freqai.freqai_interface - INFO - Saving metadata to disk.
+2026-10-20 11:05:32,949 - datasieve.pipeline - WARNING - Could not find step di in pipeline, returning None
+2026-10-20 11:05:33,333 - freqtrade.optimize.analysis.lookahead - INFO - only found 3 after skipping forced exits which is smaller than minimum trade amount = 3. Exiting this lookahead-analysis
+2026-10-20 11:05:33,334 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.
+2026-10-20 11:05:33,334 - freqtrade.optimize.analysis.lookahead - INFO -  -> SafeTrendAIV1 : too few trades. We only found 2 trades. Hint: Extend the timerange to get at least 3 or lower the value of 
+minimum_trade_amount.
+2026-10-20 11:05:33,334 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Checking look ahead bias via backtests of SafeTrendPhaseB.py took 68 seconds.
+Analyzing trades ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╸                                                    2/3  67% • 0:00:08 • 0:00:05
+                                                                        Lookahead Analysis                                                                        
+┏━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┓
+┃           filename ┃      strategy ┃                                 has_bias ┃ total_signals ┃ biased_entry_signals ┃ biased_exit_signals ┃ biased_indicators ┃
+┡━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━┩
+│ SafeTrendPhaseB.py │ SafeTrendAIV1 │ too few trades caught (2/3).Test failed. │               │                      │                     │                   │
+└────────────────────┴───────────────┴──────────────────────────────────────────┴───────────────┴──────────────────────┴─────────────────────┴───────────────────┘
+                                 Any indicators in 'biased_indicators' which are used within set_freqai_targets() can be ignored.                                 
+2026-10-20 11:05:33,340 - freqtrade.optimize.analysis.lookahead_helpers - INFO - saving /research/results/lookahead_SafeTrendAIV1.csv

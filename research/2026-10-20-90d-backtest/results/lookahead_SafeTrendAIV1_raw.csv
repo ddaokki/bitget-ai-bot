@@ -1,0 +1,2 @@
+filename,strategy,has_bias,total_signals,biased_entry_signals,biased_exit_signals,biased_indicators
+SafeTrendPhaseB.py,SafeTrendAIV1,True,12,0,0,"&-barrier,no,yes,do_predict,ai_p"

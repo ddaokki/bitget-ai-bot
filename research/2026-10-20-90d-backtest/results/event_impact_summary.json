@@ -1,0 +1,8 @@
+{
+ "rule": "kept if ratio >= 1.15 and n >= 8; ratio = sum post |ret| / sum matched baseline, BTC+ETH pooled",
+ "calendar_rows": 867,
+ "groups": 54,
+ "kept": 12,
+ "dropped": 42,
+ "events_measured": 842
+}
