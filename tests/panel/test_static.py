@@ -588,3 +588,31 @@ assert.equal(element("stats-main").textContent, ''' + repr(main) + r''');
 assert.equal(element("stats-detail").textContent, "");
 assert.doesNotMatch(element("stats-main").textContent, /img/);
 ''')
+
+
+def test_autotrade_buttons_follow_bot_state_and_live_needs_exact_confirmation(javascript):
+    javascript(r'''
+run('fixture.freqtrade.state="running"; applyStatus(fixture)');
+assert.equal(run('autotradeAllowed("start")'), false);
+assert.equal(run('autotradeAllowed("pause")'), true);
+await run('command("/api/autotrade", {action:"pause"})');
+let calls = requests.filter(r => r.url === "/api/autotrade");
+assert.equal(calls.length, 1);
+assert.deepEqual(JSON.parse(calls[0].options.body), {action:"pause"});
+run('fixture.freqtrade.state="stopped"; applyStatus(fixture); openConfirmation({kind:"autotrade",value:"start",live:false})');
+await run('confirmAction()');
+calls = requests.filter(r => r.url === "/api/autotrade");
+assert.equal(calls.length, 2);
+assert.deepEqual(JSON.parse(calls[1].options.body), {action:"start"});
+run('fixture.mode="live"; fixture.freqtrade.dry_run=false; fixture.freqtrade.state="paused"; applyStatus(fixture); openConfirmation({kind:"autotrade",value:"start",live:true})');
+element("live-confirm").value="LIV";
+await run('confirmAction()');
+assert.equal(requests.filter(r => r.url === "/api/autotrade").length, 2);
+element("live-confirm").value="LIVE";
+await run('confirmAction()');
+calls = requests.filter(r => r.url === "/api/autotrade");
+assert.equal(calls.length, 3);
+assert.deepEqual(JSON.parse(calls[2].options.body), {action:"start", confirm:"LIVE"});
+run('fixture.freqtrade.dry_run=true; applyStatus(fixture)');
+assert.equal(run('autotradeAllowed("start")'), false);
+''')

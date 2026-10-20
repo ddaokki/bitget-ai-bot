@@ -116,10 +116,22 @@ function stepAllowed(name) {
         && smoke.mode === "live" && smoke.close_confirmed === true;
 }
 
+function autotradeAllowed(value) {
+    if (!canAct() || state.pending || state.job?.running) return false;
+    const status = state.status;
+    const ft = status.freqtrade;
+    if (!["dry", "live"].includes(status.mode) || ft?.reachable !== true
+        || ft?.dry_run !== (status.mode === "dry")) return false;
+    // Start from stopped or paused; pause only a running bot.
+    if (value === "start") return ["stopped", "paused"].includes(ft.state);
+    return value === "pause" && ft.state === "running";
+}
+
 function actionAllowed(action) {
     if (!action || !canAct() || state.pending || state.job?.running) return false;
     if (action.fromMode !== state.status.mode) return false;
     if (action.kind === "step") return stepAllowed(action.value);
+    if (action.kind === "autotrade") return autotradeAllowed(action.value);
     // A mode switch would hide an open smoke trade from status and emergency close.
     return action.kind === "mode" && ["dry", "live"].includes(state.status.mode)
         && state.status.smoke_state?.exists === false
@@ -134,6 +146,8 @@ function updateControls() {
     $("mode-switch").disabled = busy || !["dry", "live"].includes(state.status?.mode)
         || state.status?.smoke_state?.exists !== false;
     $("docker-up").disabled = busy;
+    $("autotrade-start").disabled = !autotradeAllowed("start");
+    $("autotrade-pause").disabled = !autotradeAllowed("pause");
     const localBusy = busy || state.status?.session_kind !== "local";
     for (const id of ["save-keys", "save-pin"]) $(id).disabled = localBusy;
     const tailscale = state.status?.tailscale;
@@ -300,7 +314,7 @@ function applyStatus(status) {
     text("mode-switch", mode === "dry" ? "실전으로 전환" : mode === "live" ? "모의로 전환" : "모드 확인 불가");
     const ft = status.freqtrade;
     text("docker-state", status.docker_running === true ? "실행 중" : "중지 또는 확인 불가");
-    const ftNames = {running: "실행 중", stopped: "중지됨", reload_config: "설정 적용 중"};
+    const ftNames = {running: "자동매매 중", paused: "새 진입 멈춤", stopped: "중지됨", reload_config: "설정 적용 중"};
     const ftMode = ft?.dry_run === true ? "모의" : ft?.dry_run === false ? "실전" : "모드 불명";
     text("ft-state", ft?.reachable === true ? `${ftNames[ft.state] || "상태 불명"} · ${ftMode}` : "연결 안 됨");
     text("account-kind", mode === "dry" ? "모의 계정" : ({classic: "일반 계정", uta: "통합 계정"}[status.account?.kind] || "확인 불가"));
@@ -392,8 +406,10 @@ function openConfirmation(action) {
     state.confirmation = action;
     $("live-confirm").value = "";
     $("live-field").hidden = !action.live;
-    text("confirm-title", action.kind === "mode" ? (action.value === "live" ? "실전 거래로 전환" : "모의 거래로 전환") : `${STEP_NAMES[action.value]} 확인`);
+    text("confirm-title", action.kind === "mode" ? (action.value === "live" ? "실전 거래로 전환" : "모의 거래로 전환")
+        : action.kind === "autotrade" ? (action.live ? "실전 자동매매 켜기" : "모의 자동매매 켜기") : `${STEP_NAMES[action.value]} 확인`);
     text("confirm-description", action.kind === "mode" ? "모드를 저장하고 거래 봇을 다시 시작합니다. 진행 중인 포지션은 별도로 확인하세요."
+        : action.kind === "autotrade" ? "전략이 스스로 진입·청산합니다. BTC 롱만, 2배, 거래당 손실 한도 지갑의 0.5%, 하루 최대 3회. 수익을 보장하지 않습니다."
         : action.value === "enter" ? "새 포지션 진입을 요청합니다. 모드와 사용 자금을 확인하세요." : "현재 거래의 청산을 요청합니다. 체결 결과를 직접 확인하세요.");
     updateConfirmation();
     $("confirmation").showModal();
@@ -408,9 +424,9 @@ function updateConfirmation() {
 async function confirmAction() {
     const action = state.confirmation;
     if (!actionAllowed(action) || (action.live && $("live-confirm").value !== "LIVE")) return;
-    const body = action.kind === "mode" ? {mode: action.value} : {};
+    const body = action.kind === "mode" ? {mode: action.value} : action.kind === "autotrade" ? {action: action.value} : {};
     if (action.live) body.confirm = "LIVE";
-    await command(action.kind === "mode" ? "/api/mode" : `/api/steps/${action.value}`, body);
+    await command(action.kind === "mode" ? "/api/mode" : action.kind === "autotrade" ? "/api/autotrade" : `/api/steps/${action.value}`, body);
 }
 
 function runStep(name) {
@@ -516,6 +532,12 @@ function boot() {
     });
     $("docker-up").addEventListener("click", () => {
         if (canAct() && !state.pending && !state.job?.running) command("/api/docker/up", {});
+    });
+    $("autotrade-start").addEventListener("click", () => {
+        if (autotradeAllowed("start")) openConfirmation({kind: "autotrade", value: "start", live: state.status.mode === "live"});
+    });
+    $("autotrade-pause").addEventListener("click", () => {
+        if (autotradeAllowed("pause")) command("/api/autotrade", {action: "pause"});
     });
     $("login-form").addEventListener("submit", login);
     $("keys-form").addEventListener("submit", event => saveCredentials(event, "keys"));

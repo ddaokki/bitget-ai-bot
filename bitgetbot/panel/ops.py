@@ -315,7 +315,7 @@ def collect_status(settings: Settings, reader, ft) -> dict:
     if reachable:
         config = _observe(ft.show_config)
         if isinstance(config, dict):
-            freqtrade["state"] = _choice(config.get("state"), ("running", "stopped", "reload_config"))
+            freqtrade["state"] = _choice(config.get("state"), ("running", "paused", "stopped", "reload_config"))
             dry_run = config.get("dry_run")
             freqtrade["dry_run"] = dry_run if type(dry_run) is bool else None
     return {
