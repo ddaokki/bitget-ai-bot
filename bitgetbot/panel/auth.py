@@ -6,6 +6,7 @@ import re
 import secrets
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from typing import Literal
 
@@ -68,19 +69,20 @@ def verify_pin(pin: str, stored: str) -> bool:
 
 
 class Lockout:
-    """Track failed attempts and escalating locks independently per identity."""
+    """Track escalating locks in a bounded LRU, retaining the global '*' bucket."""
 
     def __init__(self, clock: Callable[[], float] = time.monotonic):
         self._clock = clock
         self._lock = threading.Lock()
         # Each entry holds failures, previous lock duration, and expiry.
-        self._attempts: dict[str, tuple[int, float, float]] = {}
+        self._attempts: OrderedDict[str, tuple[int, float, float]] = OrderedDict()
 
     def check(self, ident: str) -> float:
         with self._lock:
             entry = self._attempts.get(ident)
             if entry is None:
                 return 0.0
+            self._attempts.move_to_end(ident)
             return max(0.0, entry[2] - self._clock())
 
     def attempt(self, ident: str) -> float:
@@ -99,6 +101,8 @@ class Lockout:
         """Check and pre-count one attempt while the caller holds _lock."""
         now = self._clock()
         failures, duration, until = self._attempts.get(ident, (0, 0.0, 0.0))
+        if ident in self._attempts:
+            self._attempts.move_to_end(ident)
         if until > now:
             return until - now
         failures += 1
@@ -107,6 +111,9 @@ class Lockout:
             failures = 0
             until = now + duration
         self._attempts[ident] = (failures, duration, until)
+        if len(self._attempts) > 256:
+            oldest = next(key for key in self._attempts if key != "*")
+            del self._attempts[oldest]
         return 0.0
 
     def success(self, ident: str) -> None:

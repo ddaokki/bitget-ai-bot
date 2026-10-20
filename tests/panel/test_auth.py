@@ -216,20 +216,48 @@ def test_classify_proxy_headers_fail_closed(name, value):
         assert classify("127.0.0.1", "127.0.0.1:8090", headers) == "tailnet"
 
 
-def test_concurrent_attempts_admit_only_five_logins():
+@pytest.mark.parametrize("ident", ["a", "*"])
+def test_concurrent_attempts_admit_only_five_logins(ident):
     lockout = Lockout(clock=lambda: 0.0)
     barrier = Barrier(40)
 
     def attempt(_):
         barrier.wait(timeout=10)
-        return lockout.attempt("a")
+        return lockout.attempt(ident)
 
     with ThreadPoolExecutor(max_workers=40) as pool:
         results = list(pool.map(attempt, range(40)))
     assert results.count(0.0) == 5
     assert results.count(900.0) == 35
-    assert lockout.check("a") == 900
+    assert lockout.check(ident) == 900
     assert lockout.attempt("b") == 0
+
+
+def test_lockout_caps_entries_after_1000_identities_without_evicting_global_lock():
+    lockout = Lockout(clock=lambda: 0.0)
+    for _ in range(5):
+        assert lockout.attempt("*") == 0
+    for index in range(1000):
+        assert lockout.attempt(f"person-{index}") == 0
+    assert len(lockout._attempts) == 256
+    assert lockout.check("*") == 900
+    assert lockout.attempt("*") == 900
+
+
+@pytest.mark.parametrize("touch", ["check", "attempt", "fail"])
+def test_lockout_evicts_least_recently_used_identity_but_never_global(touch):
+    lockout = Lockout(clock=lambda: 0.0)
+    for ident in ["*", "recent", "old"]:
+        for _ in range(5):
+            lockout.attempt(ident)
+    for index in range(253):
+        lockout.attempt(f"person-{index}")
+    getattr(lockout, touch)("recent")
+    lockout.attempt("new")
+    assert lockout.check("*") == 900
+    assert lockout.check("recent") == 900
+    assert lockout.check("old") == 0
+    assert len(lockout._attempts) == 256
 
 
 def test_attempt_escalation_expiry_and_success_reset():

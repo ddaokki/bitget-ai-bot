@@ -2,6 +2,7 @@
 
 import os
 import secrets
+import socket
 import sys
 import tempfile
 from pathlib import Path
@@ -69,6 +70,12 @@ def main(argv: list[str] | None = None) -> int:
         if Path.cwd().resolve() != ops.REPO_ROOT.resolve():
             print("패널은 저장소 루트 폴더에서만 시작할 수 있습니다.", file=sys.stderr)
             return 1
+        try:
+            with socket.create_connection(("127.0.0.1", 8090), timeout=0.2):
+                print("패널이 이미 실행 중입니다.")
+                return 0
+        except OSError:
+            pass
         token = secrets.token_urlsafe(32)
         _write_token(Path(".panel/token"), token)
         app = create_app(PanelDeps(token=token))

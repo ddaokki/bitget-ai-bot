@@ -1,8 +1,10 @@
 import json
 import os
 import secrets
+import socket
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from threading import Event
@@ -221,9 +223,27 @@ def test_login_lockout_returns_429_and_success_resets(panel):
     panel.now[0] += 900
     assert panel.tailnet.post("/api/login", json={"pin": PIN}, headers=PANEL_HEADER).status_code == 200
     assert panel.deps.lockout.check("unknown") == 0
+    assert panel.deps.lockout.check("*") == 0
 
 
-def test_login_reserves_attempt_once_before_verifying_and_never_fails_twice(panel, monkeypatch):
+def test_rotating_spoofed_identities_cannot_bypass_global_login_lockout(panel):
+    tailnet_login(panel)
+    for index in range(5):
+        response = panel.local.post("/api/login", json={"pin": "000000"}, headers={
+            **PANEL_HEADER, "Tailscale-User-Login": f"person-{index}",
+        })
+        assert response.status_code == 401
+    response = panel.local.post("/api/login", json={"pin": PIN}, headers={
+        **PANEL_HEADER, "Tailscale-User-Login": "person-5",
+    })
+    assert response.status_code == 429
+    assert response.json()["retry_after"] == 900
+    assert response.headers["retry-after"] == "900"
+    assert "set-cookie" not in response.headers
+
+
+@pytest.mark.parametrize("valid", [False, True])
+def test_login_reserves_both_attempts_once_before_verifying_and_never_fails_twice(panel, monkeypatch, valid):
     tailnet_login(panel)
     events = []
 
@@ -240,17 +260,51 @@ def test_login_reserves_attempt_once_before_verifying_and_never_fails_twice(pane
 
     def verify(pin, stored):
         events.append(("verify",))
-        return True
+        return valid
 
     panel.deps.lockout = Reservation()
     monkeypatch.setattr(panel.module, "verify_pin", verify)
     response = panel.tailnet.post("/api/login", json={"pin": PIN}, headers={**PANEL_HEADER, "Tailscale-User-Login": "person"})
-    assert response.status_code == 200
-    assert events == [("attempt", "person"), ("verify",), ("success", "person")]
-    events.clear()
-    panel.deps.lockout.attempt = lambda ident: 1.2
-    assert panel.tailnet.post("/api/login", json={"pin": PIN}, headers=PANEL_HEADER).status_code == 429
-    assert events == []
+    assert response.status_code == (200 if valid else 401)
+    expected = [("attempt", "person"), ("attempt", "*"), ("verify",)]
+    if valid:
+        expected += [("success", "person"), ("success", "*")]
+    assert events == expected
+
+
+@pytest.mark.parametrize("identity_wait,global_wait,seconds", [
+    (12.1, 1.2, 13), (1.2, 12.1, 13), (0, 1.2, 2), (1.2, 0, 2),
+])
+def test_login_reserves_both_buckets_and_returns_longest_lock_without_verifying(
+    panel, monkeypatch, identity_wait, global_wait, seconds,
+):
+    tailnet_login(panel)
+    events = []
+
+    class Reservation:
+        def attempt(self, ident):
+            events.append(ident)
+            return global_wait if ident == "*" else identity_wait
+
+        def success(self, ident):
+            events.append(("success", ident))
+
+        def fail(self, ident):
+            events.append(("fail", ident))
+
+    def verify(pin, stored):
+        events.append("verify")
+        return True
+
+    panel.deps.lockout = Reservation()
+    monkeypatch.setattr(panel.module, "verify_pin", verify)
+    response = panel.tailnet.post("/api/login", json={"pin": PIN}, headers={
+        **PANEL_HEADER, "Tailscale-User-Login": "person",
+    })
+    assert response.status_code == 429
+    assert response.json()["retry_after"] == seconds
+    assert response.headers["retry-after"] == str(seconds)
+    assert events == ["person", "*"]
 
 
 @pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE", "UNKNOWN"])
@@ -594,6 +648,43 @@ def test_entrypoint_refuses_wrong_cwd_and_host_without_side_effects(tmp_path, mo
     assert not calls and not (tmp_path / ".panel").exists()
 
 
+def test_entrypoint_busy_port_preserves_running_token_and_does_not_start_server(tmp_path, monkeypatch, capsys):
+    from bitgetbot.panel import __main__ as entry
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(entry.ops, "REPO_ROOT", tmp_path)
+    path = tmp_path / ".panel" / "token"
+    entry._write_token(path, TOKEN)
+    original = path.read_bytes()
+    probes, closed, calls, received, generated = [], [], [], [], []
+
+    @contextmanager
+    def connect(address, timeout):
+        probes.append((address, timeout))
+        try:
+            yield
+        finally:
+            closed.append(True)
+
+    def token(size):
+        generated.append(size)
+        return "NEW-LAUNCH-TEST-TOKEN"
+
+    monkeypatch.setattr(socket, "create_connection", connect)
+    monkeypatch.setattr(entry.secrets, "token_urlsafe", token)
+    monkeypatch.setattr(entry, "create_app", lambda deps: received.append(deps) or "fake-app")
+    monkeypatch.setattr(entry.uvicorn, "run", lambda app, **kwargs: calls.append((app, kwargs)))
+    assert entry.main([]) == 0
+    assert path.read_bytes() == original
+    assert probes == [(("127.0.0.1", 8090), 0.2)]
+    assert closed == [True]
+    assert not calls and not received and not generated
+    captured = capsys.readouterr()
+    assert "패널이 이미 실행 중입니다." in captured.out + captured.err
+    assert TOKEN not in captured.out + captured.err
+    assert list(path.parent.iterdir()) == [path]
+
+
 def test_entrypoint_rotates_private_token_and_binds_only_loopback(tmp_path, monkeypatch, capsys):
     from bitgetbot.panel import __main__ as entry
 
@@ -602,6 +693,13 @@ def test_entrypoint_rotates_private_token_and_binds_only_loopback(tmp_path, monk
     calls, received = [], []
     monkeypatch.setattr(entry, "create_app", lambda deps: received.append(deps) or "fake-app")
     monkeypatch.setattr(entry.uvicorn, "run", lambda app, **kwargs: calls.append((app, kwargs)))
+    probes = []
+
+    def refuse(address, timeout):
+        probes.append((address, timeout))
+        raise ConnectionRefusedError
+
+    monkeypatch.setattr(socket, "create_connection", refuse)
     tokens = [secrets.token_urlsafe(32), secrets.token_urlsafe(32)]
     seen_sizes = []
 
@@ -614,6 +712,7 @@ def test_entrypoint_rotates_private_token_and_binds_only_loopback(tmp_path, monk
         assert entry.main([]) == 0
         assert (tmp_path / ".panel" / "token").read_text(encoding="utf-8").strip() == tokens[index]
         assert received[index].token == tokens[index]
+    assert probes == [(("127.0.0.1", 8090), 0.2)] * 2
     assert seen_sizes == [32, 32]
     assert calls == [("fake-app", {
         "host": "127.0.0.1", "port": 8090, "log_level": "warning", "access_log": False,
@@ -674,6 +773,10 @@ def test_entrypoint_permission_failure_stops_without_writing_token(tmp_path, mon
     def forbidden(*args, **kwargs):
         pytest.fail("Permission failure must not start server")
 
+    def port_free(address, timeout):
+        raise ConnectionRefusedError
+
+    monkeypatch.setattr(socket, "create_connection", port_free)
     monkeypatch.setattr(entry, "_restrict_to_owner", refuse)
     monkeypatch.setattr(entry.uvicorn, "run", forbidden)
     assert entry.main([]) == 1

@@ -233,7 +233,8 @@ def create_app(deps: PanelDeps) -> FastAPI:
         if stored is None:
             raise _PanelError(409, "PC에서 PIN을 먼저 설정하세요")
         ident = identity(request.headers)
-        remaining = deps.lockout.attempt(ident)
+        # Headers can be spoofed on loopback; also reserve a non-evictable global budget.
+        remaining = max(deps.lockout.attempt(ident), deps.lockout.attempt("*"))
         if remaining > 0:
             seconds = math.ceil(remaining)
             return JSONResponse(
@@ -244,6 +245,7 @@ def create_app(deps: PanelDeps) -> FastAPI:
         if not isinstance(pin, str) or not valid_pin(pin) or not verify_pin(pin, stored):
             raise _PanelError(401, "PIN이 올바르지 않습니다")
         deps.lockout.success(ident)
+        deps.lockout.success("*")
         return session_response("tailnet")
 
     @app.post("/api/pin")
