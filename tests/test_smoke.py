@@ -1195,3 +1195,118 @@ def test_cli_live_ledger_refuses_stale_state_mode(cli, monkeypatch, tmp_path, ca
     assert reader.calls == []
     assert "모드" in capsys.readouterr().out
     assert path.exists()
+
+
+def test_run_command_uses_injected_io_for_enter_live(cli, monkeypatch, tmp_path, capsys):
+    settings, _, ft, _, _ = cli
+    ft.dry_run = False
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("must use injected ask"))
+    lines, asked = [], []
+    io = smoke.SmokeIO(out=lines.append, ask=lambda p: asked.append(p) or "LIVE")
+
+    assert smoke.run_command("enter", io) == 0
+
+    assert asked == ["실전 주문을 냅니다. 계속하려면 LIVE 입력:"]
+    assert lines[0] == "=== 모드: 실전(LIVE) ==="
+    assert any("진입 확인" in line for line in lines)
+    assert [call for call in ft.calls if isinstance(call, tuple)] == [
+        ("enter", ("BTC/USDT:USDT", "long", 7.29, 2, "market", "smoke")),
+    ]
+    state = json.loads((tmp_path / ".smoke_state.json").read_text(encoding="utf-8"))
+    assert state["mode"] == "live" and state["trade_id"] == 7
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_restart_check_calls_injected_restart_instead_of_prompt(cli, monkeypatch, tmp_path,
+                                                              capsys, dry_run):
+    settings, reader, ft, _, t = cli
+    ft.dry_run = dry_run
+    ft.state = "running"
+    ft.trades = [dict(TRADE)]
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=dry_run))
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "dry" if dry_run else "live",
+    }), encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("must not prompt for restart"))
+    lines, asked, restarts = [], [], []
+
+    def restart():
+        assert ft.calls == ["config", "health", "status"]
+        assert lines[-1] == "컨테이너를 재시작합니다…"
+        restarts.append(True)
+        ft.state = "stopped"
+
+    io = smoke.SmokeIO(out=lines.append, ask=lambda p: asked.append(p) or "", restart=restart)
+
+    assert smoke.run_command("restart-check", io) == 0
+
+    assert len(restarts) == 1 and asked == []
+    assert "재시작 후 같은 거래 번호 확인: 7" in lines
+    assert "종합: PASS" in lines
+    assert not any("다음 명령을 직접 실행하세요" in line for line in lines)
+    assert ft.calls[:8] == ["config", "health", "status", "ping", "config", "start", "config", "health"]
+    assert ft.calls.count("start") == 1 and t[0] == 30
+    assert not any(isinstance(call, tuple) for call in ft.calls)
+    assert reader.calls == ([] if dry_run else ["position", "stops"])
+    assert capsys.readouterr().out == ""
+
+
+def test_console_io_resolves_builtins_at_call_time(monkeypatch):
+    lines = []
+    monkeypatch.setattr("builtins.print", lines.append)
+    monkeypatch.setattr("builtins.input", lambda p: "X")
+
+    io = smoke.SmokeIO.console()
+
+    assert io.ask("q") == "X"
+    io.out("console output")
+    assert lines == ["console output"]
+    assert io.restart is None
+
+
+def test_run_command_injected_io_dry_roundtrip(cli, monkeypatch, tmp_path, capsys):
+    _, reader, ft, keys, _ = cli
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("dry-run must not prompt"))
+    lines, asked = [], []
+    io = smoke.SmokeIO(out=lines.append, ask=lambda p: asked.append(p) or "")
+
+    for command in ("preflight", "enter", "check", "exit", "ledger"):
+        assert smoke.run_command(command, io) == 0
+
+    assert asked == []
+    assert "종합: PASS" in lines
+    assert "청산 확인: Freqtrade 열린 거래 0개" in lines
+    assert "모의(DRY-RUN): 거래소 체결 장부 내보내기를 생략합니다." in lines
+    assert [call for call in ft.calls if isinstance(call, tuple)] == [
+        ("enter", ("BTC/USDT:USDT", "long", 7.29, 2, "market", "smoke")),
+        ("exit", (7, "market")),
+    ]
+    assert not (tmp_path / ".smoke_state.json").exists()
+    assert set(reader.calls) <= {"contract", "mark"}
+    assert all(key == ("", "", "") for key in keys)
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("command", ["preflight", "enter", "check", "restart-check", "exit", "ledger"])
+@pytest.mark.parametrize("error", [RuntimeError, KeyboardInterrupt])
+def test_run_command_injected_io_sanitizes_errors(cli, monkeypatch, capsys, command, error):
+    def fail():
+        raise error("SECRET-SENTINEL")
+
+    monkeypatch.setattr(smoke, "load_settings", fail)
+    lines = []
+    io = smoke.SmokeIO(out=lines.append, ask=lambda _: pytest.fail("must not prompt"))
+
+    assert smoke.run_command(command, io) == 1
+
+    expected = ["명령 실패: 설정·연결·응답을 확인하세요. 비밀값 보호를 위해 오류 원문은 표시하지 않습니다."]
+    if command in {"check", "restart-check"}:
+        expected.append("손절 확인 실패. 지금 바로 'python -m bitgetbot.smoke exit'을 실행하세요.")
+    if command == "exit":
+        expected.append("비트겟 웹(PC)에서 서브계정 선물 포지션을 직접 확인하고 시장가 청산하세요.")
+    assert lines == expected
+    assert capsys.readouterr().out == ""

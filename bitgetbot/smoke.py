@@ -6,6 +6,7 @@ import math
 import sys
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_CEILING
 from pathlib import Path
@@ -31,6 +32,17 @@ FT_MANUAL_CLOSE = (
 )
 DRY_NOTICE = "dry-run: 거래소 손절 확인은 실전에서만 합니다"
 NO_SMOKE_TRADE = "검사할 스모크 거래가 없습니다. enter를 먼저 실행했는지 확인하세요."
+
+
+@dataclass
+class SmokeIO:
+    out: Callable[[str], None]
+    ask: Callable[[str], str]
+    restart: Callable[[], None] | None = None
+
+    @staticmethod
+    def console() -> "SmokeIO":
+        return SmokeIO(print, input, None)
 
 
 def _positive(value) -> bool:
@@ -114,28 +126,33 @@ def ft_trade_checks(trade: dict, max_liq_fraction: float = MAX_LIQ_FRACTION) -> 
     ]
 
 
-def _print_checks(checks: list[Check], out=print) -> None:
-    out("검사 | 결과 | 설명")
+def _print_checks(checks: list[Check], *, io: SmokeIO | None = None) -> None:
+    io = io if io is not None else SmokeIO.console()
+    io.out("검사 | 결과 | 설명")
     for check in checks:
         result = "UNKNOWN" if check.ok is None else "PASS" if check.ok else "FAIL"
-        out(f"{check.name} | {result} | {check.detail}")
-    out(f"종합: {overall(checks)}")
+        io.out(f"{check.name} | {result} | {check.detail}")
+    io.out(f"종합: {overall(checks)}")
 
 
 def run_check(
     reader, symbol: str, timeout_s: float = 120, interval_s: float = 5,
-    sleep=time.sleep, clock=time.monotonic, out=print,
+    sleep=time.sleep, clock=time.monotonic, out=None, *, io: SmokeIO | None = None,
 ) -> int:
+    io = io if io is not None else SmokeIO.console()
+    if out is not None:
+        io = SmokeIO(out, io.ask, io.restart)
+
     def protected():
         try:
             position = reader.fetch_position(symbol)
             plans = reader.fetch_stop_orders(symbol)
-            out("손절 후보 전체: 주문 번호 | 계획 유형 | 발동 가격 | 발동 기준")
+            io.out("손절 후보 전체: 주문 번호 | 계획 유형 | 발동 가격 | 발동 기준")
             candidates = [plan for plan in plans if plan.symbol == symbol]
             for plan in candidates:
-                out(f"{plan.order_id} | {plan.plan_type} | {plan.trigger_price} | {plan.trigger_type}")
+                io.out(f"{plan.order_id} | {plan.plan_type} | {plan.trigger_price} | {plan.trigger_type}")
             if not candidates:
-                out("손절 후보 없음")
+                io.out("손절 후보 없음")
             if position is None:
                 checks = [Check("position_exists", False, "거래소 포지션이 없습니다")]
             else:
@@ -146,15 +163,15 @@ def run_check(
                         or (position.liq_price is not None and not _positive(position.liq_price))
                         or any(not _positive(plan.trigger_price) for plan in candidates)):
                     checks.append(Check("snapshot_valid", None, "가격 또는 포지션 자료가 유효하지 않습니다"))
-            _print_checks(checks, out)
+            _print_checks(checks, io=io)
             return overall(checks) == "PASS"
         except Exception:
-            out("조회 실패: 손절 보호를 확인할 수 없습니다. 오류 원문은 비밀값 보호를 위해 생략합니다.")
+            io.out("조회 실패: 손절 보호를 확인할 수 없습니다. 오류 원문은 비밀값 보호를 위해 생략합니다.")
             return False
 
     if wait_until(protected, timeout_s, interval_s, sleep, clock):
         return 0
-    out(EXIT_WARNING)
+    io.out(EXIT_WARNING)
     return 1
 
 
@@ -169,35 +186,37 @@ def _wait(predicate, timeout_s: float, interval_s: float = 5) -> bool:
     return wait_until(observed, timeout_s, interval_s, time.sleep, time.monotonic)
 
 
-def _mode_matches(settings: Settings, config: dict) -> bool:
+def _mode_matches(settings: Settings, config: dict, *, io: SmokeIO | None = None) -> bool:
+    io = io if io is not None else SmokeIO.console()
     if type(config.get("dry_run")) is not bool or config["dry_run"] != settings.dry_run:
-        print("문제: 로컬 설정과 실행 중인 Freqtrade 모드가 다르거나 확인되지 않았습니다. 주문하지 않습니다.")
+        io.out("문제: 로컬 설정과 실행 중인 Freqtrade 모드가 다르거나 확인되지 않았습니다. 주문하지 않습니다.")
         return False
     return True
 
 
-def _preflight(settings: Settings, reader, ft) -> tuple[bool, dict]:
-    print("Freqtrade 시작을 기다리는 중입니다 (최대 3분)…")
+def _preflight(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> tuple[bool, dict]:
+    io = io if io is not None else SmokeIO.console()
+    io.out("Freqtrade 시작을 기다리는 중입니다 (최대 3분)…")
     try:
         if not _wait(ft.ping, 180, 3):
-            print(FT_UNREACHABLE)
+            io.out(FT_UNREACHABLE)
             return False, {}
         config = ft.show_config()
         trades = ft.status()
     except (FreqtradeUnreachable, FreqtradeError):
-        print(FT_UNREACHABLE)
+        io.out(FT_UNREACHABLE)
         return False, {}
-    if not _mode_matches(settings, config):
+    if not _mode_matches(settings, config, io=io):
         return False, config
     expected_db = DRY_DB_URL if settings.dry_run else LIVE_DB_URL
     if settings.db_url != expected_db:
-        print("문제: 설정 모드와 db_url이 일치하지 않습니다. set-mode로 모드와 DB를 함께 설정하세요.")
+        io.out("문제: 설정 모드와 db_url이 일치하지 않습니다. set-mode로 모드와 DB를 함께 설정하세요.")
         return False, config
     account_kind, positions, orders, balance = "unknown", [], 0, None
     plan_orders = 0
     if not settings.dry_run:
         account_kind = classify_account(reader.account_mode_report())
-        print(f"계정 모드: {account_kind}")
+        io.out(f"계정 모드: {account_kind}")
         positions = reader.fetch_positions()
         orders = reader.fetch_open_order_count()
         plan_orders = reader.fetch_plan_order_count()
@@ -212,13 +231,13 @@ def _preflight(settings: Settings, reader, ft) -> tuple[bool, dict]:
         problems.append(f"미체결 예약(트리거·손절) 주문이 {plan_orders}개 있습니다")
     try:
         stake = smoke_stake(reader.fetch_contract(SYMBOL), reader.fetch_mark_price(SYMBOL), 2)
-        print(f"예상 증거금: {stake:.2f} USDT (상한 10 USDT)")
+        io.out(f"예상 증거금: {stake:.2f} USDT (상한 10 USDT)")
     except ValueError:
         problems.append("계약·표시가격을 확인할 수 없거나 최소 주문 증거금이 10 USDT를 초과합니다.")
     for problem in problems:
-        print(f"문제: {problem}")
+        io.out(f"문제: {problem}")
     if not problems:
-        print("사전 점검 통과: 문제 0개")
+        io.out("사전 점검 통과: 문제 0개")
     return not problems, config
 
 
@@ -240,11 +259,14 @@ def _save_state(state: dict) -> None:
     STATE_PATH.write_text(json.dumps(state) + "\n", encoding="utf-8")
 
 
-def _state_mode_matches(settings: Settings, state: dict, *, exiting: bool = False) -> bool:
+def _state_mode_matches(
+    settings: Settings, state: dict, *, exiting: bool = False, io: SmokeIO | None = None,
+) -> bool:
+    io = io if io is not None else SmokeIO.console()
     if state and state.get("mode") != ("dry" if settings.dry_run else "live"):
         next_step = ("Freqtrade 청산을 계속하고 비트겟 웹(PC)에서 포지션을 직접 확인하세요."
                      if exiting else "먼저 exit으로 정리하세요.")
-        print("경고: 스모크 상태 파일의 모드가 현재 모드와 다르거나 확인되지 않았습니다. " + next_step)
+        io.out("경고: 스모크 상태 파일의 모드가 현재 모드와 다르거나 확인되지 않았습니다. " + next_step)
         return False
     return True
 
@@ -253,32 +275,33 @@ def _same_trade(trade: dict, trade_id) -> bool:
     return trade_id is not None and str(trade.get("trade_id")) == str(trade_id)
 
 
-def _enter(settings: Settings, reader, ft) -> int:
+def _enter(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
+    io = io if io is not None else SmokeIO.console()
     if STATE_PATH.exists():
-        print("이전 스모크 상태 파일이 남아 있습니다. 먼저 exit으로 정리하세요")
+        io.out("이전 스모크 상태 파일이 남아 있습니다. 먼저 exit으로 정리하세요")
         return 1
-    ready, config = _preflight(settings, reader, ft)
+    ready, config = _preflight(settings, reader, ft, io=io)
     if not ready:
         return 1
-    typed = "" if settings.dry_run else input("실전 주문을 냅니다. 계속하려면 LIVE 입력:")
+    typed = "" if settings.dry_run else io.ask("실전 주문을 냅니다. 계속하려면 LIVE 입력:")
     if not require_live_confirmation(settings.dry_run, typed):
-        print("취소했습니다. 주문하지 않았습니다.")
+        io.out("취소했습니다. 주문하지 않았습니다.")
         return 1
     # Re-read public data immediately before entry; never exceed the stake cap.
     stake = smoke_stake(reader.fetch_contract(SYMBOL), reader.fetch_mark_price(SYMBOL), 2)
     if config.get("state") == "stopped":
         ft.start()
         if not _wait(lambda: ft.show_config().get("state") == "running", 10, 1):
-            print("10초 내 Freqtrade 실행 상태가 running이 되지 않았습니다. 주문하지 않습니다.")
+            io.out("10초 내 Freqtrade 실행 상태가 running이 되지 않았습니다. 주문하지 않습니다.")
             return 1
     elif config.get("state") != "running":
-        print("Freqtrade 실행 상태를 확인할 수 없습니다. 주문하지 않습니다.")
+        io.out("Freqtrade 실행 상태를 확인할 수 없습니다. 주문하지 않습니다.")
         return 1
     current_config = ft.show_config()
-    if not _mode_matches(settings, current_config):
+    if not _mode_matches(settings, current_config, io=io):
         return 1
     if current_config.get("state") != "running":
-        print("Freqtrade 실행 상태가 running이 아닙니다. 주문하지 않습니다.")
+        io.out("Freqtrade 실행 상태가 running이 아닙니다. 주문하지 않습니다.")
         return 1
     state = {"started_ms": time.time_ns() // 1_000_000, "trade_id": None,
              "mode": "dry" if settings.dry_run else "live"}
@@ -298,94 +321,100 @@ def _enter(settings: Settings, reader, ft) -> int:
             return True
 
         if not _wait(visible, 60):
-            print("60초 내 거래를 확인하지 못했습니다. enter를 반복하지 마세요.")
-            print(EXIT_WARNING)
+            io.out("60초 내 거래를 확인하지 못했습니다. enter를 반복하지 마세요.")
+            io.out(EXIT_WARNING)
             return 1
         _save_state(state)
-        print(f"진입 확인: 거래 번호 {state['trade_id']}, 증거금 {stake:.2f} USDT")
+        io.out(f"진입 확인: 거래 번호 {state['trade_id']}, 증거금 {stake:.2f} USDT")
         return 0
     except (Exception, KeyboardInterrupt):
         # The saved attempt marks the boundary after which the POST may have reached Freqtrade.
-        print("진입 확인 실패: 비밀값 보호를 위해 오류 원문은 표시하지 않습니다.")
-        print(EXIT_WARNING)
+        io.out("진입 확인 실패: 비밀값 보호를 위해 오류 원문은 표시하지 않습니다.")
+        io.out(EXIT_WARNING)
         return 1
 
 
-def _check(settings: Settings, reader, ft) -> int:
+def _check(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
+    io = io if io is not None else SmokeIO.console()
     state = _load_state()
     if not state:
-        print(NO_SMOKE_TRADE)
+        io.out(NO_SMOKE_TRADE)
         return 1
-    if not _state_mode_matches(settings, state):
+    if not _state_mode_matches(settings, state, io=io):
         return 1
-    if not _mode_matches(settings, ft.show_config()):
-        print(EXIT_WARNING)
+    if not _mode_matches(settings, ft.show_config(), io=io):
+        io.out(EXIT_WARNING)
         return 1
     trades = [trade for trade in ft.status() if trade.get("pair") == PAIR
               and (not state.get("trade_id") or _same_trade(trade, state["trade_id"]))]
     if not trades:
-        print(NO_SMOKE_TRADE)
+        io.out(NO_SMOKE_TRADE)
         return 1
     if len(trades) != 1:
-        print("검사할 스모크 거래를 하나로 확인할 수 없습니다.")
-        print(EXIT_WARNING)
+        io.out("검사할 스모크 거래를 하나로 확인할 수 없습니다.")
+        io.out(EXIT_WARNING)
         return 1
     if not settings.dry_run:
-        return run_check(reader, SYMBOL, 120, 5, time.sleep, time.monotonic, print)
-    print(DRY_NOTICE)
+        return run_check(reader, SYMBOL, 120, 5, time.sleep, time.monotonic, io=io)
+    io.out(DRY_NOTICE)
     checks = ft_trade_checks(trades[0])
-    _print_checks(checks)
+    _print_checks(checks, io=io)
     result = overall(checks)
     if result == "FAIL":
-        print(EXIT_WARNING)
+        io.out(EXIT_WARNING)
         return 1
     if result == "UNKNOWN":
-        print("경고: 청산가를 알 수 없거나 판정 자료가 부족합니다. 모의 점검만 계속하며 실전에서는 PASS가 필요합니다.")
+        io.out("경고: 청산가를 알 수 없거나 판정 자료가 부족합니다. 모의 점검만 계속하며 실전에서는 PASS가 필요합니다.")
     return 0
 
 
-def _restart_check(settings: Settings, reader, ft) -> int:
+def _restart_check(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
+    io = io if io is not None else SmokeIO.console()
     state = _load_state()
     if not state:
-        print(NO_SMOKE_TRADE)
+        io.out(NO_SMOKE_TRADE)
         return 1
-    if not _state_mode_matches(settings, state):
+    if not _state_mode_matches(settings, state, io=io):
         return 1
     trade_id = state.get("trade_id")
     if trade_id is None:
-        print("저장된 거래 번호가 없습니다.")
-        print(EXIT_WARNING)
+        io.out("저장된 거래 번호가 없습니다.")
+        io.out(EXIT_WARNING)
         return 1
     config = ft.show_config()
     if config.get("state") != "running":
-        print("재시작 점검 전 Freqtrade 실행 상태가 running이어야 합니다.")
+        io.out("재시작 점검 전 Freqtrade 실행 상태가 running이어야 합니다.")
         return 1
-    if not _mode_matches(settings, config):
-        print(EXIT_WARNING)
+    if not _mode_matches(settings, config, io=io):
+        io.out(EXIT_WARNING)
         return 1
     unconfirmed = "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요."
     startup_before = ft.health().get("bot_startup_ts")
     if type(startup_before) is not int:
-        print(unconfirmed)
+        io.out(unconfirmed)
         return 1
     if not any(_same_trade(trade, trade_id) and trade.get("pair") == PAIR for trade in ft.status()):
-        print(NO_SMOKE_TRADE)
+        io.out(NO_SMOKE_TRADE)
         return 1
-    print("다음 명령을 직접 실행하세요: docker compose -f freqtrade/docker-compose.yml restart freqtrade")
-    input("재시작 명령 실행 후 Enter를 누르세요: ")
+    if io.restart is not None:
+        io.out("컨테이너를 재시작합니다…")
+        io.restart()
+    else:
+        io.out("다음 명령을 직접 실행하세요: docker compose -f freqtrade/docker-compose.yml restart freqtrade")
+        io.ask("재시작 명령 실행 후 Enter를 누르세요: ")
     if not _wait(ft.ping, 90):
-        print(FT_MANUAL_CLOSE)
+        io.out(FT_MANUAL_CLOSE)
         return 1
     config = ft.show_config()
     if config.get("state") != "stopped":
-        print(unconfirmed)
+        io.out(unconfirmed)
         return 1
-    if not _mode_matches(settings, config):
-        print(EXIT_WARNING)
+    if not _mode_matches(settings, config, io=io):
+        io.out(EXIT_WARNING)
         return 1
     ft.start()
     if not _wait(lambda: ft.show_config().get("state") == "running", 10, 1):
-        print(unconfirmed)
+        io.out(unconfirmed)
         return 1
 
     def startup_advanced():
@@ -393,49 +422,51 @@ def _restart_check(settings: Settings, reader, ft) -> int:
         return type(startup_after) is int and startup_after > startup_before
 
     if not _wait(startup_advanced, 15, 1):
-        print(unconfirmed)
+        io.out(unconfirmed)
         return 1
     time.sleep(30)
     if not any(_same_trade(trade, trade_id) and trade.get("pair") == PAIR for trade in ft.status()):
-        print(NO_SMOKE_TRADE)
+        io.out(NO_SMOKE_TRADE)
         return 1
-    print(f"재시작 후 같은 거래 번호 확인: {trade_id}")
-    return _check(settings, reader, ft)
+    io.out(f"재시작 후 같은 거래 번호 확인: {trade_id}")
+    return _check(settings, reader, ft, io=io)
 
 
-def _ledger(settings: Settings, reader) -> int:
+def _ledger(settings: Settings, reader, *, io: SmokeIO | None = None) -> int:
+    io = io if io is not None else SmokeIO.console()
     if settings.dry_run:
-        print("모의(DRY-RUN): 거래소 체결 장부 내보내기를 생략합니다.")
+        io.out("모의(DRY-RUN): 거래소 체결 장부 내보내기를 생략합니다.")
         return 0
     state = _load_state()
     if not state:
-        print("장부 시작 시각이 없습니다. .smoke_state.json을 확인하세요.")
+        io.out("장부 시작 시각이 없습니다. .smoke_state.json을 확인하세요.")
         return 1
-    if not _state_mode_matches(settings, state):
+    if not _state_mode_matches(settings, state, io=io):
         return 1
     fills = reader.fetch_fills(SYMBOL, state["started_ms"])
     if not fills:
-        print("조회된 체결이 없습니다. 잠시 후 ledger를 다시 실행하세요.")
+        io.out("조회된 체결이 없습니다. 잠시 후 ledger를 다시 실행하세요.")
         return 1
     rate, at = fetch_krw_per_usdt()
     rows = fills_to_rows(fills, rate, at)
     date = datetime.fromtimestamp(state["started_ms"] / 1000, timezone.utc).strftime("%Y%m%d")
     path = Path("ledger") / f"smoke-{date}.csv"
     count = append_csv(rows, path)
-    print(f"장부 저장: {path.as_posix()}, 새 체결 {count}개")
+    io.out(f"장부 저장: {path.as_posix()}, 새 체결 {count}개")
     if state.get("close_confirmed") is True:
         STATE_PATH.unlink(missing_ok=True)
     return 0
 
 
-def _exit(settings: Settings, reader, ft) -> int:
+def _exit(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
+    io = io if io is not None else SmokeIO.console()
     config = ft.show_config()
     state = _load_state()
-    state_matches = _state_mode_matches(settings, state, exiting=True)
+    state_matches = _state_mode_matches(settings, state, exiting=True, io=io)
     mode_matches = (type(config.get("dry_run")) is bool
                     and config["dry_run"] == settings.dry_run and state_matches)
     if not mode_matches:
-        print("경고: 모드가 다르거나 확인되지 않았습니다. Freqtrade의 열린 거래를 청산하고 비트겟 웹(PC)에서 포지션을 직접 확인하세요.")
+        io.out("경고: 모드가 다르거나 확인되지 않았습니다. Freqtrade의 열린 거래를 청산하고 비트겟 웹(PC)에서 포지션을 직접 확인하세요.")
     # A trade ID from another mode's database must not select a trade in this database.
     ft.force_exit((state.get("trade_id") if mode_matches else None) or "all", "market")
 
@@ -447,33 +478,64 @@ def _exit(settings: Settings, reader, ft) -> int:
             return ft_empty and exchange_empty
         except Exception:
             # Observation only: retry transient GET errors, never the force_exit POST.
-            print("청산 조회 실패: 제한 시간 안에서 다시 확인합니다. 오류 원문은 표시하지 않습니다.")
+            io.out("청산 조회 실패: 제한 시간 안에서 다시 확인합니다. 오류 원문은 표시하지 않습니다.")
             return False
 
     if not _wait(closed, 60):
-        print("60초 내 청산을 확인하지 못했습니다. 비트겟 웹(PC)에서 포지션을 직접 확인하고 시장가 청산하세요.")
+        io.out("60초 내 청산을 확인하지 못했습니다. 비트겟 웹(PC)에서 포지션을 직접 확인하고 시장가 청산하세요.")
         return 1
-    print("청산 확인: Freqtrade 열린 거래 0개" + (
+    io.out("청산 확인: Freqtrade 열린 거래 0개" + (
         ", 거래소 포지션 없음" if not settings.dry_run and mode_matches else ""
     ))
     if not mode_matches:
-        print("모드 불일치로 거래소 청산 여부는 확인하지 않았습니다. 비트겟 웹(PC)에서 직접 확인하세요.")
+        io.out("모드 불일치로 거래소 청산 여부는 확인하지 않았습니다. 비트겟 웹(PC)에서 직접 확인하세요.")
         return 1
     if not settings.dry_run and not state:
-        print("청산은 완료됐습니다. 장부 시작 시각이 없어 장부를 저장하지 않았습니다. 비트겟 웹(PC)에서 체결 내역을 확인하세요.")
+        io.out("청산은 완료됐습니다. 장부 시작 시각이 없어 장부를 저장하지 않았습니다. 비트겟 웹(PC)에서 체결 내역을 확인하세요.")
         return 1
     try:
         if state:
             state["close_confirmed"] = True
             _save_state(state)
-        if _ledger(settings, reader) != 0:
+        if _ledger(settings, reader, io=io) != 0:
             raise ValueError("장부 저장 실패")
     except (Exception, KeyboardInterrupt):
         # Keep the saved start time so the standalone ledger command remains usable.
-        print("청산은 완료됐습니다. 장부 저장에 실패했으니 'python -m bitgetbot.smoke ledger'를 다시 실행하세요.")
+        io.out("청산은 완료됐습니다. 장부 저장에 실패했으니 'python -m bitgetbot.smoke ledger'를 다시 실행하세요.")
         return 1
     STATE_PATH.unlink(missing_ok=True)
     return 0
+
+
+def run_command(command: str, io: SmokeIO) -> int:
+    try:
+        settings = load_settings()
+        if type(settings.dry_run) is not bool:
+            io.out("dry_run 설정은 true 또는 false여야 합니다.")
+            return 1
+        io.out("=== 모드: 모의(DRY-RUN) ===" if settings.dry_run else "=== 모드: 실전(LIVE) ===")
+        # Dry-run constructs a credential-free adapter and never calls its private methods.
+        credentials = ("", "", "") if settings.dry_run else (settings.key, settings.secret, settings.password)
+        reader = BitgetReader(make_exchange(*credentials))
+        if command == "ledger":
+            return _ledger(settings, reader, io=io)
+        ft = FreqtradeClient(settings.api_url, settings.api_user, settings.api_pass)
+        if command == "preflight":
+            return 0 if _preflight(settings, reader, ft, io=io)[0] else 1
+        handlers = {"enter": _enter, "check": _check, "restart-check": _restart_check, "exit": _exit}
+        return handlers[command](settings, reader, ft, io=io)
+    except (Exception, KeyboardInterrupt) as error:
+        # Upstream exceptions and configs may include credentials. Never print their repr/body.
+        if (isinstance(error, FreqtradeUnreachable)
+                and command in {"check", "restart-check"} and STATE_PATH.exists()):
+            io.out(FT_MANUAL_CLOSE)
+            return 1
+        io.out("명령 실패: 설정·연결·응답을 확인하세요. 비밀값 보호를 위해 오류 원문은 표시하지 않습니다.")
+        if command in {"check", "restart-check"}:
+            io.out(EXIT_WARNING)
+        if command == "exit":
+            io.out("비트겟 웹(PC)에서 서브계정 선물 포지션을 직접 확인하고 시장가 청산하세요.")
+        return 1
 
 
 class _KoreanHelpFormatter(argparse.HelpFormatter):
@@ -523,33 +585,10 @@ def main(argv: list[str] | None = None) -> int:
             print("exchange.key/secret/password를 채우세요. 모드는 set-mode dry 또는 set-mode live로 설정하세요.")
             print("자동 생성된 api_server 인증값은 유지하세요. 비밀값을 화면·로그·깃에 남기지 마세요.")
             return 0
-        settings = load_settings()
-        if type(settings.dry_run) is not bool:
-            print("dry_run 설정은 true 또는 false여야 합니다.")
-            return 1
-        print("=== 모드: 모의(DRY-RUN) ===" if settings.dry_run else "=== 모드: 실전(LIVE) ===")
-        # Dry-run constructs a credential-free adapter and never calls its private methods.
-        credentials = ("", "", "") if settings.dry_run else (settings.key, settings.secret, settings.password)
-        reader = BitgetReader(make_exchange(*credentials))
-        if command == "ledger":
-            return _ledger(settings, reader)
-        ft = FreqtradeClient(settings.api_url, settings.api_user, settings.api_pass)
-        if command == "preflight":
-            return 0 if _preflight(settings, reader, ft)[0] else 1
-        handlers = {"enter": _enter, "check": _check, "restart-check": _restart_check, "exit": _exit}
-        return handlers[command](settings, reader, ft)
-    except (Exception, KeyboardInterrupt) as error:
-        # Upstream exceptions and configs may include credentials. Never print their repr/body.
-        if (isinstance(error, FreqtradeUnreachable)
-                and command in {"check", "restart-check"} and STATE_PATH.exists()):
-            print(FT_MANUAL_CLOSE)
-            return 1
+    except (Exception, KeyboardInterrupt):
         print("명령 실패: 설정·연결·응답을 확인하세요. 비밀값 보호를 위해 오류 원문은 표시하지 않습니다.")
-        if command in {"check", "restart-check"}:
-            print(EXIT_WARNING)
-        if command == "exit":
-            print("비트겟 웹(PC)에서 서브계정 선물 포지션을 직접 확인하고 시장가 청산하세요.")
         return 1
+    return run_command(command, SmokeIO.console())
 
 
 if __name__ == "__main__":
