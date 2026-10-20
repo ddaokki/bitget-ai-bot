@@ -52,11 +52,11 @@ RUNS = {
     "baseline_oos": ("SafeTrendV0", OOS, "phase B variant", None),
     "aiv0_raw": ("SafeTrendAIV0", OOS, "phase A corrected", "spike-p2-raw"),
     "tiered_raw": ("SafeTrendAITiered", OOS, "phase A corrected", "spike-p2-raw"),
-    "aiv0_cal": ("SafeTrendAIV0", OOS, "phase B variant", "spike-p2-aiv0-cal"),
-    "aiv1_cal": ("SafeTrendAIV1", OOS, "phase B variant", "spike-p2-aiv1-cal"),
-    "tiered_v1": ("SafeTrendTieredV1", OOS, "phase B variant", "spike-p2-aiv1-cal"),
-    "tiered_v1_plus": ("SafeTrendTieredV1Plus", OOS, "phase B variant", "spike-p2-aiv1-cal"),
-    "tiered_v1_tp2": ("SafeTrendTieredV1TP2", OOS, "EXPLORATORY", "spike-p2-aiv1-cal"),
+    "aiv0_cal": ("SafeTrendAIV0", OOS, "phase B variant", "spike-p2-aiv0-cal-v2"),
+    "aiv1_cal": ("SafeTrendAIV1", OOS, "phase B variant", "spike-p2-aiv1-cal-v2"),
+    "tiered_v1": ("SafeTrendTieredV1", OOS, "phase B variant", "spike-p2-aiv1-cal-v2"),
+    "tiered_v1_plus": ("SafeTrendTieredV1Plus", OOS, "phase B variant", "spike-p2-aiv1-cal-v2"),
+    "tiered_v1_tp2": ("SafeTrendTieredV1TP2", OOS, "EXPLORATORY", "spike-p2-aiv1-cal-v2"),
     "aiv1_raw": ("SafeTrendAIV1", OOS, "reference (uncalibrated p)", "spike-p2-aiv1-raw"),
     "tiered_v1_raw": ("SafeTrendTieredV1", OOS, "reference (uncalibrated p)", "spike-p2-aiv1-raw"),
     "tiered_v1_plus_raw": ("SafeTrendTieredV1Plus", OOS, "reference (uncalibrated p)", "spike-p2-aiv1-raw"),
@@ -238,6 +238,8 @@ def model_predictions(identifier: str) -> pd.DataFrame:
         pair = path.parent.name.split("-")[2].split("_")[0] + "/USDT:USDT"
         frame = pd.read_feather(path)
         frame["pair"] = pair
+        side = path.parent / "spike_window.json"
+        frame["fallback"] = bool(json.loads(side.read_text()).get("platt_fallback")) if side.is_file() else False
         frames.append(frame)
     if frames:
         return pd.concat(frames, ignore_index=True)
@@ -275,11 +277,32 @@ def calibration_report(identifier: str, labels: pd.DataFrame) -> dict:
             "signal_share_p_ge": {str(x): round(float((p[sig] >= x).mean()), 4) for x in (0.45, 0.5, 0.55, 0.65)},
             "signal_p_quantiles": {str(q): round(float(np.quantile(p[sig], q)), 4) for q in (0.5, 0.9, 0.99, 1.0)} if sig.sum() else {},
         }
+    if "fallback" in merged and merged.cal_yes.notna().any():
+        # Windows that kept a positive Platt slope: a monotone map cannot change their ranking,
+        # so raw and calibrated AUC differ only through pooling across windows.
+        keep = ~merged.fallback.to_numpy(dtype=bool)
+        hk = hit[keep]
+        out["non_fallback_windows"] = {
+            "rows": int(keep.sum()), "auc_raw": round(float(roc_auc_score(hk, merged.raw_yes.to_numpy()[keep])), 4),
+            "auc_cal": round(float(roc_auc_score(hk, merged.cal_yes.to_numpy()[keep])), 4),
+            "fallback_rows": int((~keep).sum()),
+            "fallback_rows_auc_raw": round(float(roc_auc_score(hit[~keep], merged.raw_yes.to_numpy()[~keep])), 4) if (~keep).sum() > 10 else None,
+        }
     windows = []
     for path in sorted((MODELS / identifier).glob("sub-train-BTC_*/spike_window.json")):
         info = json.loads(path.read_text())
         windows.append({k: info.get(k) for k in ("train_start", "train_end", "platt_a", "platt_b", "holdout_yes_rate", "holdout_raw_mean")} | {"kept_groups": sorted((info.get("event_weights") or {}).keys())})
     out["windows_btc"] = windows
+    # Review fix: windows whose Platt slope was <= 0 fall back to a constant base-rate p.
+    fallbacks = []
+    for path in sorted((MODELS / identifier).glob("sub-train-*/spike_window.json")):
+        info = json.loads(path.read_text())
+        if info.get("platt_fallback"):
+            fallbacks.append({k: info.get(k) for k in ("pair", "train_start", "train_end", "platt_raw_slope", "train_yes_rate")})
+    n_windows = len(list((MODELS / identifier).glob("sub-train-*/spike_window.json")))
+    if n_windows:
+        out["platt_fallback"] = {"windows_total": n_windows, "windows_fallback": len(fallbacks),
+                                 "btc_fallback": sum(1 for f in fallbacks if f["pair"] == "BTC/USDT:USDT"), "list": fallbacks}
     return out
 
 
@@ -328,12 +351,13 @@ def main():
     last6 = pm.loc[pm.run.isin(["baseline_oos", "tiered_v1", "tiered_v1_plus", "tiered_v1_raw", "tiered_v1_plus_raw"]) & (pm.open_utc >= LAST6M)]
     last6[["run", "pair", "side", "tier", "p", "entries", "open_kst", "close_kst", "exit_reason", "cause", "net_usdt"]].to_csv(OUT / "last6m_entries.csv", index=False)
     labels = labelled_rows(candles)
-    summary["calibration"] = {ident: calibration_report(ident, labels) for ident in ("spike-p2-raw", "spike-p2-aiv0-cal", "spike-p2-aiv1-cal", "spike-p2-aiv1-raw")}
+    summary["calibration"] = {ident: calibration_report(ident, labels) for ident in ("spike-p2-raw", "spike-p2-aiv0-cal-v2", "spike-p2-aiv1-cal-v2", "spike-p2-aiv1-raw")}
     summary["postmortem_cause_counts"] = pm.groupby(["run", "cause"]).size().unstack(fill_value=0).to_dict(orient="index")
     (OUT / "summary_b.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
     brief = {r: {k: m[k] for k in ("trades", "win_rate", "net_pct", "net_pct_signed_funding_phaseA", "mdd_mtm_pct", "mdd_closed_trade_pct", "pf", "net_2024_plus_pct", "net_last6m_pct", "max_concurrent_positions", "scale_in_orders")} for r, m in summary["runs"].items()}
     print(json.dumps(brief, indent=1))
-    print(json.dumps({k: {kk: vv for kk, vv in v.items() if kk in ("rows", "base_rate")} | {s: {kk: v[s][kk] for kk in ("bucket_gap", "auc", "brier", "signal_share_p_ge", "signal_p_quantiles")} for s in ("pre", "post") if s in v} for k, v in summary["calibration"].items()}, indent=1))
+    print(json.dumps({k: {kk: vv for kk, vv in v.items() if kk in ("rows", "base_rate")} | {s: {kk: v[s][kk] for kk in ("bucket_gap", "auc", "brier", "signal_share_p_ge", "signal_p_quantiles")} for s in ("pre", "post") if s in v}
+                      | {"fallback": {kk: vv for kk, vv in v.get("platt_fallback", {}).items() if kk != "list"}, "non_fallback": v.get("non_fallback_windows")} for k, v in summary["calibration"].items()}, indent=1))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 {
   "freqai": {
-    "identifier": "spike-p2-aiv1-cal",
+    "identifier": "spike-p2-aiv1-cal-v2",
     "spike_model": {
       "calibrate": true,
       "event_weights": true,

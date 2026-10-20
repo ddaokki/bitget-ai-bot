@@ -79,6 +79,9 @@ class SpikeCalibratedLGBM(LightGBMClassifier):
         if isinstance(model, CalibratedModel):
             model.event_weights = weights
             info = dict(model.info)
+            if info.get("platt_fallback"):
+                logger.warning(f"PLATT_FALLBACK {pair} window {start:%Y-%m-%d}..{end:%Y-%m-%d}: "
+                               f"constant p = {info.get('train_yes_rate'):.4f} (no entries above the base rate)")
         else:
             info = {}
         info.update({
@@ -105,12 +108,20 @@ class SpikeCalibratedLGBM(LightGBMClassifier):
         model = CalibratedModel(base, PlattMap())
         raw = model.raw_yes(X.iloc[hold_idx])
         hit = (y.iloc[hold_idx, 0].astype(str) == "yes").to_numpy()
-        model.platt = PlattMap.fit(raw, hit)
+        # Base rate of the WHOLE training window (fit part + holdout): the constant used
+        # when the Platt slope would be <= 0 (review fix: never reverse the ranking).
+        train_yes_rate = float((y.iloc[:, 0].astype(str) == "yes").mean())
+        model.platt = PlattMap.fit(raw, hit, base_rate=train_yes_rate)
+        if model.platt.fallback:
+            logger.warning(f"{dk.pair}: Platt slope <= 0 on the calibration holdout; "
+                           f"falling back to constant p = training-window base rate {train_yes_rate:.4f}")
         model.info = {
             "rows": int(len(X)), "fit_rows": int(len(fit_idx)), "holdout_rows": int(len(hold_idx)),
             "holdout_yes_rate": float(hit.mean()) if len(hit) else None,
             "holdout_raw_mean": float(raw.mean()) if len(raw) else None,
+            "train_yes_rate": train_yes_rate,
             "platt_a": model.platt.a, "platt_b": model.platt.b, "platt_fitted": model.platt.fitted,
+            "platt_fallback": model.platt.fallback, "platt_raw_slope": model.platt.raw_slope,
         }
         return model
 

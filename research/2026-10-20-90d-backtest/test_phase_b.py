@@ -195,6 +195,27 @@ class CalibrationTests(unittest.TestCase):
         self.assertLess(proba[0, 1], 0.8)
         self.assertIn(model.predict(np.array([[0.99]]))[0], ["no", "yes"])
 
+    def test_negative_slope_falls_back_to_base_rate(self):
+        """Review fix: a Platt slope <= 0 would reverse the ranking for the next window."""
+        from spike_calibration import PlattMap
+        rng = np.random.default_rng(5)
+        raw = rng.uniform(0.05, 0.95, 4000)
+        hit = rng.uniform(size=4000) < (0.6 - 0.5 * raw)    # higher raw score -> LOWER hit rate
+        platt = PlattMap.fit(raw, hit, base_rate=0.33)
+        self.assertTrue(platt.fallback)
+        self.assertEqual(platt.a, 0.0)
+        self.assertLess(platt.raw_slope, 0)
+        q = platt(np.array([0.01, 0.5, 0.99]))
+        np.testing.assert_allclose(q, 0.33, atol=1e-9)              # constant = training-window base rate
+        self.assertFalse((q >= 0.45).any())                          # no entry passes a threshold above it
+        # Without an explicit base rate the holdout hit rate is used.
+        np.testing.assert_allclose(PlattMap.fit(raw, hit)(np.array([0.9])), hit.mean(), atol=1e-9)
+        # A positive slope is kept and does not fall back; ranking is preserved.
+        good = PlattMap.fit(raw, rng.uniform(size=4000) < (0.1 + 0.5 * raw))
+        self.assertFalse(good.fallback)
+        self.assertGreater(good.a, 0)
+        self.assertLess(good(np.array([0.2]))[0], good(np.array([0.8]))[0])
+
     def test_single_class_holdout_is_identity(self):
         from spike_calibration import PlattMap
         platt = PlattMap.fit(np.full(50, 0.3), np.zeros(50))
