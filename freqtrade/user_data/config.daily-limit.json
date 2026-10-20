@@ -1,0 +1,3 @@
+{
+  "exchange": {"_ft_has_params": {"ohlcv_candle_limit_per_timeframe": {"1d": 90}}}
+}

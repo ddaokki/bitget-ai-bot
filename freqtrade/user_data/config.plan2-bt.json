@@ -1,0 +1,6 @@
+{
+  "exchange": {"pair_whitelist": ["BTC/USDT:USDT"], "_ft_has_params": {"ohlcv_candle_limit_per_timeframe": {"1d": 90}}},
+  "max_open_trades": 1,
+  "futures_funding_rate": 0,
+  "dry_run_wallet": 105
+}
