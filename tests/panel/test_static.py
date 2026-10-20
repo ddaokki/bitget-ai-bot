@@ -507,3 +507,40 @@ for (const [path, method] of [["/api/status","GET"],["/api/job","GET"],
     assert.equal(intercepted, false, path);
 }
 ''', worker=True)
+
+
+EMERGENCY_SCOPE = "거래 봇(Freqtrade)이 연 거래를 시장가로 청산 요청 (현재 모드)"
+
+
+def test_emergency_copy_names_freqtrade_trades_not_all_positions(client):
+    html = client.get("/").text
+    script = client.get("/static/app.js").text
+    assert EMERGENCY_SCOPE in html
+    for text in (html, script):
+        assert "모든 포지션" not in text
+        assert "전부 청산" not in text
+
+
+def test_mode_switch_is_locked_while_smoke_state_exists(javascript):
+    javascript(r'''
+run('applyStatus(fixture)');
+assert.equal(element("mode-switch").disabled, false);
+assert.equal(run('actionAllowed({kind:"mode",value:"live",fromMode:"dry"})'), true);
+run('fixture.smoke_state.exists=true; applyStatus(fixture)');
+assert.equal(element("mode-switch").disabled, true);
+assert.equal(run('actionAllowed({kind:"mode",value:"live",fromMode:"dry"})'), false);
+run('fixture.smoke_state=null; applyStatus(fixture)');
+assert.equal(element("mode-switch").disabled, true);
+''')
+
+
+def test_emergency_success_shows_server_scope_message(javascript):
+    javascript(r'''
+run('applyStatus(fixture); armEmergency()');
+assert.doesNotMatch(element("emergency-arm").textContent, /전부/);
+response={ok:true,status:200,json:async()=>({ok:true,message:"모의 거래만 청산했습니다. 실거래 포지션은 비트겟 웹에서 확인하세요."}),headers:{get:()=>null}};
+await run('confirmEmergency()');
+assert.match(element("emergency-message").textContent, /모의 거래만 청산했습니다/);
+assert.match(element("emergency-message").textContent, /체결 보장이 아닙니다/);
+assert.doesNotMatch(element("emergency-message").textContent, /전부/);
+''')

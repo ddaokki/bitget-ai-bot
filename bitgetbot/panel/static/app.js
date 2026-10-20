@@ -120,7 +120,9 @@ function actionAllowed(action) {
     if (!action || !canAct() || state.pending || state.job?.running) return false;
     if (action.fromMode !== state.status.mode) return false;
     if (action.kind === "step") return stepAllowed(action.value);
+    // A mode switch would hide an open smoke trade from status and emergency close.
     return action.kind === "mode" && ["dry", "live"].includes(state.status.mode)
+        && state.status.smoke_state?.exists === false
         && ["dry", "live"].includes(action.value) && action.value !== state.status.mode;
 }
 
@@ -129,7 +131,8 @@ function updateControls() {
         button.disabled = !stepAllowed(button.dataset.step);
     });
     const busy = !canAct() || state.pending || state.job?.running === true;
-    $("mode-switch").disabled = busy || !["dry", "live"].includes(state.status?.mode);
+    $("mode-switch").disabled = busy || !["dry", "live"].includes(state.status?.mode)
+        || state.status?.smoke_state?.exists !== false;
     $("docker-up").disabled = busy;
     const localBusy = busy || state.status?.session_kind !== "local";
     for (const id of ["save-keys", "save-pin"]) $(id).disabled = localBusy;
@@ -393,7 +396,7 @@ function disarmEmergency() {
     state.emergencyDeadline = 0;
     $("emergency-confirm").hidden = true;
     $("emergency-confirm").disabled = true;
-    text("emergency-arm", "전부 청산 준비");
+    text("emergency-arm", "봇 거래 청산 준비");
 }
 
 function armEmergency() {
@@ -415,8 +418,10 @@ async function confirmEmergency() {
     resetPreflight();
     updateControls();
     try {
-        await request("/api/emergency/close-all", {});
-        text("emergency-message", "시장가 전부 청산을 요청했습니다. 접수는 체결 보장이 아닙니다. 포지션을 직접 확인하세요.");
+        const result = await request("/api/emergency/close-all", {});
+        const scope = typeof result.message === "string" ? result.message
+            : "거래 봇(Freqtrade)이 연 거래를 시장가로 청산 요청 (현재 모드).";
+        text("emergency-message", `${scope} 접수는 체결 보장이 아닙니다. 포지션을 직접 확인하세요.`);
         await refreshStatus();
     } catch (error) {
         text("emergency-message", `${error.message} 비트겟 웹(PC)에서 직접 시장가 청산하세요. 자동 재시도하지 않습니다.`);
