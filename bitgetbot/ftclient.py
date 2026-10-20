@@ -75,6 +75,15 @@ class FreqtradeClient:
             "GET", "trades", params={"limit": limit, "order_by_id": "false"},
         ).json()
 
+    def balance(self) -> dict:
+        return self._request("GET", "balance").json()
+
+    def pair_candles(self, pair: str, timeframe: str, limit: int) -> dict:
+        # Read-only: the analyzed candles the running strategy already holds in memory.
+        return self._request(
+            "GET", "pair_candles", params={"pair": pair, "timeframe": timeframe, "limit": limit},
+        ).json()
+
     def start(self) -> dict:
         return self._request("POST", "start").json()
 

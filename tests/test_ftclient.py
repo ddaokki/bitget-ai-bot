@@ -74,6 +74,7 @@ def test_force_exit_payload(trade_id, ordertype):
     ("start", "POST", {"status": "starting trader ..."}),
     ("stop", "POST", {"status": "stopping trader ..."}),
     ("pause", "POST", {"status": "pausing trader ..."}),
+    ("balance", "GET", {"total": 105.5, "stake": "USDT"}),
 ])
 @pytest.mark.parametrize("base_url", ["http://127.0.0.1:8080", "http://127.0.0.1:8080/"])
 def test_authenticated_routes(method, verb, payload, base_url):
@@ -203,3 +204,19 @@ def test_timeout_is_applied_to_requests(timeout):
         "http://127.0.0.1:8080", "u", "p", transport=httpx.MockTransport(handler), **kwargs,
     )
     assert client.status() == []
+
+
+def test_pair_candles_is_an_authenticated_read_only_get():
+    payload = {"columns": ["__date_ts", "close"], "data": [[1, 2.0]]}
+
+    def handler(req):
+        assert req.method == "GET"
+        assert req.url.path == "/api/v1/pair_candles"
+        assert dict(req.url.params) == {"pair": "BTC/USDT:USDT", "timeframe": "1h", "limit": "72"}
+        assert req.headers["authorization"] == "Basic dTpw"
+        return httpx.Response(200, json=payload)
+
+    client = FreqtradeClient(
+        "http://127.0.0.1:8080", "u", "p", transport=httpx.MockTransport(handler),
+    )
+    assert client.pair_candles("BTC/USDT:USDT", "1h", 72) == payload

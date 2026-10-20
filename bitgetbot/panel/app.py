@@ -1,5 +1,5 @@
 """Loopback control-panel API. Orders stay inside smoke, emergency close-all, or the strategy
-the user switches on with /api/autotrade (Freqtrade /start, /pause)."""
+the user switches on with /api/autotrade or a confirmed mode switch (Freqtrade /start, /pause)."""
 
 import json
 import math
@@ -22,7 +22,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from bitgetbot.bitget_read import BitgetReader, make_exchange
 from bitgetbot.ftclient import FreqtradeClient
-from bitgetbot.panel import ops
+from bitgetbot.ledger import fetch_krw_per_usdt
+from bitgetbot.panel import charts, ops
 from bitgetbot.panel.auth import (
     Lockout, Sessions, allowed_host, classify, csrf_ok, effective_scheme, hash_pin, identity, valid_pin,
     verify_pin,
@@ -47,6 +48,9 @@ AUTOTRADE_STARTED = "자동매매를 켰습니다 (현재 모드: {mode}). 전�
 AUTOTRADE_PAUSED = "새 진입을 멈췄습니다. 열린 포지션과 손절은 계속 관리합니다."
 AUTOTRADE_MISMATCH = "거래 봇 모드가 저장된 모드와 다릅니다. 모드를 다시 적용한 뒤 시도하세요"
 AUTOTRADE_FAILED = "거래 봇에 요청하지 못했습니다. 실행 상태를 확인하세요"
+MODE_SWITCHED = "{mode} 모드로 전환했습니다. 거래 봇이 준비되면(약 1~2분) 자동매매가 저절로 켜집니다."
+AUTO_START_TIMEOUT_S = 180
+AUTO_START_INTERVAL_S = 3
 # Audit actions by exact POST path. Request bodies, keys, PINs and tokens are never recorded.
 AUDIT_ACTIONS = {
     "/api/pin": "pin_set", "/api/keys": "keys_saved", "/api/mode": "mode",
@@ -61,6 +65,10 @@ class _PanelError(HTTPException):
 
 def _reader_factory(key: str, secret: str, password: str):
     return BitgetReader(make_exchange(key, secret, password))
+
+
+def _daemon(task: Callable[[], None]) -> None:
+    threading.Thread(target=task, name="panel-autotrade-auto", daemon=True).start()
 
 
 @dataclass(repr=False)
@@ -81,10 +89,20 @@ class PanelDeps:
     static_dir: Path = STATIC_DIR
     smoke_command: Callable[[str, SmokeIO], int] = run_command
     audit_path: Path | None = None
+    # Runs the post-switch "start autotrade when ready" task; tests replace it to run it inline.
+    background: Callable[[Callable[[], None]], None] = _daemon
+    sleep: Callable[[float], None] = time.sleep
+    krw_rate: Callable[[], tuple[float, str]] = fetch_krw_per_usdt
+    equity_log: charts.EquityLog | None = None
+    fx: charts.FxCache | None = None
 
     def __post_init__(self):
         if self.audit_path is None:
             self.audit_path = self.pin_store_path.with_name("audit.log")
+        if self.equity_log is None:
+            self.equity_log = charts.EquityLog(self.pin_store_path.with_name("equity.jsonl"), self.clock)
+        if self.fx is None:
+            self.fx = charts.FxCache(self.krw_rate, self.clock)
         if self.jobs is None:
             self.jobs = JobRunner(self._execute, clock=self.clock)
         if self.sessions is None:
@@ -180,19 +198,16 @@ def _audit_action(method: str, path: str, status: int) -> tuple[str, str | None]
     return None if action is None else (action, None)
 
 
-def _audit(deps: PanelDeps, request: Request, kind: str, status: int) -> None:
-    """Append one JSON line per panel action; a failed write never changes the response."""
+def _write_audit(deps: PanelDeps, kind: str, ident: str | None, action: str, step: str | None,
+                 status: int) -> None:
+    """Append one JSON line; a failed write never changes the response."""
     try:
-        found = _audit_action(request.method, request.url.path, status)
-        if found is None:
-            return
-        action, step = found
         entry = {
             "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "source": kind,
         }
         if kind == "tailnet":
-            entry["identity"] = identity(request.headers)[:256]
+            entry["identity"] = (ident or "")[:256]
         entry["action"] = action
         if step is not None:
             entry["step"] = step
@@ -202,6 +217,18 @@ def _audit(deps: PanelDeps, request: Request, kind: str, status: int) -> None:
             deps.audit_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
             with open(deps.audit_path, "a", encoding="utf-8") as log:
                 log.write(line)
+    except Exception:
+        pass
+
+
+def _audit(deps: PanelDeps, request: Request, kind: str, status: int) -> None:
+    """One line per panel action: no request bodies, keys, PINs or tokens."""
+    try:
+        found = _audit_action(request.method, request.url.path, status)
+        if found is None:
+            return
+        ident = identity(request.headers) if kind == "tailnet" else None
+        _write_audit(deps, kind, ident, found[0], found[1], status)
     except Exception:
         pass
 
@@ -224,10 +251,59 @@ def _open_trade_blocks_mode(deps: PanelDeps) -> bool:
         return True
 
 
+def _equity_reader(settings: Settings, reader, ft) -> Callable[[], float | None]:
+    return lambda: charts.current_equity(settings.dry_run, reader, ft)
+
+
 def create_app(deps: PanelDeps) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
     # Serialize config writes with job admission, not with long-running jobs or emergency exits.
     operation_lock = threading.Lock()
+    # A later mode switch, manual autotrade action or emergency close cancels a pending auto start.
+    auto_generation = [0]
+
+    def cancel_auto_start() -> int:
+        auto_generation[0] += 1
+        return auto_generation[0]
+
+    def auto_start(mode: str, generation: int, kind: str, ident: str | None) -> None:
+        """After a switch, start automatic trading once the restarted bot runs in the saved mode."""
+        dry = mode == "dry"
+        result = 503
+        try:
+            for attempt in range(AUTO_START_TIMEOUT_S // AUTO_START_INTERVAL_S + 1):
+                if attempt:
+                    deps.sleep(AUTO_START_INTERVAL_S)
+                if generation != auto_generation[0]:
+                    result = 409
+                    return
+                try:
+                    settings = _settings(deps)
+                    if settings.dry_run is not dry:
+                        return  # the saved mode changed again; never start the other mode
+                    ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
+                    config = ft.show_config()
+                    if not isinstance(config, dict) or config.get("dry_run") is not dry:
+                        continue
+                    state = config.get("state")
+                    if state == "running":
+                        result = 200
+                        return
+                    if state not in {"paused", "stopped"}:
+                        continue
+                    with operation_lock:
+                        if generation != auto_generation[0]:
+                            result = 409
+                            return
+                        if deps.jobs.snapshot()["running"]:
+                            continue
+                        ft.start()
+                    result = 200
+                    return
+                except Exception:
+                    continue
+        finally:
+            _write_audit(deps, kind, ident, "autotrade_auto", None, result)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, error):
@@ -357,6 +433,8 @@ def create_app(deps: PanelDeps) -> FastAPI:
         reader = deps.reader_factory(*credentials)
         ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
         snapshot = ops.collect_status(settings, reader, ft)
+        # Asset history: at most one snapshot per mode every 10 minutes while the panel is polled.
+        deps.equity_log.maybe_record("dry" if settings.dry_run else "live", _equity_reader(settings, reader, ft))
         snapshot.update(
             keys_configured=deps.keys_configured(), pin_set=_pin_hash(deps.pin_store_path) is not None,
             docker_running=ops.docker_running(deps.runner), job=deps.jobs.snapshot(),
@@ -394,8 +472,25 @@ def create_app(deps: PanelDeps) -> FastAPI:
                 raise _PanelError(409, "다른 작업이 실행 중입니다")
         return {"ok": True}
 
+    @app.get("/api/charts")
+    def chart_data():
+        settings = _settings(deps)
+        mode_name = "dry" if settings.dry_run else "live"
+        credentials = ("", "", "") if settings.dry_run else (settings.key, settings.secret, settings.password)
+        reader = deps.reader_factory(*credentials)
+        ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
+        equity = ops.observe(_equity_reader(settings, reader, ft))
+        history = ops.observe(lambda: deps.equity_log.history(mode_name)) or []
+        krw = ops.observe(deps.fx.rate) if equity is not None else None
+        reachable = ops.observe(ft.ping) is True
+        return {
+            "mode": mode_name,
+            "asset": charts.asset_payload(mode_name, equity, history, krw),
+            "btc": ops.observe(lambda: charts.btc_payload(ft)) if reachable else None,
+        }
+
     @app.post("/api/mode")
-    def mode(body: dict = Depends(_body)):
+    def mode(request: Request, body: dict = Depends(_body)):
         with operation_lock:
             if deps.jobs.snapshot()["running"]:
                 raise _PanelError(409, "다른 작업이 실행 중입니다")
@@ -412,12 +507,17 @@ def create_app(deps: PanelDeps) -> FastAPI:
                 pass  # unreachable bot: the open-trade check below still decides
             if _open_trade_blocks_mode(deps):
                 raise _PanelError(409, OPEN_TRADE)
+            generation = cancel_auto_start()
             deps.mode_setter(value)
             ok = (ops.compose_restart(deps.runner) if ops.freqtrade_container_running(deps.runner)
                   else ops.compose_up(deps.runner))
             if not ok:
                 raise _PanelError(503, "모드는 저장했지만 컨테이너 적용에 실패했습니다. 실행 상태를 확인하세요")
-        return {"ok": True}
+            kind = request.state.session_kind
+            ident = identity(request.headers) if kind == "tailnet" else None
+            # The LIVE confirmation above covers starting the strategy: one step, no second prompt.
+            deps.background(lambda: auto_start(value, generation, kind, ident))
+        return {"ok": True, "message": MODE_SWITCHED.format(mode="실전" if value == "live" else "모의")}
 
     @app.post("/api/autotrade")
     def autotrade(body: dict = Depends(_body)):
@@ -430,6 +530,7 @@ def create_app(deps: PanelDeps) -> FastAPI:
             settings = _settings(deps)
             if action == "start" and not settings.dry_run and body.get("confirm") != "LIVE":
                 raise _PanelError(400, "실전 자동매매에는 LIVE 확인이 필요합니다")
+            cancel_auto_start()  # a manual choice wins over a pending automatic start
             ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
             try:
                 # Never start a bot whose running mode differs from the saved one (e.g. a live
@@ -458,6 +559,7 @@ def create_app(deps: PanelDeps) -> FastAPI:
     def emergency():
         # No job/mode lock and no POST retries, even on an ambiguous timeout.
         # force_exit("all") reaches only the trades of the Freqtrade instance (mode/DB) now running.
+        cancel_auto_start()  # never switch automatic trading on after an emergency close
         try:
             settings = _settings(deps)
             deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass).force_exit("all", "market")

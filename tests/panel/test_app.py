@@ -34,8 +34,13 @@ class FT:
         self.calls = []
         self.error = None
         self.dry = True
-        self.trades = []
+        self.state = "running"
+        self.open_trades = []
         self.ping_error = None
+        self.config_error = None
+        self.equity = 105.5
+        self.candles = None
+        self.history = {"trades": [], "total_trades": 0}
 
     def ping(self):
         if self.ping_error:
@@ -43,10 +48,29 @@ class FT:
         return True
 
     def show_config(self):
-        return {"state": "running", "dry_run": self.dry, "api_server": {"password": SENTINELS[5]}}
+        if self.config_error:
+            raise self.config_error
+        return {"state": self.state, "dry_run": self.dry, "api_server": {"password": SENTINELS[5]}}
+
+    def balance(self):
+        if self.equity is None:
+            raise FreqtradeUnreachable(SENTINELS[3])
+        return {"total": self.equity, "stake": "USDT", "note": SENTINELS[3]}
+
+    def pair_candles(self, pair, timeframe, limit):
+        self.calls.append(("pair_candles", pair, timeframe, limit))
+        if self.candles is None:
+            raise FreqtradeError(500, SENTINELS[3])
+        return self.candles
+
+    def profit(self):
+        return {"closed_trade_count": 0}
+
+    def trades(self, limit=500):
+        return self.history
 
     def status(self):
-        return list(self.trades)
+        return list(self.open_trades)
 
     def start(self):
         self.calls.append(("start",))
@@ -68,6 +92,13 @@ class FT:
 
 
 class Reader:
+    equity = 114.25
+
+    def fetch_usdt_equity(self):
+        if self.equity is None:
+            raise RuntimeError(SENTINELS[3])
+        return self.equity
+
     def account_mode_report(self):
         return {"v2_ok": True, "v3_ok": False, "v3_error": "40000"}
 
@@ -100,6 +131,11 @@ def panel(tmp_path, monkeypatch):
     runner_calls, reader_calls, ft_calls, executions, modes, keys = [], [], [], [], [], []
     release, entered = Event(), Event()
     options = {"block": False, "restart_error": False, "container": True, "compose_code": 0, "execute_error": False}
+    background, sleeps, fx_calls = [], [], []
+
+    def krw_rate():
+        fx_calls.append(now[0])
+        return 1400.0, "2026-10-21T00:00:00Z"
 
     def runner(argv, timeout):
         assert timeout > 0
@@ -151,6 +187,7 @@ def panel(tmp_path, monkeypatch):
         pin_store_path=tmp_path / ".panel" / "panel.json", clock=lambda: now[0],
         mode_setter=mode_setter, keys_setter=lambda *values: keys.append(values),
         keys_configured=lambda: {"key": True, "secret": True, "password": True},
+        background=background.append, sleep=sleeps.append, krw_rate=krw_rate,
     )
     application = module.create_app(deps)
     with TestClient(application, base_url="http://127.0.0.1:8090", client=("127.0.0.1", 12345)) as local:
@@ -160,6 +197,7 @@ def panel(tmp_path, monkeypatch):
                 settings=settings, ft=ft, runner_calls=runner_calls, reader_calls=reader_calls,
                 ft_calls=ft_calls, executions=executions, modes=modes, keys=keys,
                 options=options, now=now, release=release, entered=entered, state_path=ops.STATE_PATH,
+                background=background, sleeps=sleeps, fx_calls=fx_calls,
             )
             yield data
             release.set()
@@ -860,7 +898,7 @@ def test_mode_switch_refused_while_smoke_state_exists(panel):
 
 def test_mode_switch_refused_while_freqtrade_reports_open_trades(panel):
     local_login(panel)
-    panel.ft.trades = [{"trade_id": 3, "pair": "BTC/USDT:USDT"}]
+    panel.ft.open_trades = [{"trade_id": 3, "pair": "BTC/USDT:USDT"}]
     response = panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER)
     assert response.status_code == 409
     assert response.json()["detail"] == "진행 중인 거래를 먼저 청산하세요"
@@ -1132,3 +1170,312 @@ def test_mode_switch_still_works_when_pause_fails(panel):
     response = panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER)
     assert response.status_code == 200
     assert "SECRET-SENTINEL" not in response.text
+
+
+# --- One-step switch: the bot starts automatic trading by itself once the restarted bot is ready.
+
+def switch(panel, mode="live"):
+    body = {"mode": mode, "confirm": "LIVE"} if mode == "live" else {"mode": mode}
+    response = panel.local.post("/api/mode", json=body, headers=PANEL_HEADER)
+    assert response.status_code == 200
+    return response
+
+
+def auto_lines(panel):
+    return [line for line in audit_lines(panel) if line["action"] == "autotrade_auto"]
+
+
+def test_live_switch_starts_autotrade_once_when_bot_is_ready(panel):
+    local_login(panel)
+    panel.ft.dry, panel.ft.state = False, "paused"
+    response = switch(panel)
+    assert "자동매매가 저절로 켜집니다" in response.json()["message"]
+    assert "실전" in response.json()["message"]
+    assert len(panel.background) == 1
+    assert ("start",) not in panel.ft.calls          # nothing starts inside the request
+    panel.background.pop()()
+    assert panel.ft.calls.count(("start",)) == 1
+    assert panel.sleeps == []
+    assert [(line["source"], line["result"]) for line in auto_lines(panel)] == [("local", 200)]
+    text = panel.deps.audit_path.read_text(encoding="utf-8")
+    assert all(secret not in text for secret in SENTINELS)
+
+
+def test_auto_start_waits_for_restarted_bot_in_the_saved_mode(panel):
+    local_login(panel)
+    panel.ft.state = "paused"
+    switch(panel)                                    # the bot still reports dry for a while
+    answers = iter([FreqtradeUnreachable(SENTINELS[3]), "dry", "dry", "live-reload", "live"])
+
+    def show_config():
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        state = "reload_config" if answer == "live-reload" else "paused"
+        return {"state": state, "dry_run": answer == "dry"}
+
+    panel.ft.show_config = show_config
+    panel.background.pop()()
+    assert panel.sleeps == [3, 3, 3, 3]
+    assert panel.ft.calls.count(("start",)) == 1
+    assert [line["result"] for line in auto_lines(panel)] == [200]
+
+
+def test_auto_start_gives_up_after_180_seconds_without_starting(panel):
+    local_login(panel)
+    switch(panel)                                    # fake bot stays dry: never the saved live mode
+    panel.background.pop()()
+    assert panel.sleeps == [3] * 60
+    assert ("start",) not in panel.ft.calls
+    assert [line["result"] for line in auto_lines(panel)] == [503]
+
+
+def test_auto_start_does_nothing_when_bot_already_runs(panel):
+    local_login(panel)
+    panel.ft.dry, panel.ft.state = False, "running"
+    switch(panel)
+    panel.background.pop()()
+    assert ("start",) not in panel.ft.calls
+    assert [line["result"] for line in auto_lines(panel)] == [200]
+
+
+@pytest.mark.parametrize("cancel", ["pause", "emergency", "switch"])
+def test_later_manual_action_cancels_pending_auto_start(panel, cancel):
+    local_login(panel)
+    panel.ft.dry, panel.ft.state = False, "paused"
+    switch(panel)
+    task = panel.background.pop()
+    if cancel == "pause":
+        assert panel.local.post("/api/autotrade", json={"action": "pause"}, headers=PANEL_HEADER).status_code == 200
+    elif cancel == "emergency":
+        assert panel.local.post("/api/emergency/close-all", headers=PANEL_HEADER).status_code == 200
+    else:
+        switch(panel, "dry")
+    panel.ft.calls.clear()
+    task()
+    assert ("start",) not in panel.ft.calls
+    assert [line["result"] for line in auto_lines(panel)] == [409]
+
+
+def test_auto_start_never_starts_when_saved_mode_changed_meanwhile(panel):
+    local_login(panel)
+    panel.ft.dry, panel.ft.state = False, "paused"
+    switch(panel)
+    panel.settings[0] = replace(panel.settings[0], dry_run=True)
+    panel.background.pop()()
+    assert ("start",) not in panel.ft.calls
+    assert [line["result"] for line in auto_lines(panel)] == [503]
+
+
+def test_auto_start_waits_while_a_job_runs(panel):
+    local_login(panel)
+    panel.ft.dry, panel.ft.state = False, "paused"
+    switch(panel)
+    running = iter([True, True, False])
+    original = panel.deps.jobs.snapshot
+    panel.deps.jobs.snapshot = lambda: {**original(), "running": next(running, False)}
+    panel.background.pop()()
+    assert panel.sleeps == [3, 3]
+    assert panel.ft.calls.count(("start",)) == 1
+
+
+def test_auto_start_failure_is_sanitized_and_retried(panel, caplog, capsys):
+    local_login(panel)
+    panel.ft.dry, panel.ft.state = False, "paused"
+    switch(panel)
+    panel.ft.error = FreqtradeError(500, " ".join(SENTINELS))
+    panel.background.pop()()
+    assert panel.ft.calls.count(("start",)) == 61
+    assert [line["result"] for line in auto_lines(panel)] == [503]
+    assert all(secret not in caplog.text for secret in SENTINELS)
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ""
+
+
+def test_dry_switch_from_phone_also_auto_starts_with_identity(panel):
+    tailnet_login(panel)
+    panel.settings[0] = replace(panel.settings[0], dry_run=False)
+    panel.ft.state = "stopped"
+    response = panel.tailnet.post("/api/mode", json={"mode": "dry"},
+                                  headers={**PANEL_HEADER, "Tailscale-User-Login": "me@example.com"})
+    assert response.status_code == 200 and "모의" in response.json()["message"]
+    panel.background.pop()()
+    assert panel.ft.calls.count(("start",)) == 1
+    [line] = auto_lines(panel)
+    assert (line["source"], line["identity"], line["result"]) == ("tailnet", "me@example.com", 200)
+
+
+def test_failed_switch_never_schedules_auto_start(panel):
+    local_login(panel)
+    panel.options["compose_code"] = 1
+    response = panel.local.post("/api/mode", json={"mode": "live", "confirm": "LIVE"}, headers=PANEL_HEADER)
+    assert response.status_code == 503
+    assert panel.background == []
+    panel.options["compose_code"] = 0
+    panel.ft.open_trades = [{"trade_id": 3}]
+    assert panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER).status_code == 409
+    assert panel.background == []
+    assert panel.local.post("/api/mode", json={"mode": "live"}, headers=PANEL_HEADER).status_code == 400
+    assert panel.background == []
+
+
+def test_default_background_runs_in_a_daemon_thread(monkeypatch):
+    from bitgetbot.panel import app as module
+
+    started = []
+
+    class Thread:
+        def __init__(self, target, name, daemon):
+            started.append((target, daemon))
+
+        def start(self):
+            started.append("started")
+
+    monkeypatch.setattr(module.threading, "Thread", Thread)
+    module._daemon(print)
+    assert started == [(print, True), "started"]
+
+
+# --- Charts: asset history and BTC price, read-only.
+
+HOUR = 3_600_000
+CANDLE_START = 1_792_000_000_000
+
+
+def candles(count=72):
+    return {"pair": "BTC/USDT:USDT", "columns": ["date", "open", "close", "__date_ts", "enter_long"],
+            "data": [["2026-10-20 00:00:00", 1, 60000 + index, CANDLE_START + index * HOUR, 0]
+                     for index in range(count)],
+            "secret": SENTINELS[3]}
+
+
+def raise_secret():
+    raise RuntimeError(SENTINELS[3])
+
+
+def test_charts_require_session(panel):
+    assert panel.local.get("/api/charts").status_code == 401
+    assert panel.tailnet.get("/api/charts").status_code == 401
+
+
+def test_dry_charts_use_freqtrade_balance_krw_and_btc_closes(panel):
+    local_login(panel)
+    panel.ft.candles = candles(80)
+    open_ts = CANDLE_START + 70 * HOUR
+    panel.ft.open_trades = [{"pair": "BTC/USDT:USDT", "enter_tag": "safe_long", "open_rate": 60070.5,
+                             "stop_loss_abs": 58000, "open_timestamp": open_ts, "secret": SENTINELS[3]}]
+    panel.ft.history = {"trades": [
+        {"pair": "BTC/USDT:USDT", "enter_tag": "safe_long", "open_timestamp": CANDLE_START + 20 * HOUR},
+        {"pair": "BTC/USDT:USDT", "enter_tag": "smoke", "open_timestamp": CANDLE_START + 30 * HOUR},
+        {"pair": "BTC/USDT:USDT", "enter_tag": "safe_long", "open_timestamp": CANDLE_START - 100 * HOUR},
+    ], "total_trades": 3}
+    data = panel.local.get("/api/charts").json()
+    assert data["mode"] == "dry"
+    asset = data["asset"]
+    assert asset["equity_usdt"] == 105.5 and asset["krw_per_usdt"] == 1400.0
+    assert asset["equity_krw"] == pytest.approx(105.5 * 1400)
+    btc = data["btc"]
+    assert ("pair_candles", "BTC/USDT:USDT", "1h", 72) in panel.ft.calls
+    assert len(btc["closes"]) == 72
+    assert btc["closes"][0] == [CANDLE_START + 8 * HOUR, 60008.0]
+    assert btc["entry"] == 60070.5 and btc["stop"] == 58000
+    assert btc["entries"] == [CANDLE_START + 20 * HOUR, open_ts]
+    assert SENTINELS[3] not in json.dumps(data)
+    assert panel.reader_calls == [("", "", "")]
+
+
+def test_charts_ignore_manual_open_trade_lines(panel):
+    local_login(panel)
+    panel.ft.candles = candles()
+    panel.ft.open_trades = [{"pair": "BTC/USDT:USDT", "enter_tag": "smoke", "open_rate": 60000,
+                             "stop_loss_abs": 58000, "open_timestamp": CANDLE_START}]
+    btc = panel.local.get("/api/charts").json()["btc"]
+    assert btc["entry"] is None and btc["stop"] is None and btc["entries"] == []
+
+
+def test_live_charts_use_bitget_equity(panel):
+    local_login(panel)
+    panel.settings[0] = replace(panel.settings[0], dry_run=False)
+    data = panel.local.get("/api/charts").json()
+    assert data["mode"] == "live"
+    assert data["asset"]["equity_usdt"] == 114.25
+    assert panel.reader_calls == [tuple(SENTINELS[2:5])]
+    assert data["btc"] is None                      # candles failed upstream: hidden, not an error
+    assert all(secret not in json.dumps(data) for secret in SENTINELS)
+
+
+def test_charts_survive_every_upstream_failure_without_details(panel, caplog):
+    local_login(panel)
+    panel.ft.equity = None
+    panel.ft.ping_error = FreqtradeUnreachable(SENTINELS[3])
+    panel.deps.fx.fetch = raise_secret
+    response = panel.local.get("/api/charts")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["asset"]["equity_usdt"] is None and data["asset"]["equity_krw"] is None
+    assert data["btc"] is None
+    assert all(secret not in response.text + caplog.text for secret in SENTINELS)
+
+
+def test_charts_settings_failure_is_sanitized_503(panel):
+    local_login(panel)
+
+    def fail():
+        raise RuntimeError(" ".join(SENTINELS))
+
+    panel.deps.settings_loader = fail
+    response = panel.local.get("/api/charts")
+    assert response.status_code == 503
+    assert all(secret not in response.text for secret in SENTINELS)
+
+
+def test_charts_show_usd_only_when_upbit_is_unavailable(panel):
+    local_login(panel)
+    panel.deps.fx.fetch = raise_secret
+    asset = panel.local.get("/api/charts").json()["asset"]
+    assert asset["equity_usdt"] == 105.5
+    assert asset["krw_per_usdt"] is None and asset["equity_krw"] is None
+
+
+def test_krw_rate_is_cached_for_five_minutes(panel):
+    local_login(panel)
+    for _ in range(3):
+        panel.local.get("/api/charts")
+    assert len(panel.fx_calls) == 1
+    panel.now[0] += 301
+    panel.local.get("/api/charts")
+    assert len(panel.fx_calls) == 2
+
+
+def test_status_polls_record_equity_every_ten_minutes_per_mode(panel):
+    local_login(panel)
+    path = panel.deps.pin_store_path.with_name("equity.jsonl")
+    panel.local.get("/api/status")                  # first poll after start records at once
+    panel.now[0] += 300
+    panel.ft.equity = 110.0
+    panel.local.get("/api/status")                  # too soon
+    panel.now[0] += 300
+    panel.local.get("/api/status")
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert rows == [{"ts": 1000, "mode": "dry", "equity_usdt": 105.5},
+                    {"ts": 1600, "mode": "dry", "equity_usdt": 110.0}]
+    panel.settings[0] = replace(panel.settings[0], dry_run=False)
+    panel.local.get("/api/status")                  # the live series has its own schedule
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert rows[-1] == {"ts": 1600, "mode": "live", "equity_usdt": 114.25}
+    panel.settings[0] = replace(panel.settings[0], dry_run=True)
+    panel.ft.equity = 111.0
+    asset = panel.local.get("/api/charts").json()["asset"]
+    assert asset["history"] == [[1000, 105.5], [1600, 110.0]]
+    assert asset["since"] == 1000
+    assert asset["change_usdt"] == pytest.approx(5.5)
+    assert asset["change_pct"] == pytest.approx(5.5 / 105.5 * 100)
+    text = path.read_text(encoding="utf-8")
+    assert all(secret not in text for secret in SENTINELS)
+
+
+def test_status_survives_equity_read_failure(panel):
+    local_login(panel)
+    panel.ft.equity = None
+    assert panel.local.get("/api/status").status_code == 200
+    assert not panel.deps.pin_store_path.with_name("equity.jsonl").exists()

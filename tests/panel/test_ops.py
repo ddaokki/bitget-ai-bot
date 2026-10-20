@@ -333,16 +333,18 @@ class FT:
     def trades(self, limit=500):
         assert limit == 500
         now = time.time() * 1000
-        rows = [(1, 0.02), (2, 0.0), (3, -0.01), (40, 0.05)]
+        rows = [(1, 0.02, "safe_long"), (2, 0.0, "safe_long"), (3, -0.01, "safe_long"),
+                (40, 0.05, "safe_long"), (1, -0.0001, "smoke"), (5, 0.03, None)]
         return {"trades": [{"close_timestamp": int(now - days * DAY_MS), "profit_ratio": ratio,
-                            "is_open": False, "pair": SECRET} for days, ratio in rows],
-                "trades_count": len(rows), "offset": 0, "total_trades": 13}
+                            "enter_tag": tag, "is_open": False, "pair": SECRET} for days, ratio, tag in rows],
+                "trades_count": len(rows), "offset": 0, "total_trades": len(rows)}
 
 
 DAY_MS = 86_400_000
-STATS = {"closed_trades": 13, "wins": 8, "losses": 5, "win_rate": pytest.approx(8 / 13),
-         "avg_profit_pct": pytest.approx(0.8), "win_rate_30d": pytest.approx(2 / 3),
-         "closed_trades_30d": 3}
+# Strategy ("safe_") trades only: the smoke and untagged manual trades are counted apart.
+STATS = {"closed_trades": 4, "wins": 3, "losses": 1, "win_rate": pytest.approx(0.75),
+         "avg_profit_pct": pytest.approx(1.5), "win_rate_30d": pytest.approx(2 / 3),
+         "closed_trades_30d": 3, "other_trades": 2, "partial": False}
 
 
 def test_collect_dry_status_never_calls_private_reader(ops, settings):
@@ -454,14 +456,23 @@ def test_collect_stats_for_current_mode_from_allowlisted_fields(ops, settings, d
     assert SECRET not in repr(result)
 
 
-def test_stats_fall_back_to_counts_and_percent_mean(ops, settings):
+def test_smoke_test_loss_is_not_a_strategy_loss(ops, settings):
+    """The live smoke-test trade (enter_tag "smoke") must not show up as "0승 1패"."""
     ft = FT()
-    ft.profit = lambda: {"closed_trade_count": 4, "winning_trades": 1, "losing_trades": 3,
-                         "profit_closed_percent_mean": -1.25}
+    ft.profit = lambda: {"closed_trade_count": 1, "winning_trades": 0, "losing_trades": 1, "winrate": 0}
+    ft.trades = lambda limit=500: {"trades": [{
+        "close_timestamp": int(time.time() * 1000 - DAY_MS), "profit_ratio": -0.0009,
+        "profit_abs": -0.0086, "enter_tag": "smoke", "is_open": False}], "total_trades": 1}
     assert ops.collect_status(settings, Reader(), ft)["stats"] == {
-        "closed_trades": 4, "wins": 1, "losses": 3, "win_rate": 0.25, "avg_profit_pct": -1.25,
-        "win_rate_30d": pytest.approx(2 / 3), "closed_trades_30d": 3,
+        "closed_trades": 0, "wins": 0, "losses": 0, "win_rate": None, "avg_profit_pct": None,
+        "win_rate_30d": None, "closed_trades_30d": 0, "other_trades": 1, "partial": False,
     }
+
+
+@pytest.mark.parametrize("tag", [None, "", "smoke", "manual", "SAFE_long", " safe_long", 7])
+def test_only_safe_prefixed_tags_are_strategy_trades(ops, tag):
+    assert ops.is_strategy_tag(tag) is False
+    assert ops.is_strategy_tag("safe_long") is True
 
 
 def test_stats_without_closed_trades_skip_trade_history(ops, settings):
@@ -471,19 +482,17 @@ def test_stats_without_closed_trades_skip_trade_history(ops, settings):
     ft.trades = lambda limit=500: pytest.fail("no closed trades means no history request")
     assert ops.collect_status(settings, Reader(), ft)["stats"] == {
         "closed_trades": 0, "wins": 0, "losses": 0, "win_rate": None, "avg_profit_pct": None,
-        "win_rate_30d": None, "closed_trades_30d": 0,
+        "win_rate_30d": None, "closed_trades_30d": 0, "other_trades": 0, "partial": False,
     }
 
 
-def test_stats_sanitize_malformed_profit_fields(ops, settings):
+def test_stats_ignore_aggregate_win_fields(ops, settings):
     ft = FT()
-    ft.profit = lambda: {"closed_trade_count": 4, "winning_trades": True, "losing_trades": -1,
+    ft.profit = lambda: {"closed_trade_count": 6, "winning_trades": True, "losing_trades": -1,
                          "winrate": 1.5, "profit_closed_ratio_mean": SECRET,
                          "profit_closed_percent_mean": float("inf")}
     stats = ops.collect_status(settings, Reader(), ft)["stats"]
-    assert {key: stats[key] for key in ("wins", "losses", "win_rate", "avg_profit_pct")} == {
-        "wins": None, "losses": None, "win_rate": None, "avg_profit_pct": None,
-    }
+    assert stats == STATS
     assert SECRET not in repr(stats)
 
 
@@ -506,33 +515,47 @@ def test_stats_without_valid_closed_count_are_none(ops, settings, profit):
     {"trades": [], "total_trades": SECRET},
     [SECRET],
 ])
-def test_unclear_recent_history_hides_only_30d_numbers(ops, settings, history):
+def test_unclear_history_hides_stats_rather_than_mixing_in_manual_trades(ops, settings, history):
     ft = FT()
     ft.trades = lambda limit=500: history
-    stats = ops.collect_status(settings, Reader(), ft)["stats"]
-    assert stats["closed_trades"] == 13 and stats["win_rate"] == pytest.approx(8 / 13)
-    assert stats["win_rate_30d"] is None and stats["closed_trades_30d"] is None
-    assert SECRET not in repr(stats)
+    result = ops.collect_status(settings, Reader(), ft)
+    assert result["stats"] is None
+    assert SECRET not in repr(result)
 
 
-def test_truncated_recent_page_hides_30d_numbers(ops, settings):
+def test_truncated_recent_page_is_partial_and_hides_30d_numbers(ops, settings):
     ft = FT()
     now = time.time() * 1000
     ft.trades = lambda limit=500: {
-        "trades": [{"close_timestamp": int(now - DAY_MS), "profit_ratio": 0.01}] * 2,
+        "trades": [{"close_timestamp": int(now - DAY_MS), "profit_ratio": 0.01, "enter_tag": "safe_long"}] * 2,
         "trades_count": 2, "offset": 0, "total_trades": 13,
     }
     stats = ops.collect_status(settings, Reader(), ft)["stats"]
+    assert stats["closed_trades"] == 2 and stats["partial"] is True
     assert stats["win_rate_30d"] is None and stats["closed_trades_30d"] is None
+
+
+def test_open_trades_in_history_are_skipped(ops, settings):
+    ft = FT()
+    now = time.time() * 1000
+    ft.trades = lambda limit=500: {"trades": [
+        {"is_open": True, "enter_tag": "safe_long", "close_timestamp": None, "profit_ratio": None},
+        {"close_timestamp": int(now - DAY_MS), "profit_ratio": -0.02, "enter_tag": "safe_long"},
+    ], "total_trades": 2}
+    stats = ops.collect_status(settings, Reader(), ft)["stats"]
+    assert (stats["closed_trades"], stats["wins"], stats["losses"]) == (1, 0, 1)
+    assert stats["avg_profit_pct"] == pytest.approx(-2.0)
 
 
 def test_recent_window_with_no_trades_has_zero_count(ops, settings):
     ft = FT()
     old = int(time.time() * 1000 - 45 * DAY_MS)
-    ft.trades = lambda limit=500: {"trades": [{"close_timestamp": old, "profit_ratio": None}],
+    ft.trades = lambda limit=500: {"trades": [{"close_timestamp": old, "profit_ratio": None,
+                                               "enter_tag": "safe_long"}],
                                    "trades_count": 1, "offset": 0, "total_trades": 13}
     stats = ops.collect_status(settings, Reader(), ft)["stats"]
     assert stats["closed_trades_30d"] == 0 and stats["win_rate_30d"] is None
+    assert stats["closed_trades"] == 1 and stats["wins"] == 1
 
 
 @pytest.mark.parametrize("dry", [True, False])

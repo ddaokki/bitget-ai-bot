@@ -105,6 +105,23 @@ class BitgetReader:
                 return float(row["available"])
         raise ValueError("USDT 계정 잔액을 찾을 수 없습니다")
 
+    def fetch_usdt_equity(self) -> float:
+        """USDT-futures account equity including unrealized PnL (read-only).
+
+        Same field ccxt's fetch_balance maps to the swap "total" (accountEquity), read directly
+        so each panel poll does not reload the whole market list.
+        """
+        response = self.exchange.privateMixGetV2MixAccountAccounts({
+            "productType": "USDT-FUTURES",
+        })
+        for row in response.get("data") or []:
+            if row.get("marginCoin") == "USDT":
+                equity = num(row.get("accountEquity"))
+                if equity is None or not math.isfinite(equity) or equity < 0:
+                    break
+                return equity
+        raise ValueError("USDT 계정 자산을 찾을 수 없습니다")
+
     def fetch_contract(self, symbol: str) -> ContractSpec:
         response = self.exchange.publicMixGetV2MixMarketContracts({
             "productType": "USDT-FUTURES", "symbol": symbol,

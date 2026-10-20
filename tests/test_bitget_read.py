@@ -333,3 +333,22 @@ def test_contract_missing_symbol_raises():
 ])
 def test_num(value, expected):
     assert num(value) == expected
+
+
+def test_usdt_equity_reads_account_equity_including_unrealized():
+    ex = FakeEx(accounts={"code": "00000", "data": [
+        {"marginCoin": "USDC", "accountEquity": "999"},
+        {"marginCoin": "USDT", "available": "10", "accountEquity": "114.25", "unrealizedPL": "-0.75"},
+    ]})
+    assert BitgetReader(ex).fetch_usdt_equity() == 114.25
+    assert ex.calls == [("accounts", {"productType": "USDT-FUTURES"})]
+
+
+@pytest.mark.parametrize("row", [
+    {"marginCoin": "USDT"}, {"marginCoin": "USDT", "accountEquity": ""},
+    {"marginCoin": "USDT", "accountEquity": "nan"}, {"marginCoin": "USDT", "accountEquity": "-1"},
+    {"marginCoin": "USDC", "accountEquity": "5"},
+])
+def test_usdt_equity_missing_or_invalid_raises(row):
+    with pytest.raises(ValueError):
+        BitgetReader(FakeEx(accounts={"code": "00000", "data": [row]})).fetch_usdt_equity()
