@@ -1,0 +1,244 @@
+{
+  "start_utc": "2022-01-01 00:00:00+00:00",
+  "end_exclusive_utc": "2026-10-20 00:00:00+00:00",
+  "funding_model": "Synthetic +0.0100% per 8h at 00/08/16 UTC, signed (longs pay, shorts receive). NOT actual history: Bitget only serves ~270 recent funding records per pair.",
+  "funding_real_recent_summary": {
+    "BTC/USDT:USDT": {
+      "records": 100,
+      "first_utc": "2026-09-17 08:00:00+00:00",
+      "last_utc": "2026-10-20 08:00:00+00:00",
+      "interval_hours_mode": 8.0,
+      "mean_rate": 5.947000000000001e-05,
+      "median_rate": 6.3e-05,
+      "share_positive": 0.94
+    },
+    "ETH/USDT:USDT": {
+      "records": 100,
+      "first_utc": "2026-09-17 08:00:00+00:00",
+      "last_utc": "2026-10-20 08:00:00+00:00",
+      "interval_hours_mode": 8.0,
+      "mean_rate": 6.557999999999999e-05,
+      "median_rate": 6.75e-05,
+      "share_positive": 0.92
+    },
+    "SOL/USDT:USDT": {
+      "records": 100,
+      "first_utc": "2026-09-17 08:00:00+00:00",
+      "last_utc": "2026-10-20 08:00:00+00:00",
+      "interval_hours_mode": 8.0,
+      "mean_rate": 4.434e-05,
+      "median_rate": 4.4e-05,
+      "share_positive": 0.75
+    },
+    "XRP/USDT:USDT": {
+      "records": 100,
+      "first_utc": "2026-09-17 08:00:00+00:00",
+      "last_utc": "2026-10-20 08:00:00+00:00",
+      "interval_hours_mode": 8.0,
+      "mean_rate": 7.236e-05,
+      "median_rate": 0.0001,
+      "share_positive": 0.94
+    },
+    "NEAR/USDT:USDT": {
+      "records": 100,
+      "first_utc": "2026-09-17 08:00:00+00:00",
+      "last_utc": "2026-10-20 08:00:00+00:00",
+      "interval_hours_mode": 8.0,
+      "mean_rate": 7.038000000000001e-05,
+      "median_rate": 0.0001,
+      "share_positive": 0.89
+    }
+  },
+  "records": [
+    {
+      "pair": "BTC/USDT:USDT",
+      "kind": "futures",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": 0,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "6c2fb49f5ca08043d9f70413320e64ff22a31a2f4e6e92c85862cd0040fa7381"
+    },
+    {
+      "pair": "BTC/USDT:USDT",
+      "kind": "mark",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": null,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "df577b98c979763ce169902a252edbea6fdb3be972120b2cbe7f703ec2db5c26"
+    },
+    {
+      "pair": "ETH/USDT:USDT",
+      "kind": "futures",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": 0,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "476bbbc9b6893c2199bcf17dafc289bc7e184a5580f5f0c2e283eadb31aa62eb"
+    },
+    {
+      "pair": "ETH/USDT:USDT",
+      "kind": "mark",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": null,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "ab2c73628cb5231e42b1b2ab302c369870ef68b8423b002c7ac02a183fbbbc1f"
+    },
+    {
+      "pair": "SOL/USDT:USDT",
+      "kind": "futures",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": 0,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "f365febd628ce65f3f7623ea1707dddcbb97e975339c1e3f424ecefce121274f"
+    },
+    {
+      "pair": "SOL/USDT:USDT",
+      "kind": "mark",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": null,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "8f9269dfca9959086aae6dfbe05f3894a1e17118e1036e2e4777669d0aa6e827"
+    },
+    {
+      "pair": "XRP/USDT:USDT",
+      "kind": "futures",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": 0,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "dd01e2920f1a6c127ad28c30e4a87f791c2ee8799d83a2b6b5a816391e8b7eb9"
+    },
+    {
+      "pair": "XRP/USDT:USDT",
+      "kind": "mark",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": null,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "91a8749a35b6f9113b932d14631fa2fec49b6fe5a5d9efa0c9808ced52cdbd58"
+    },
+    {
+      "pair": "NEAR/USDT:USDT",
+      "kind": "futures",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": 0,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "268f0b07085387a9641b9ebc5be87d00f4b224fb2a67b4c418fda1ec2a77c931"
+    },
+    {
+      "pair": "NEAR/USDT:USDT",
+      "kind": "mark",
+      "rows": 42071,
+      "expected_rows": 42072,
+      "missing_count": 1,
+      "gap_runs": [
+        {
+          "first_utc": "2026-08-25 00:00:00+00:00",
+          "last_utc": "2026-08-25 00:00:00+00:00",
+          "hours": 1
+        }
+      ],
+      "duplicates": 0,
+      "zero_volume_rows": null,
+      "first_utc": "2022-01-01 00:00:00+00:00",
+      "last_utc": "2026-10-19 23:00:00+00:00",
+      "sha256_values": "0672542e4c929431f4ca4eb3113cbd10a620937aab3f6b58db656a6e82eaf178"
+    }
+  ]
+}

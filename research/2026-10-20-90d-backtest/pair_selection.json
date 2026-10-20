@@ -1,0 +1,155 @@
+{
+  "selection_utc": "2026-10-20T09:34:28.794127+00:00",
+  "volume_start_utc": "2026-09-20T00:00:00.000Z",
+  "volume_end_exclusive_utc": "2026-10-20T00:00:00+00:00",
+  "history_required_utc": "2022-01-01T00:00:00.000Z",
+  "method": "Sum Bitget UTC daily candle quote volume (field 6) over 30 complete days across active linear USDT perpetuals (stable/fiat/pegged bases excluded). Take today's top 15, always add BTC/ETH, then keep only pairs for which Bitget returns a 1h candle at or before 2022-01-01T00:00Z.",
+  "universe_count": 841,
+  "ranked_count": 789,
+  "top15": [
+    "BTC/USDT:USDT",
+    "ETH/USDT:USDT",
+    "SOL/USDT:USDT",
+    "ZEC/USDT:USDT",
+    "XRP/USDT:USDT",
+    "SOXL/USDT:USDT",
+    "XAU/USDT:USDT",
+    "SNDK/USDT:USDT",
+    "NEAR/USDT:USDT",
+    "KORU/USDT:USDT",
+    "MU/USDT:USDT",
+    "SUI/USDT:USDT",
+    "CL/USDT:USDT",
+    "MSTR/USDT:USDT",
+    "HYPE/USDT:USDT"
+  ],
+  "selected": [
+    {
+      "pair": "BTC/USDT:USDT",
+      "quote_volume_30d": 75158543118.5198,
+      "minimum_amount": 0.0001,
+      "minimum_cost": 5.0,
+      "volume_rank": 1,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z"
+    },
+    {
+      "pair": "ETH/USDT:USDT",
+      "quote_volume_30d": 49115300837.8982,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 2,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z"
+    },
+    {
+      "pair": "SOL/USDT:USDT",
+      "quote_volume_30d": 7677820587.9805,
+      "minimum_amount": 0.1,
+      "minimum_cost": 5.0,
+      "volume_rank": 3,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z"
+    },
+    {
+      "pair": "XRP/USDT:USDT",
+      "quote_volume_30d": 6266563496.966,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 5,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z"
+    },
+    {
+      "pair": "NEAR/USDT:USDT",
+      "quote_volume_30d": 3281048842.6756,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 9,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z"
+    }
+  ],
+  "dropped_no_history": [
+    {
+      "pair": "ZEC/USDT:USDT",
+      "quote_volume_30d": 6883352683.24489,
+      "minimum_amount": 0.001,
+      "minimum_cost": 5.0,
+      "volume_rank": 4,
+      "first_candle_probe_utc": null
+    },
+    {
+      "pair": "SOXL/USDT:USDT",
+      "quote_volume_30d": 6054058531.8917,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 6,
+      "first_candle_probe_utc": null
+    },
+    {
+      "pair": "XAU/USDT:USDT",
+      "quote_volume_30d": 3783947664.4251,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 7,
+      "first_candle_probe_utc": null
+    },
+    {
+      "pair": "SNDK/USDT:USDT",
+      "quote_volume_30d": 3711413768.67879,
+      "minimum_amount": 0.001,
+      "minimum_cost": 5.0,
+      "volume_rank": 8,
+      "first_candle_probe_utc": null
+    },
+    {
+      "pair": "KORU/USDT:USDT",
+      "quote_volume_30d": 2395278062.06025,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 10,
+      "first_candle_probe_utc": null
+    },
+    {
+      "pair": "MU/USDT:USDT",
+      "quote_volume_30d": 2054797992.5064,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 11,
+      "first_candle_probe_utc": null
+    },
+    {
+      "pair": "SUI/USDT:USDT",
+      "quote_volume_30d": 1991614644.71408,
+      "minimum_amount": 0.1,
+      "minimum_cost": 5.0,
+      "volume_rank": 12,
+      "first_candle_probe_utc": null
+    },
+    {
+      "pair": "CL/USDT:USDT",
+      "quote_volume_30d": 1979955453.08494,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 13,
+      "first_candle_probe_utc": null
+    },
+    {
+      "pair": "MSTR/USDT:USDT",
+      "quote_volume_30d": 1801801029.8038,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 14,
+      "first_candle_probe_utc": null
+    },
+    {
+      "pair": "HYPE/USDT:USDT",
+      "quote_volume_30d": 1749667722.3401601,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 15,
+      "first_candle_probe_utc": null
+    }
+  ],
+  "failures": [],
+  "caveats": [
+    "Survivorship bias: the list is today's winners. Coins that were big in 2022-2023 and later collapsed or were delisted are not in it.",
+    "History is probed directly from Bitget; no other exchange is used to fill missing early data."
+  ]
+}

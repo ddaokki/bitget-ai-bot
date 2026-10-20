@@ -1,0 +1,7 @@
+run,tier,trades,win_rate,avg_r,profit_usdt,avg_hold_h,avg_mfe_atr,avg_mae_atr
+ai_v0,base,89,42.7,0.1,8.27,59.2,3.2,1.3
+baseline_4y,base,410,33.2,0.01,4.36,56.4,2.86,1.43
+baseline_oos,base,318,33.3,0.02,5.79,57.3,2.88,1.41
+tiered,high,39,28.2,0.02,1.04,94.3,3.7,1.62
+tiered,low,63,57.1,0.32,11.38,26.2,1.8,0.99
+tiered,mid,30,40.0,0.28,9.53,60.4,3.57,1.16

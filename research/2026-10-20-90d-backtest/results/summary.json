@@ -1,0 +1,312 @@
+{
+  "runs": {
+    "baseline_4y": {
+      "trades": 410,
+      "win_rate": 33.2,
+      "net_profit_usdt": 4.36,
+      "net_profit_pct": 4.15,
+      "max_drawdown_pct": 21.55,
+      "profit_factor": 1.02,
+      "avg_hold_hours": 56.4,
+      "long_short": "213/197"
+    },
+    "baseline_oos": {
+      "trades": 318,
+      "win_rate": 33.3,
+      "net_profit_usdt": 5.8,
+      "net_profit_pct": 5.52,
+      "max_drawdown_pct": 21.74,
+      "profit_factor": 1.03,
+      "avg_hold_hours": 57.3,
+      "long_short": "184/134"
+    },
+    "ai_v0": {
+      "trades": 89,
+      "win_rate": 42.7,
+      "net_profit_usdt": 8.27,
+      "net_profit_pct": 7.88,
+      "max_drawdown_pct": 14.45,
+      "profit_factor": 1.21,
+      "avg_hold_hours": 59.2,
+      "long_short": "62/27"
+    },
+    "tiered": {
+      "trades": 132,
+      "win_rate": 44.7,
+      "net_profit_usdt": 21.95,
+      "net_profit_pct": 20.9,
+      "max_drawdown_pct": 10.21,
+      "profit_factor": 1.32,
+      "avg_hold_hours": 54.1,
+      "long_short": "91/41"
+    }
+  },
+  "per_year": {
+    "baseline_4y": {
+      "2022": {
+        "trades": 21,
+        "win_rate": 47.6,
+        "net_profit_usdt": 4.88,
+        "net_profit_pct": 4.65,
+        "max_drawdown_pct": 3.61,
+        "profit_factor": 1.59,
+        "avg_hold_hours": 61.3,
+        "long_short": "0/21",
+        "start_balance": 105.0
+      },
+      "2023": {
+        "trades": 98,
+        "win_rate": 32.7,
+        "net_profit_usdt": 13.67,
+        "net_profit_pct": 12.44,
+        "max_drawdown_pct": 10.65,
+        "profit_factor": 1.32,
+        "avg_hold_hours": 53.2,
+        "long_short": "50/48",
+        "start_balance": 109.88
+      },
+      "2024": {
+        "trades": 102,
+        "win_rate": 36.3,
+        "net_profit_usdt": -3.0,
+        "net_profit_pct": -2.43,
+        "max_drawdown_pct": 10.27,
+        "profit_factor": 0.94,
+        "avg_hold_hours": 59.2,
+        "long_short": "82/20",
+        "start_balance": 123.55
+      },
+      "2025": {
+        "trades": 114,
+        "win_rate": 35.1,
+        "net_profit_usdt": 2.99,
+        "net_profit_pct": 2.48,
+        "max_drawdown_pct": 11.38,
+        "profit_factor": 1.05,
+        "avg_hold_hours": 57.7,
+        "long_short": "66/48",
+        "start_balance": 120.55
+      },
+      "2026": {
+        "trades": 75,
+        "win_rate": 22.7,
+        "net_profit_usdt": -14.19,
+        "net_profit_pct": -11.48,
+        "max_drawdown_pct": 15.72,
+        "profit_factor": 0.69,
+        "avg_hold_hours": 53.7,
+        "long_short": "15/60",
+        "start_balance": 123.54
+      }
+    },
+    "baseline_oos": {
+      "2023": {
+        "trades": 25,
+        "win_rate": 48.0,
+        "net_profit_usdt": 21.23,
+        "net_profit_pct": 20.22,
+        "max_drawdown_pct": 2.87,
+        "profit_factor": 3.68,
+        "avg_hold_hours": 56.5,
+        "long_short": "19/6",
+        "start_balance": 105.0
+      },
+      "2024": {
+        "trades": 104,
+        "win_rate": 35.6,
+        "net_profit_usdt": -2.91,
+        "net_profit_pct": -2.31,
+        "max_drawdown_pct": 11.34,
+        "profit_factor": 0.95,
+        "avg_hold_hours": 59.9,
+        "long_short": "84/20",
+        "start_balance": 126.23
+      },
+      "2025": {
+        "trades": 114,
+        "win_rate": 35.1,
+        "net_profit_usdt": 2.22,
+        "net_profit_pct": 1.8,
+        "max_drawdown_pct": 11.33,
+        "profit_factor": 1.04,
+        "avg_hold_hours": 57.7,
+        "long_short": "66/48",
+        "start_balance": 123.32
+      },
+      "2026": {
+        "trades": 75,
+        "win_rate": 22.7,
+        "net_profit_usdt": -14.74,
+        "net_profit_pct": -11.74,
+        "max_drawdown_pct": 15.68,
+        "profit_factor": 0.69,
+        "avg_hold_hours": 53.7,
+        "long_short": "15/60",
+        "start_balance": 125.54
+      }
+    },
+    "ai_v0": {
+      "2023": {
+        "trades": 5,
+        "win_rate": 100.0,
+        "net_profit_usdt": 15.23,
+        "net_profit_pct": 14.5,
+        "max_drawdown_pct": -0.0,
+        "profit_factor": null,
+        "avg_hold_hours": 102.6,
+        "long_short": "5/0",
+        "start_balance": 105.0
+      },
+      "2024": {
+        "trades": 29,
+        "win_rate": 41.4,
+        "net_profit_usdt": -3.23,
+        "net_profit_pct": -2.69,
+        "max_drawdown_pct": 5.93,
+        "profit_factor": 0.75,
+        "avg_hold_hours": 64.1,
+        "long_short": "29/0",
+        "start_balance": 120.23
+      },
+      "2025": {
+        "trades": 34,
+        "win_rate": 35.3,
+        "net_profit_usdt": -7.95,
+        "net_profit_pct": -6.8,
+        "max_drawdown_pct": 6.84,
+        "profit_factor": 0.51,
+        "avg_hold_hours": 47.8,
+        "long_short": "20/14",
+        "start_balance": 117.0
+      },
+      "2026": {
+        "trades": 21,
+        "win_rate": 42.9,
+        "net_profit_usdt": 4.23,
+        "net_profit_pct": 3.88,
+        "max_drawdown_pct": 3.3,
+        "profit_factor": 1.39,
+        "avg_hold_hours": 60.7,
+        "long_short": "8/13",
+        "start_balance": 109.05
+      }
+    },
+    "tiered": {
+      "2023": {
+        "trades": 4,
+        "win_rate": 100.0,
+        "net_profit_usdt": 19.77,
+        "net_profit_pct": 18.83,
+        "max_drawdown_pct": -0.0,
+        "profit_factor": null,
+        "avg_hold_hours": 132.5,
+        "long_short": "4/0",
+        "start_balance": 105.0
+      },
+      "2024": {
+        "trades": 44,
+        "win_rate": 50.0,
+        "net_profit_usdt": 3.06,
+        "net_profit_pct": 2.45,
+        "max_drawdown_pct": 6.67,
+        "profit_factor": 1.13,
+        "avg_hold_hours": 59.2,
+        "long_short": "42/2",
+        "start_balance": 124.77
+      },
+      "2025": {
+        "trades": 54,
+        "win_rate": 38.9,
+        "net_profit_usdt": -5.55,
+        "net_profit_pct": -4.34,
+        "max_drawdown_pct": 8.64,
+        "profit_factor": 0.79,
+        "avg_hold_hours": 44.8,
+        "long_short": "35/19",
+        "start_balance": 127.83
+      },
+      "2026": {
+        "trades": 30,
+        "win_rate": 40.0,
+        "net_profit_usdt": 4.68,
+        "net_profit_pct": 3.82,
+        "max_drawdown_pct": 3.99,
+        "profit_factor": 1.27,
+        "avg_hold_hours": 53.0,
+        "long_short": "10/20",
+        "start_balance": 122.27
+      }
+    }
+  },
+  "bnh_btc": {
+    "from_2022-10-01": {
+      "2022": -14.8,
+      "2023": 155.7,
+      "2024": 121.2,
+      "2025": -6.4,
+      "2026": -6.5,
+      "whole_window": 322.1
+    },
+    "from_2023-10-01": {
+      "2023": 56.9,
+      "2024": 121.2,
+      "2025": -6.4,
+      "2026": -6.5,
+      "whole_window": 203.8
+    }
+  },
+  "calibration_oos": [
+    {
+      "p_bucket": "[0.0, 0.3)",
+      "rows": 15625,
+      "mean_p": 0.184,
+      "realised_yes_rate": 0.319
+    },
+    {
+      "p_bucket": "[0.3, 0.45)",
+      "rows": 8777,
+      "mean_p": 0.371,
+      "realised_yes_rate": 0.322
+    },
+    {
+      "p_bucket": "[0.45, 0.55)",
+      "rows": 3946,
+      "mean_p": 0.496,
+      "realised_yes_rate": 0.343
+    },
+    {
+      "p_bucket": "[0.55, 0.65)",
+      "rows": 2593,
+      "mean_p": 0.597,
+      "realised_yes_rate": 0.334
+    },
+    {
+      "p_bucket": "[0.65, 1.0)",
+      "rows": 2454,
+      "mean_p": 0.751,
+      "realised_yes_rate": 0.389
+    },
+    {
+      "p_bucket": "ALL",
+      "rows": 33395,
+      "mean_p": 0.344,
+      "realised_yes_rate": 0.329
+    }
+  ],
+  "last90_entries": 34,
+  "most_traded_pair_last90": "BTC/USDT:USDT",
+  "most_traded_non_btc_pair_last90": "SOL/USDT:USDT",
+  "last90_counts_by_pair": {
+    "BTC/USDT:USDT": 10,
+    "SOL/USDT:USDT": 8,
+    "XRP/USDT:USDT": 7,
+    "NEAR/USDT:USDT": 7,
+    "ETH/USDT:USDT": 2
+  },
+  "funding_shorts_symmetric_stress_usdt": {
+    "baseline_4y": 7.09,
+    "baseline_oos": 4.95,
+    "ai_v0": 1.11,
+    "tiered": 2.04
+  }
+}
