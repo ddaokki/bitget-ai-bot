@@ -16,3 +16,4 @@ node_modules/
 **/user_data/*.sqlite*
 ledger/
 .smoke_state.json
+.panel/
