@@ -20,6 +20,7 @@ TRADE = {"trade_id": 7, "pair": "BTC/USDT:USDT", "enter_tag": "smoke",
          "open_rate": 111240.5, "stop_loss_abs": 107900.0,
          "liquidation_price": 56300.0, "is_short": False}
 EXIT_WARNING = "지금 바로 'python -m bitgetbot.smoke exit'"
+AUTOTRADE_PAUSED = '재시작 후 자동매매는 꺼진(paused) 상태입니다. 다시 켜려면 "자동매매 켜기"를 누르세요.'
 
 
 def test_preflight_ok_live_clean_account():
@@ -221,8 +222,18 @@ class FakeFT:
         self.bot_startup_ts = self.startup_ts_on_start
         return {"status": "starting"}
 
+    def pause(self):
+        # Freqtrade runs startup() when it enters paused from stopped, too.
+        self.calls.append("pause")
+        self.state = "paused"
+        self.bot_startup_ts = self.startup_ts_on_start
+        return {"status": "paused, no more entries will occur from now. Run /start to enable entries."}
+
     def force_enter(self, *args):
         self.calls.append(("enter", args))
+        if self.state != "running":
+            # Freqtrade 2026.9 _force_entry_validations: "trader is not running".
+            raise FreqtradeError(400, "trader is not running")
         self.trades = [dict(TRADE)]
         return dict(TRADE)
 
@@ -260,7 +271,9 @@ def test_cli_dry_run_roundtrip_uses_no_private_bitget(cli, capsys, tmp_path, mon
     assert state["trade_id"] == 7 and state["started_ms"] > 0
     assert state["mode"] == "dry"
     assert ("enter", ("BTC/USDT:USDT", "long", 7.29, 2, "market", "smoke")) in ft.calls
-    assert ft.calls.index("start") < ft.calls.index(("enter", ("BTC/USDT:USDT", "long", 7.29, 2, "market", "smoke")))
+    order = ("enter", ("BTC/USDT:USDT", "long", 7.29, 2, "market", "smoke"))
+    assert ft.calls.index("start") < ft.calls.index(order) < ft.calls.index("pause")
+    assert ft.state == "paused"
     assert smoke.main(["check"]) == 0
     assert smoke.main(["exit"]) == 0
     assert ("exit", (7, "market")) in ft.calls
@@ -294,7 +307,7 @@ def test_cli_live_enter_rejects_plan_orders_before_confirmation(cli, monkeypatch
     monkeypatch.setattr("builtins.input", lambda _: pytest.fail("leftover trigger must block entry"))
     assert smoke.main(["enter"]) == 1
     assert "미체결 예약(트리거·손절) 주문이 1개 있습니다" in capsys.readouterr().out
-    assert "start" not in ft.calls
+    assert "start" not in ft.calls and "pause" not in ft.calls
     assert not any(isinstance(call, tuple) and call[0] == "enter" for call in ft.calls)
 
 
@@ -377,7 +390,7 @@ def test_cli_live_check_unknown_liquidation_still_fails(cli, monkeypatch, capsys
     assert t[0] == 120
 
 
-def test_cli_enter_never_orders_if_start_stays_stopped(cli, monkeypatch, tmp_path, capsys):
+def test_cli_enter_never_orders_if_start_stays_stopped_and_restores_paused(cli, monkeypatch, tmp_path, capsys):
     _, _, ft, _, t = cli
 
     def start_without_ready():
@@ -387,7 +400,8 @@ def test_cli_enter_never_orders_if_start_stays_stopped(cli, monkeypatch, tmp_pat
     monkeypatch.setattr(ft, "start", start_without_ready)
     assert smoke.main(["enter"]) == 1
     assert t[0] == 10
-    assert "start" in ft.calls
+    assert ft.calls.index("start") < ft.calls.index("pause")
+    assert ft.state == "paused"
     assert not any(isinstance(call, tuple) and call[0] == "enter" for call in ft.calls)
     assert not (tmp_path / ".smoke_state.json").exists()
     assert "10초" in capsys.readouterr().out
@@ -404,7 +418,7 @@ def test_cli_enter_waits_for_running_at_one_second_intervals(cli, monkeypatch):
         return {"status": "starting"}
 
     def delayed_config():
-        if "start" in ft.calls:
+        if "start" in ft.calls and "pause" not in ft.calls:
             polls.append(t[0])
             if t[0] >= 3:
                 ft.state = "running"
@@ -419,6 +433,62 @@ def test_cli_enter_waits_for_running_at_one_second_intervals(cli, monkeypatch):
     monkeypatch.setattr(ft, "force_enter", enter_when_ready)
     assert smoke.main(["enter"]) == 0
     assert polls == [0, 1, 2, 3, 3]
+    assert ft.state == "paused"
+
+
+@pytest.mark.parametrize("prior", ["stopped", "paused"])
+def test_cli_enter_runs_only_for_the_order_and_restores_paused(cli, tmp_path, capsys, prior):
+    _, _, ft, _, _ = cli
+    ft.state = prior
+    assert smoke.main(["enter"]) == 0
+    order = ("enter", ("BTC/USDT:USDT", "long", 7.29, 2, "market", "smoke"))
+    assert ft.calls.count("start") == 1 and ft.calls.count("pause") == 1
+    assert ft.calls.index("start") < ft.calls.index(order) < ft.calls.index("pause")
+    assert [call for call in ft.calls if isinstance(call, tuple)] == [order]
+    assert ft.state == "paused"
+    assert json.loads((tmp_path / ".smoke_state.json").read_text())["trade_id"] == 7
+    output = capsys.readouterr().out
+    assert "진입 확인: 거래 번호 7" in output and "자동매매가 켜져 있을 수 있습니다" not in output
+
+
+def test_cli_enter_when_autotrade_already_running_changes_no_state(cli, monkeypatch):
+    _, _, ft, _, t = cli
+    ft.state = "running"
+    monkeypatch.setattr(ft, "start", lambda: pytest.fail("already running"))
+    monkeypatch.setattr(ft, "pause", lambda: pytest.fail("the user switched autotrade on; keep it"))
+    assert smoke.main(["enter"]) == 0
+    assert [call for call in ft.calls if isinstance(call, tuple)] == [
+        ("enter", ("BTC/USDT:USDT", "long", 7.29, 2, "market", "smoke")),
+    ]
+    assert ft.state == "running" and t[0] == 0
+
+
+def test_cli_enter_warns_when_autotrade_cannot_be_paused_again(cli, monkeypatch, capsys):
+    _, _, ft, _, _ = cli
+
+    def broken_pause():
+        ft.calls.append("pause")
+        raise FreqtradeUnreachable("SECRET-SENTINEL")
+
+    monkeypatch.setattr(ft, "pause", broken_pause)
+    assert smoke.main(["enter"]) == 0
+    output = capsys.readouterr().out
+    assert "자동매매가 켜져 있을 수 있습니다" in output and "자동매매 멈추기" in output
+    assert "SECRET-SENTINEL" not in output
+
+
+def test_cli_enter_order_failure_still_restores_paused(cli, monkeypatch, capsys):
+    _, _, ft, _, _ = cli
+
+    def failing_enter(*args):
+        ft.calls.append(("enter", args))
+        raise FreqtradeError(500, "SECRET-SENTINEL")
+
+    monkeypatch.setattr(ft, "force_enter", failing_enter)
+    assert smoke.main(["enter"]) == 1
+    assert "pause" in ft.calls
+    assert ft.state == "paused"
+    assert "SECRET-SENTINEL" not in capsys.readouterr().out
 
 
 def test_cli_live_balance_missing_is_preflight_problem(cli, monkeypatch, capsys):
@@ -440,7 +510,7 @@ def test_cli_enter_rechecks_preflight_before_confirmation(cli, monkeypatch):
     monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     monkeypatch.setattr("builtins.input", lambda _: pytest.fail("must reject exposure first"))
     assert smoke.main(["enter"]) == 1
-    assert "start" not in ft.calls
+    assert "start" not in ft.calls and "pause" not in ft.calls
     assert not any(isinstance(call, tuple) for call in ft.calls)
 
 
@@ -450,7 +520,7 @@ def test_cli_live_confirmation_refusal_never_orders(cli, monkeypatch):
     monkeypatch.setattr(smoke, "load_settings", lambda: replace(settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite"))
     monkeypatch.setattr("builtins.input", lambda _: "yes")
     assert smoke.main(["enter"]) == 1
-    assert "start" not in ft.calls
+    assert "start" not in ft.calls and "pause" not in ft.calls
     assert not any(isinstance(call, tuple) for call in ft.calls)
 
 
@@ -525,8 +595,8 @@ def test_cli_restart_waits_for_user_and_preserves_trade_id(cli, monkeypatch, tmp
     def restart(prompt):
         assert ft.calls == ["config", "health", "status"]
         prompts.append(prompt)
-        ft.state = "stopped"
         assert ft.bot_startup_ts == 100
+        ft.state, ft.bot_startup_ts = "paused", 101
         return ""
 
     monkeypatch.setattr("builtins.input", restart)
@@ -535,8 +605,9 @@ def test_cli_restart_waits_for_user_and_preserves_trade_id(cli, monkeypatch, tmp
     output = capsys.readouterr().out
     assert "docker compose -f freqtrade/docker-compose.yml restart freqtrade" in output
     assert "7" in output and "PASS" in output
-    assert ft.calls[:8] == ["config", "health", "status", "ping", "config", "start", "config", "health"]
-    assert ft.calls.count("start") == 1
+    assert AUTOTRADE_PAUSED in output
+    assert ft.calls[:6] == ["config", "health", "status", "ping", "config", "health"]
+    assert "start" not in ft.calls and "pause" not in ft.calls
     assert t[0] == 30
     assert reader.calls == []
 
@@ -548,7 +619,7 @@ def test_cli_restart_wrong_trade_is_failure(cli, monkeypatch, tmp_path, capsys):
     (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "dry"}))
 
     def restart(_):
-        ft.state = "stopped"
+        ft.state, ft.bot_startup_ts = "paused", 101
         ft.trades = [{**TRADE, "trade_id": 8}]
         return ""
 
@@ -679,7 +750,7 @@ def test_cli_check_unreachable_directs_manual_close_without_exit(cli, monkeypatc
     (tmp_path / ".smoke_state.json").write_text(json.dumps({
         "started_ms": 1, "trade_id": 7, "mode": "dry",
     }), encoding="utf-8")
-    monkeypatch.setattr("builtins.input", lambda _: setattr(ft, "state", "stopped") or "")
+    monkeypatch.setattr("builtins.input", lambda _: setattr(ft, "state", "paused") or "")
 
     def unreachable():
         raise FreqtradeUnreachable("SECRET-SENTINEL")
@@ -703,7 +774,7 @@ def test_cli_restart_ping_timeout_does_not_order(cli, monkeypatch, tmp_path, cap
     monkeypatch.setattr("builtins.input", lambda _: "")
     assert smoke.main(["restart-check"]) == 1
     assert t[0] == 90
-    assert "start" not in ft.calls
+    assert "start" not in ft.calls and "pause" not in ft.calls
     output = capsys.readouterr().out
     assert ("Freqtrade에 연결할 수 없습니다. Docker Desktop과 컨테이너를 확인하세요. "
             "복구가 안 되면 비트겟 웹(PC)에서 포지션을 직접 시장가 청산하세요.") in output
@@ -829,20 +900,36 @@ def test_cli_restart_enter_without_restart_fails(cli, tmp_path, monkeypatch, cap
     monkeypatch.setattr("builtins.input", lambda _: "")
     assert smoke.main(["restart-check"]) == 1
     assert "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요." in capsys.readouterr().out
-    assert "start" not in ft.calls and t[0] == 0
+    assert "start" not in ft.calls and "pause" not in ft.calls and t[0] == 0
     assert ft.calls.count("status") == 1
 
 
-@pytest.mark.parametrize("state", ["stopped", "paused", None])
-def test_cli_restart_requires_running_before_prompt(cli, tmp_path, monkeypatch, capsys, state):
+def test_cli_restart_paused_without_restart_fails_on_timestamp(cli, tmp_path, monkeypatch, capsys):
+    _, _, ft, _, t = cli
+    ft.state = "paused"
+    ft.trades = [dict(TRADE)]
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "dry",
+    }), encoding="utf-8")
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    assert smoke.main(["restart-check"]) == 1
+    output = capsys.readouterr().out
+    assert "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요." in output
+    assert AUTOTRADE_PAUSED not in output
+    assert "start" not in ft.calls and "pause" not in ft.calls and t[0] == 15
+    assert ft.calls.count("status") == 1
+
+
+@pytest.mark.parametrize("state", ["stopped", "reload_config", None])
+def test_cli_restart_requires_running_or_paused_before_prompt(cli, tmp_path, monkeypatch, capsys, state):
     _, _, ft, _, t = cli
     ft.state = state
     (tmp_path / ".smoke_state.json").write_text(json.dumps({
         "started_ms": 1, "trade_id": 7, "mode": "dry",
     }), encoding="utf-8")
-    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("not running: no restart prompt"))
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("not active: no restart prompt"))
     assert smoke.main(["restart-check"]) == 1
-    assert "재시작 점검 전 Freqtrade 실행 상태가 running이어야 합니다." in capsys.readouterr().out
+    assert "재시작 점검 전 Freqtrade 실행 상태가 running 또는 paused여야 합니다." in capsys.readouterr().out
     assert ft.calls == ["config"] and t[0] == 0
 
 
@@ -865,12 +952,16 @@ def test_cli_restart_requires_integer_timestamp_before_prompt(cli, tmp_path, mon
 def test_cli_restart_waits_for_start_timestamp_increase(cli, tmp_path, monkeypatch, capsys, timestamp):
     _, _, ft, _, t = cli
     ft.state = "running"
-    ft.startup_ts_on_start = timestamp
     ft.trades = [dict(TRADE)]
     (tmp_path / ".smoke_state.json").write_text(json.dumps({
         "started_ms": 1, "trade_id": 7, "mode": "dry",
     }), encoding="utf-8")
-    monkeypatch.setattr("builtins.input", lambda _: setattr(ft, "state", "stopped") or "")
+
+    def restart(_):
+        ft.state, ft.bot_startup_ts = "paused", timestamp
+        return ""
+
+    monkeypatch.setattr("builtins.input", restart)
     health = ft.health
     polls = []
 
@@ -881,66 +972,88 @@ def test_cli_restart_waits_for_start_timestamp_increase(cli, tmp_path, monkeypat
     monkeypatch.setattr(ft, "health", observed_health)
     assert smoke.main(["restart-check"]) == 1
     assert "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요." in capsys.readouterr().out
-    assert ft.calls.count("start") == 1 and t[0] == 15
+    assert "start" not in ft.calls and t[0] == 15
     assert polls == [0] + list(range(16))
     assert ft.calls.count("status") == 1
 
 
-def test_cli_restart_waits_for_running_before_polling_health(cli, tmp_path, monkeypatch, capsys):
+def test_cli_restart_polls_health_until_startup_advances(cli, tmp_path, monkeypatch, capsys):
     _, _, ft, _, t = cli
     ft.state = "running"
     ft.trades = [dict(TRADE)]
     (tmp_path / ".smoke_state.json").write_text(json.dumps({
         "started_ms": 1, "trade_id": 7, "mode": "dry",
     }), encoding="utf-8")
-    monkeypatch.setattr("builtins.input", lambda _: setattr(ft, "state", "stopped") or "")
-    start, config, health = ft.start, ft.show_config, ft.health
-    config_polls, health_polls = [], []
+    restarted = []
 
-    def delayed_start():
-        result = start()
-        ft.state = "stopped"
-        return result
+    def restart(_):
+        restarted.append(True)
+        ft.state = "paused"
+        return ""
 
-    def delayed_config():
-        if "start" in ft.calls:
-            config_polls.append(t[0])
-            if t[0] >= 3:
-                ft.state = "running"
-        return config()
+    monkeypatch.setattr("builtins.input", restart)
+    monkeypatch.setattr(ft, "start", lambda: pytest.fail("restart-check must never start autotrade"))
+    health = ft.health
+    health_polls = []
 
     def delayed_health():
-        if "start" in ft.calls:
+        if restarted:
             health_polls.append(t[0])
-            assert ft.state == "running"
-            if t[0] < 6:
-                return {"bot_startup_ts": 100}
+            assert ft.state == "paused"
+            ft.bot_startup_ts = 100 if t[0] < 6 else 101
         return health()
 
-    monkeypatch.setattr(ft, "start", delayed_start)
-    monkeypatch.setattr(ft, "show_config", delayed_config)
     monkeypatch.setattr(ft, "health", delayed_health)
     assert smoke.main(["restart-check"]) == 0
-    assert config_polls[:4] == [0, 1, 2, 3]
-    assert health_polls == [3, 4, 5, 6]
+    assert health_polls == [0, 1, 2, 3, 4, 5, 6]
     assert t[0] == 36
     assert "PASS" in capsys.readouterr().out
 
 
-def test_cli_restart_start_stays_stopped_times_out(cli, tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("after", ["stopped", "running", None])
+def test_cli_restart_requires_paused_after_restart(cli, tmp_path, monkeypatch, capsys, after):
     _, _, ft, _, t = cli
     ft.state = "running"
     ft.trades = [dict(TRADE)]
     (tmp_path / ".smoke_state.json").write_text(json.dumps({
         "started_ms": 1, "trade_id": 7, "mode": "dry",
     }), encoding="utf-8")
-    monkeypatch.setattr("builtins.input", lambda _: setattr(ft, "state", "stopped") or "")
-    monkeypatch.setattr(ft, "start", lambda: ft.calls.append("start"))
+
+    def restart(_):
+        ft.state, ft.bot_startup_ts = after, 101
+        return ""
+
+    monkeypatch.setattr("builtins.input", restart)
     assert smoke.main(["restart-check"]) == 1
-    assert "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요." in capsys.readouterr().out
-    assert t[0] == 10 and ft.calls.count("start") == 1
+    output = capsys.readouterr().out
+    assert "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요." in output
+    assert AUTOTRADE_PAUSED not in output
+    assert t[0] == 0 and "start" not in ft.calls and "pause" not in ft.calls
     assert ft.calls.count("health") == 1
     assert ft.calls.count("status") == 1
+
+
+@pytest.mark.parametrize("before", ["running", "paused"])
+def test_cli_restart_check_never_calls_start(cli, tmp_path, monkeypatch, capsys, before):
+    _, _, ft, _, t = cli
+    ft.state = before
+    ft.trades = [dict(TRADE)]
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "dry",
+    }), encoding="utf-8")
+
+    def restart(_):
+        ft.state, ft.bot_startup_ts = "paused", 101
+        return ""
+
+    monkeypatch.setattr("builtins.input", restart)
+    monkeypatch.setattr(ft, "start", lambda: pytest.fail("restart-check must never start autotrade"))
+    assert smoke.main(["restart-check"]) == 0
+    output = capsys.readouterr().out
+    assert "재시작 후 같은 거래 번호 확인: 7" in output and "종합: PASS" in output
+    assert (AUTOTRADE_PAUSED in output) is (before == "running")
+    assert "start" not in ft.calls and "pause" not in ft.calls
+    assert ft.state == "paused" and t[0] == 30
 
 
 @pytest.mark.parametrize("dry_run", [True, False])
@@ -1057,7 +1170,9 @@ def test_cli_enter_preorder_errors_do_not_print_exit_warning(cli, tmp_path, monk
 @pytest.mark.parametrize("last_config", [
     {"state": "running", "dry_run": False},
     {"state": "stopped", "dry_run": True},
+    {"state": "reload_config", "dry_run": True},
     {"state": "running"},
+    {"state": "paused"},
 ])
 def test_cli_enter_rechecks_running_and_mode_together_before_order(cli, monkeypatch, tmp_path,
                                                                  capsys, last_config):
@@ -1238,7 +1353,7 @@ def test_restart_check_calls_injected_restart_instead_of_prompt(cli, monkeypatch
         assert ft.calls == ["config", "health", "status"]
         assert lines[-1] == "컨테이너를 재시작합니다…"
         restarts.append(True)
-        ft.state = "stopped"
+        ft.state, ft.bot_startup_ts = "paused", 101
 
     io = smoke.SmokeIO(out=lines.append, ask=lambda p: asked.append(p) or "", restart=restart)
 
@@ -1248,8 +1363,9 @@ def test_restart_check_calls_injected_restart_instead_of_prompt(cli, monkeypatch
     assert "재시작 후 같은 거래 번호 확인: 7" in lines
     assert "종합: PASS" in lines
     assert not any("다음 명령을 직접 실행하세요" in line for line in lines)
-    assert ft.calls[:8] == ["config", "health", "status", "ping", "config", "start", "config", "health"]
-    assert ft.calls.count("start") == 1 and t[0] == 30
+    assert AUTOTRADE_PAUSED in lines
+    assert ft.calls[:6] == ["config", "health", "status", "ping", "config", "health"]
+    assert "start" not in ft.calls and "pause" not in ft.calls and t[0] == 30
     assert not any(isinstance(call, tuple) for call in ft.calls)
     assert reader.calls == ([] if dry_run else ["position", "stops"])
     assert capsys.readouterr().out == ""

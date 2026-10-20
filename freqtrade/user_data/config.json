@@ -5,25 +5,25 @@
   "tradable_balance_ratio": 0.99,
   "dry_run": true,
   "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite",
-  "dry_run_wallet": 100,
+  "dry_run_wallet": 114,
   "trading_mode": "futures",
   "margin_mode": "isolated",
-  "initial_state": "stopped",
+  "initial_state": "paused",
   "force_entry_enable": true,
   "timeframe": "1h",
   "entry_pricing": {
-    "price_side": "same",
+    "price_side": "other",
     "use_order_book": true,
     "order_book_top": 1
   },
   "exit_pricing": {
-    "price_side": "same",
+    "price_side": "other",
     "use_order_book": true,
     "order_book_top": 1
   },
   "order_types": {
-    "entry": "limit",
-    "exit": "limit",
+    "entry": "market",
+    "exit": "market",
     "emergency_exit": "market",
     "force_entry": "market",
     "force_exit": "market",
@@ -39,6 +39,7 @@
     "password": "",
     "ccxt_config": {"options": {"uta": false}},
     "ccxt_async_config": {"options": {"uta": false}},
+    "_ft_has_params": {"ohlcv_candle_limit_per_timeframe": {"1d": 90}},
     "pair_whitelist": ["BTC/USDT:USDT"],
     "pair_blacklist": []
   },

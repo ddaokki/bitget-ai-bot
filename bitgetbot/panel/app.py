@@ -1,4 +1,5 @@
-"""Loopback control-panel API. Orders stay inside smoke or emergency close-all."""
+"""Loopback control-panel API. Orders stay inside smoke, emergency close-all, or the strategy
+the user switches on with /api/autotrade (Freqtrade /start, /pause)."""
 
 import json
 import math
@@ -42,11 +43,15 @@ KEYS_SAVED = "거래 봇을 재시작해야 새 키가 적용됩니다."
 EMERGENCY_SCOPE = "거래 봇(Freqtrade)이 연 거래를 시장가로 청산 요청했습니다 (현재 모드: {mode})."
 EMERGENCY_DRY = "모의 거래만 청산했습니다. 실거래 포지션은 비트겟 웹에서 확인하세요."
 EMERGENCY_LIVE = "봇이 모르는 포지션은 비트겟 웹에서 확인하세요."
+AUTOTRADE_STARTED = "자동매매를 켰습니다 (현재 모드: {mode}). 전략이 스스로 진입·청산합니다."
+AUTOTRADE_PAUSED = "새 진입을 멈췄습니다. 열린 포지션과 손절은 계속 관리합니다."
+AUTOTRADE_MISMATCH = "거래 봇 모드가 저장된 모드와 다릅니다. 모드를 다시 적용한 뒤 시도하세요"
+AUTOTRADE_FAILED = "거래 봇에 요청하지 못했습니다. 실행 상태를 확인하세요"
 # Audit actions by exact POST path. Request bodies, keys, PINs and tokens are never recorded.
 AUDIT_ACTIONS = {
     "/api/pin": "pin_set", "/api/keys": "keys_saved", "/api/mode": "mode",
     "/api/docker/up": "docker_up", "/api/emergency/close-all": "emergency",
-    "/api/phone/enable": "phone_enable",
+    "/api/phone/enable": "phone_enable", "/api/autotrade": "autotrade",
 }
 
 
@@ -399,6 +404,12 @@ def create_app(deps: PanelDeps) -> FastAPI:
                 raise _PanelError(400, "모드는 dry 또는 live로 입력하세요")
             if value == "live" and body.get("confirm") != "LIVE":
                 raise _PanelError(400, "실전 전환에는 LIVE 확인이 필요합니다")
+            # Stop automatic entries first, so no trade can open between this check and the switch.
+            try:
+                settings = _settings(deps)
+                deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass).pause()
+            except Exception:
+                pass  # unreachable bot: the open-trade check below still decides
             if _open_trade_blocks_mode(deps):
                 raise _PanelError(409, OPEN_TRADE)
             deps.mode_setter(value)
@@ -407,6 +418,32 @@ def create_app(deps: PanelDeps) -> FastAPI:
             if not ok:
                 raise _PanelError(503, "모드는 저장했지만 컨테이너 적용에 실패했습니다. 실행 상태를 확인하세요")
         return {"ok": True}
+
+    @app.post("/api/autotrade")
+    def autotrade(body: dict = Depends(_body)):
+        with operation_lock:
+            if deps.jobs.snapshot()["running"]:
+                raise _PanelError(409, "다른 작업이 실행 중입니다")
+            action = body.get("action")
+            if not isinstance(action, str) or action not in {"start", "pause"}:
+                raise _PanelError(400, "자동매매 동작은 start 또는 pause로 입력하세요")
+            settings = _settings(deps)
+            if action == "start" and not settings.dry_run and body.get("confirm") != "LIVE":
+                raise _PanelError(400, "실전 자동매매에는 LIVE 확인이 필요합니다")
+            ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
+            try:
+                # Never start a bot whose running mode differs from the saved one (e.g. a live
+                # bot still running after the setting was switched back to dry).
+                if ft.show_config().get("dry_run") is not settings.dry_run:
+                    raise _PanelError(409, AUTOTRADE_MISMATCH)
+                (ft.start if action == "start" else ft.pause)()
+            except _PanelError:
+                raise
+            except Exception:
+                raise _PanelError(503, AUTOTRADE_FAILED) from None
+        if action == "pause":
+            return {"ok": True, "message": AUTOTRADE_PAUSED}
+        return {"ok": True, "message": AUTOTRADE_STARTED.format(mode="모의" if settings.dry_run else "실전")}
 
     @app.post("/api/docker/up")
     def docker_up():

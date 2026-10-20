@@ -48,6 +48,18 @@ class FT:
     def status(self):
         return list(self.trades)
 
+    def start(self):
+        self.calls.append(("start",))
+        if self.error:
+            raise self.error
+        return {"status": SENTINELS[3]}
+
+    def pause(self):
+        self.calls.append(("pause",))
+        if self.error:
+            raise self.error
+        return {"status": SENTINELS[3]}
+
     def force_exit(self, trade_id, ordertype):
         self.calls.append((trade_id, ordertype))
         if self.error:
@@ -1044,3 +1056,79 @@ def test_entrypoint_keeps_existing_streams(tmp_path, monkeypatch):
     assert entry.main([]) == 0
     assert seen == [before]
     assert not (tmp_path / ".panel" / "panel.out.log").exists()
+
+
+def test_autotrade_start_in_dry_mode_starts_freqtrade(panel):
+    local_login(panel)
+    response = panel.local.post("/api/autotrade", json={"action": "start"}, headers=PANEL_HEADER)
+    assert response.status_code == 200
+    assert panel.ft.calls == [("start",)]
+    assert "모의" in response.json()["message"]
+    assert SENTINELS[3] not in response.text
+
+
+def test_autotrade_live_start_requires_exact_live_confirmation(panel):
+    local_login(panel)
+    panel.settings[0] = replace(panel.settings[0], dry_run=False)
+    panel.ft.dry = False
+    for body in [{"action": "start"}, {"action": "start", "confirm": "live"}]:
+        assert panel.local.post("/api/autotrade", json=body, headers=PANEL_HEADER).status_code == 400
+    assert panel.ft.calls == []
+    response = panel.local.post("/api/autotrade", json={"action": "start", "confirm": "LIVE"}, headers=PANEL_HEADER)
+    assert response.status_code == 200
+    assert panel.ft.calls == [("start",)]
+    assert "실전" in response.json()["message"]
+
+
+def test_autotrade_pause_needs_no_confirmation_and_works_from_phone(panel):
+    tailnet_login(panel)
+    response = panel.tailnet.post("/api/autotrade", json={"action": "pause"}, headers=PANEL_HEADER)
+    assert response.status_code == 200
+    assert panel.ft.calls == [("pause",)]
+
+
+@pytest.mark.parametrize("body", [{}, {"action": "stop"}, {"action": ["start"]}, {"action": "START"}])
+def test_autotrade_rejects_unknown_actions(panel, body):
+    local_login(panel)
+    assert panel.local.post("/api/autotrade", json=body, headers=PANEL_HEADER).status_code == 400
+    assert panel.ft.calls == []
+
+
+def test_autotrade_refuses_when_running_bot_mode_differs_from_settings(panel):
+    local_login(panel)
+    panel.ft.dry = False          # running bot is live while the saved setting is dry
+    response = panel.local.post("/api/autotrade", json={"action": "start"}, headers=PANEL_HEADER)
+    assert response.status_code == 409
+    assert panel.ft.calls == []
+
+
+@pytest.mark.parametrize("error", [FreqtradeUnreachable("SECRET-SENTINEL"), FreqtradeError(500, "SECRET-SENTINEL")])
+def test_autotrade_freqtrade_failure_is_sanitized(panel, error):
+    local_login(panel)
+    panel.ft.error = error
+    response = panel.local.post("/api/autotrade", json={"action": "start"}, headers=PANEL_HEADER)
+    assert response.status_code == 503
+    assert "SECRET-SENTINEL" not in response.text
+
+
+def test_autotrade_blocked_while_a_job_runs(panel):
+    local_login(panel)
+    panel.options["block"] = True
+    assert panel.local.post("/api/steps/preflight", json={}, headers=PANEL_HEADER).status_code == 200
+    assert panel.entered.wait(5)
+    assert panel.local.post("/api/autotrade", json={"action": "start"}, headers=PANEL_HEADER).status_code == 409
+    panel.release.set()
+
+
+def test_mode_switch_pauses_automatic_entries_before_checking_open_trades(panel):
+    local_login(panel)
+    assert panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER).status_code == 200
+    assert panel.ft.calls[0] == ("pause",)
+
+
+def test_mode_switch_still_works_when_pause_fails(panel):
+    local_login(panel)
+    panel.ft.error = FreqtradeUnreachable("SECRET-SENTINEL")
+    response = panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER)
+    assert response.status_code == 200
+    assert "SECRET-SENTINEL" not in response.text
