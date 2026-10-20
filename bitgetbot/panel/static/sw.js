@@ -33,11 +33,7 @@ self.addEventListener("fetch", event => {
     if (!SHELL.includes(url.pathname)) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
-        if (url.pathname !== "/") {
-            const cached = await cache.match(url.pathname);
-            if (cached) return cached;
-        }
-        // Network first for the entry page. Never retain redirects or token URLs.
+        // Network first for every shell file. Never retain redirects or token URLs.
         try {
             const response = await fetch(request);
             if (response.ok && !response.redirected) await cache.put(url.pathname, response.clone());

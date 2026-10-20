@@ -56,8 +56,7 @@ function disconnected() {
     state.online = false;
     resetPreflight();
     closeConfirmation();
-    disarmEmergency();
-    text("connection", "연결 끊김 · 표시된 값은 이전 조회 결과입니다. 주문 버튼을 잠갔습니다.");
+    text("connection", "연결 끊김 · 표시된 값은 이전 조회 결과입니다. 일반 주문은 잠겼지만 긴급 청산은 요청할 수 있습니다.");
     $("connection").className = "connection offline";
     updateControls();
 }
@@ -138,7 +137,8 @@ function updateControls() {
     $("phone-enable").disabled = localBusy || !state.status?.pin_set
         || tailscale?.installed !== true || tailscale?.logged_in !== true || tailscale?.funnel !== false;
     // Emergency close remains available while a normal job runs or Freqtrade is down.
-    $("emergency-arm").disabled = !state.authenticated || !state.online || state.emergencyPending;
+    // A failed status lookup is not a logout; the server authorizes each emergency POST.
+    $("emergency-arm").disabled = state.needsLogin || state.emergencyPending;
     $("emergency-confirm").disabled = $("emergency-arm").disabled || Date.now() >= state.emergencyDeadline;
     updateConfirmation();
 }
@@ -397,7 +397,7 @@ function disarmEmergency() {
 }
 
 function armEmergency() {
-    if (!state.authenticated || !state.online || state.emergencyPending) return;
+    if (state.needsLogin || state.emergencyPending) return;
     state.emergencyDeadline = Date.now() + 3000;
     text("emergency-arm", "청산 준비됨 · 옆 확인 버튼을 누르세요");
     $("emergency-confirm").hidden = false;
@@ -408,7 +408,7 @@ function armEmergency() {
 }
 
 async function confirmEmergency() {
-    if (!state.authenticated || !state.online || state.emergencyPending
+    if (state.needsLogin || state.emergencyPending
         || !state.emergencyDeadline || Date.now() >= state.emergencyDeadline) { disarmEmergency(); return; }
     disarmEmergency();
     state.emergencyPending = true;

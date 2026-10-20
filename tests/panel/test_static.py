@@ -287,6 +287,65 @@ assert.equal(requests.filter(r => r.url==="/api/emergency/close-all").length, 1)
 ''')
 
 
+@pytest.mark.parametrize("authenticated", [False, True])
+def test_emergency_remains_available_after_status_failure_while_offline(javascript, authenticated):
+    javascript(('run("applyStatus(fixture)");' if authenticated else '') + r'''
+run('state.online=false');
+response={ok:false,status:503,json:async()=>({detail:"상태 조회 실패"}),headers:{get:()=>null}};
+await run('poll()');
+assert.equal(run('state.online'), false);
+assert.equal(run('state.needsLogin'), false);
+assert.equal(element("emergency-arm").disabled, false);
+run('armEmergency()');
+assert.ok(run('state.emergencyDeadline') > Date.now());
+assert.equal(element("emergency-confirm").hidden, false);
+assert.equal(element("emergency-confirm").disabled, false);
+assert.equal(requests.filter(r => r.options.method === "POST").length, 0);
+await Promise.all([run('confirmEmergency()'), run('confirmEmergency()')]);
+await run('confirmEmergency()');
+const exits = requests.filter(r => r.url === "/api/emergency/close-all");
+assert.equal(exits.length, 1);
+assert.equal(exits[0].options.method, "POST");
+assert.equal(exits[0].options.headers["X-Panel-Request"], "1");
+assert.equal(exits[0].options.credentials, "same-origin");
+assert.match(element("emergency-message").textContent, /자동 재시도하지 않습니다/);
+''')
+
+
+def test_status_failure_does_not_cancel_armed_emergency(javascript):
+    javascript(r'''
+run('applyStatus(fixture); armEmergency()');
+const deadline = run('state.emergencyDeadline');
+response={ok:false,status:503,json:async()=>({detail:"상태 조회 실패"}),headers:{get:()=>null}};
+await run('poll()');
+assert.equal(run('state.emergencyDeadline'), deadline);
+assert.equal(element("emergency-confirm").hidden, false);
+assert.equal(element("emergency-confirm").disabled, false);
+await run('confirmEmergency()');
+assert.equal(requests.filter(r => r.url === "/api/emergency/close-all").length, 1);
+''')
+
+
+def test_emergency_stays_disabled_after_401_even_if_status_later_fails(javascript):
+    javascript(r'''
+run('applyStatus(fixture); armEmergency()');
+response={ok:false,status:401,json:async()=>({detail:"로그인이 필요합니다"}),headers:{get:()=>null}};
+await run('poll()');
+assert.equal(run('state.needsLogin'), true);
+assert.equal(element("emergency-arm").disabled, true);
+assert.equal(element("emergency-confirm").hidden, true);
+response={ok:false,status:503,json:async()=>({detail:"상태 조회 실패"}),headers:{get:()=>null}};
+await run('poll()');
+run('armEmergency()');
+assert.equal(run('state.emergencyDeadline'), 0);
+assert.equal(element("emergency-arm").disabled, true);
+run('state.emergencyDeadline=Date.now()+3000');
+await run('confirmEmergency()');
+assert.equal(element("emergency-confirm").disabled, true);
+assert.equal(requests.filter(r => r.options.method === "POST").length, 0);
+''')
+
+
 def test_submit_clears_passwords_even_when_action_is_blocked(javascript):
     javascript(r'''
 run('applyStatus(fixture); state.pending=true');
@@ -391,17 +450,22 @@ assert.equal(requests.length, 0);
 ''')
 
 
-def test_service_worker_shell_install_and_root_network_first(javascript):
-    javascript(r'''
+@pytest.mark.parametrize("path", [
+    "/", "/static/index.html", "/static/style.css", "/static/app.js",
+    "/manifest.webmanifest", "/static/icon-192.png", "/static/icon-512.png",
+])
+def test_service_worker_shell_install_and_network_first(javascript, path):
+    javascript("const path = " + repr(path) + ";" + r'''
 const writes = [], prefetched = [], order = [];
 const stale = {old:true}, fresh = {ok:true,redirected:false,clone(){return this;}};
+const stored = new Map([[path, stale]]);
 context.Request = class {
     constructor(path, options) {this.url=new URL(path,"http://127.0.0.1:8090").href; this.options=options;}
 };
 context.caches = {open:async()=>({
     addAll:async paths=>prefetched.push(...paths),
-    match:async path=>{order.push("cache"); return stale;},
-    put:async(path,value)=>writes.push({path,value})
+    match:async path=>{order.push("cache"); return stored.get(path);},
+    put:async(path,value)=>{writes.push({path,value}); stored.set(path,value);}
 })};
 let installed;
 listeners.install({waitUntil(promise){installed=promise;}});
@@ -413,15 +477,18 @@ for (const req of prefetched) {
     assert.equal(new URL(req.url).pathname.startsWith("/api"), false);
 }
 let result;
-const event={request:{url:"http://127.0.0.1:8090/",method:"GET"}, respondWith(promise){result=promise;}};
+const event={request:{url:new URL(path,"http://127.0.0.1:8090").href,method:"GET"}, respondWith(promise){result=promise;}};
 context.fetch=async()=>{order.push("network"); return fresh;};
 listeners.fetch(event);
 assert.equal(await result, fresh);
 assert.deepEqual(order, ["network"]);
-assert.deepEqual(writes.map(write=>write.path), ["/"]);
-context.fetch=async()=>{throw Error("offline");};
+assert.deepEqual(writes.map(write=>write.path), [path]);
+assert.equal(stored.get(path), fresh);
+context.fetch=async()=>{order.push("network"); throw Error("offline");};
+order.length=0;
 listeners.fetch(event);
-assert.equal(await result, stale);
+assert.equal(await result, fresh);
+assert.deepEqual(order, ["network", "cache"]);
 context.fetch=async()=>({...fresh,redirected:true});
 listeners.fetch(event);
 await result;
@@ -432,8 +499,9 @@ assert.equal(writes.length, 1);
 def test_service_worker_never_intercepts_api_posts_tokens_or_foreign_requests(javascript):
     javascript(r'''
 for (const [path, method] of [["/api/status","GET"],["/api/job","GET"],
-    ["/api/login","POST"],["/?t=do-not-cache","GET"],
-    ["/static/app.js?token=do-not-cache","GET"],["https://other.invalid/","GET"]]) {
+    ["/api/login","POST"],["/static/app.js","POST"],["/?t=do-not-cache","GET"],
+    ["/static/app.js?token=do-not-cache","GET"],["https://other.invalid/","GET"],
+    ["/not-shell","GET"]]) {
     let intercepted=false;
     listeners.fetch({request:{url:new URL(path,"http://127.0.0.1:8090").href, method}, respondWith(){intercepted=true;}});
     assert.equal(intercepted, false, path);
