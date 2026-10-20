@@ -59,18 +59,28 @@ class EquityLog:
         self.path = path
         self.clock = clock
         self._lock = threading.Lock()
+        self._claim_lock = threading.Lock()
         self._next: dict[str, float] = {}
 
     def due(self, mode: str) -> bool:
         return self.clock() >= self._next.get(mode, float("-inf"))
 
+    def _claim(self, mode: str) -> float | None:
+        """Atomically check and claim the slot, so concurrent polls never read the exchange twice."""
+        with self._claim_lock:
+            now = self.clock()
+            if now < self._next.get(mode, float("-inf")):
+                return None
+            self._next[mode] = now + SNAPSHOT_RETRY_S
+            return now
+
     def maybe_record(self, mode: str, read: Callable[[], float | None]) -> bool:
         """Record one snapshot when due. Never raises; returns whether a line was written."""
-        if mode not in {"dry", "live"} or not self.due(mode):
+        if mode not in {"dry", "live"}:
             return False
-        now = self.clock()
-        # Claim the slot first so concurrent polls do not read the exchange twice.
-        self._next[mode] = now + SNAPSHOT_RETRY_S
+        now = self._claim(mode)
+        if now is None:
+            return False
         try:
             value = read()
         except Exception:
@@ -83,11 +93,16 @@ class EquityLog:
                 self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
                 with open(self.path, "a", encoding="utf-8") as log:
                     log.write(line)
+        except Exception:
+            return False
+        # The line is written: the next snapshot waits the full interval even if pruning fails.
+        self._next[mode] = now + SNAPSHOT_INTERVAL_S
+        try:
+            with self._lock:
                 if self.path.stat().st_size > PRUNE_BYTES:
                     self._prune(now)
         except Exception:
-            return False
-        self._next[mode] = now + SNAPSHOT_INTERVAL_S
+            pass  # e.g. the file is held open elsewhere on Windows; retried on the next snapshot
         return True
 
     def _rows(self) -> list[dict]:
@@ -205,7 +220,9 @@ def btc_payload(ft) -> dict:
     """72 x 1h closes from the running bot, plus the open strategy trade's entry/stop and entries."""
     closes = _closes(ft.pair_candles(BTC_PAIR, BTC_TIMEFRAME, BTC_CANDLES))
     start = closes[0][0] if closes else None
-    end = closes[-1][0] + HOUR_MS if closes else None
+    # The strategy enters just after the newest analysed candle closes (about last + 1h), so allow
+    # one more hour; otherwise the entry of the trade open right now would have no marker.
+    end = closes[-1][0] + 2 * HOUR_MS if closes else None
     entry = stop = None
     entries = []
 

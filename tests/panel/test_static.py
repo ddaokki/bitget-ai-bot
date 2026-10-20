@@ -45,6 +45,7 @@ def client(tmp_path):
     deps = PanelDeps(
         token="static-test-only", settings_loader=forbidden, reader_factory=forbidden,
         ft_factory=forbidden, runner=forbidden, pin_store_path=tmp_path / "pin.json",
+        record_on_startup=False,
     )
     with TestClient(create_app(deps), base_url="http://127.0.0.1:8090") as browser:
         yield browser
@@ -693,6 +694,14 @@ assert.match(element("keys-state").textContent, /^미설정/);
 ''')
 
 
+def test_key_hint_names_the_word_the_status_line_shows(client):
+    html = client.get("/").text
+    script = client.get("/static/app.js").text
+    assert '위 상태가 "저장됨"이면 다시 넣을 필요가 없습니다.' in html
+    assert '"저장됨 · 다시 넣지 않아도 됩니다"' in script
+    assert '"설정됨"이면' not in html
+
+
 def test_charts_card_is_at_the_top_and_csp_safe(client):
     html = client.get("/").text
     document = Elements(html)
@@ -809,4 +818,43 @@ response={ok:false,status:503,json:async()=>({detail:"요청 실패"}),headers:{
 await run('refreshCharts()');
 assert.match(element("asset-change").textContent, /그래프를 불러오지 못했습니다/);
 assert.equal(run('state.chartsPending'), false);
+''')
+
+
+def test_first_chart_failure_never_leaves_the_card_checking(javascript):
+    javascript(r'''
+run('applyStatus(fixture)');
+for (const id of ["asset-main", "btc-last"]) element(id).textContent = "확인 중";
+response={ok:false,status:503,json:async()=>({detail:"요청 실패"}),headers:{get:()=>null}};
+await run('refreshCharts()');
+assert.equal(element("asset-main").textContent, "조회 불가");
+assert.equal(element("btc-last").textContent, "조회 불가");
+assert.match(element("asset-chart").children[0].textContent, /자산을 조회하지 못했습니다/);
+assert.match(element("btc-chart").children[0].textContent, /가격을 받지 못했습니다/);
+assert.match(element("asset-change").textContent, /그래프를 불러오지 못했습니다/);
+''')
+
+
+def test_later_chart_failure_keeps_the_last_good_charts(javascript):
+    javascript(CHARTS + r'''
+run('applyStatus(fixture)');
+context.chartData = chartData;
+run('renderCharts(chartData)');
+response={ok:false,status:503,json:async()=>({detail:"요청 실패"}),headers:{get:()=>null}};
+await run('refreshCharts()');
+assert.equal(element("asset-main").textContent, "159,950원");
+assert.equal(element("btc-last").textContent, "$60,071");
+''')
+
+
+def test_entry_after_the_newest_close_is_marked_on_the_last_point(javascript):
+    javascript(CHARTS + r'''
+run('applyStatus(fixture)');
+chartData.btc.entries = [start + 71 * hour + hour + 5000];   // the trade open right now
+context.chartData = chartData;
+run('renderCharts(chartData)');
+const nodes = svgNodes("btc-chart");
+const [marker] = nodes.filter(n => n.tagName === "circle");
+const points = nodes.find(n => n.tagName === "polyline").attributes.points.split(" ");
+assert.equal(`${marker.attributes.cx},${marker.attributes.cy}`, points.at(-1));
 ''')

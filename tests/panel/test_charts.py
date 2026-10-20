@@ -95,6 +95,46 @@ def test_large_file_is_pruned_to_thirty_days(log, monkeypatch):
     assert list(equity.path.parent.iterdir()) == [equity.path]
 
 
+def test_prune_failure_still_waits_the_full_interval(log, monkeypatch):
+    equity, clock = log
+    monkeypatch.setattr(charts, "PRUNE_BYTES", 0)
+
+    def broken(now):
+        raise OSError(SECRET)
+
+    monkeypatch.setattr(equity, "_prune", broken)
+    assert equity.maybe_record("dry", lambda: 1.0) is True
+    clock.now += charts.SNAPSHOT_RETRY_S
+    assert equity.maybe_record("dry", lambda: pytest.fail("snapshot repeated after a prune failure")) is False
+    clock.now += charts.SNAPSHOT_INTERVAL_S
+    assert equity.maybe_record("dry", lambda: 2.0) is True
+    assert len(equity.path.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_concurrent_polls_read_and_write_once(log):
+    import threading
+
+    equity, _ = log
+    inside, release, reads = threading.Event(), threading.Event(), []
+
+    def slow_read():
+        reads.append(1)
+        inside.set()
+        assert release.wait(5)
+        return 1.0
+
+    results = []
+    first = threading.Thread(target=lambda: results.append(equity.maybe_record("dry", slow_read)))
+    first.start()
+    assert inside.wait(5)
+    # Another poll arrives while the first read is still in flight.
+    results.append(equity.maybe_record("dry", slow_read))
+    release.set()
+    first.join(5)
+    assert sorted(results) == [False, True] and len(reads) == 1
+    assert len(equity.path.read_text(encoding="utf-8").splitlines()) == 1
+
+
 def test_write_failure_is_silent(tmp_path):
     clock = Clock()
     blocker = tmp_path / "file"
@@ -204,8 +244,19 @@ def test_open_strategy_trade_gives_entry_stop_and_marker():
     ]
     trades = {"trades": [{"pair": "BTC/USDT:USDT", "enter_tag": "safe_long", "open_timestamp": 5 * HOUR},
                          {"pair": "BTC/USDT:USDT", "enter_tag": "safe_long", "open_timestamp": 11 * HOUR},
-                         {"pair": "BTC/USDT:USDT", "enter_tag": "safe_long", "open_timestamp": 12 * HOUR},
+                         {"pair": "BTC/USDT:USDT", "enter_tag": "safe_long", "open_timestamp": 13 * HOUR},
                          SECRET]}
     payload = charts.btc_payload(CandleFT(candles, status, trades))
     assert payload["entry"] == 105.5 and payload["stop"] is None
     assert payload["entries"] == [5 * HOUR, 11 * HOUR]
+
+
+def test_entry_just_after_the_newest_candle_closes_still_gets_a_marker():
+    # The strategy enters right after the last analysed candle closes: about last + 1h + seconds.
+    candles = {"columns": ["__date_ts", "close"], "data": [[HOUR * index, 100 + index] for index in range(1, 11)]}
+    now_entry = 10 * HOUR + HOUR + 5000
+    status = [{"pair": "BTC/USDT:USDT", "enter_tag": "safe_long", "open_rate": 110, "stop_loss_abs": 100,
+               "open_timestamp": now_entry}]
+    trades = {"trades": [{"pair": "BTC/USDT:USDT", "enter_tag": "safe_long", "open_timestamp": 12 * HOUR + 1}]}
+    payload = charts.btc_payload(CandleFT(candles, status, trades))
+    assert payload["entries"] == [now_entry]

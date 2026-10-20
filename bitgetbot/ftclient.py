@@ -38,6 +38,9 @@ class FreqtradeClient:
             timeout=timeout,
         )
 
+    def close(self) -> None:
+        self._client.close()
+
     def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
         try:
             response = self._client.request(method, f"/api/v1/{path}", **kwargs)

@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -68,7 +69,16 @@ def _reader_factory(key: str, secret: str, password: str):
 
 
 def _daemon(task: Callable[[], None]) -> None:
-    threading.Thread(target=task, name="panel-autotrade-auto", daemon=True).start()
+    threading.Thread(target=task, name="panel-background", daemon=True).start()
+
+
+def _close(client) -> None:
+    close = getattr(client, "close", None)
+    if callable(close):
+        try:
+            close()
+        except Exception:
+            pass
 
 
 @dataclass(repr=False)
@@ -89,8 +99,10 @@ class PanelDeps:
     static_dir: Path = STATIC_DIR
     smoke_command: Callable[[str, SmokeIO], int] = run_command
     audit_path: Path | None = None
-    # Runs the post-switch "start autotrade when ready" task; tests replace it to run it inline.
+    # Runs the post-switch "start autotrade when ready" task and the startup equity snapshot;
+    # tests replace it to run them inline.
     background: Callable[[Callable[[], None]], None] = _daemon
+    record_on_startup: bool = True
     sleep: Callable[[float], None] = time.sleep
     krw_rate: Callable[[], tuple[float, str]] = fetch_krw_per_usdt
     equity_log: charts.EquityLog | None = None
@@ -256,7 +268,17 @@ def _equity_reader(settings: Settings, reader, ft) -> Callable[[], float | None]
 
 
 def create_app(deps: PanelDeps) -> FastAPI:
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
+    @asynccontextmanager
+    async def lifespan(_app):
+        # One equity snapshot on startup, in the background so startup never blocks or fails.
+        if deps.record_on_startup:
+            try:
+                deps.background(record_equity_on_startup)
+            except Exception:
+                pass
+        yield
+
+    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False, lifespan=lifespan)
     # Serialize config writes with job admission, not with long-running jobs or emergency exits.
     operation_lock = threading.Lock()
     # A later mode switch, manual autotrade action or emergency close cancels a pending auto start.
@@ -270,10 +292,17 @@ def create_app(deps: PanelDeps) -> FastAPI:
         """After a switch, start automatic trading once the restarted bot runs in the saved mode."""
         dry = mode == "dry"
         result = 503
+        # Wall-clock deadline: a slow or hanging API (10 s client timeout) must not stretch the wait.
+        deadline = deps.clock() + AUTO_START_TIMEOUT_S
+        ft = None
         try:
-            for attempt in range(AUTO_START_TIMEOUT_S // AUTO_START_INTERVAL_S + 1):
-                if attempt:
+            first = True
+            while True:
+                if not first:
+                    if deps.clock() + AUTO_START_INTERVAL_S > deadline:
+                        return
                     deps.sleep(AUTO_START_INTERVAL_S)
+                first = False
                 if generation != auto_generation[0]:
                     result = 409
                     return
@@ -281,7 +310,8 @@ def create_app(deps: PanelDeps) -> FastAPI:
                     settings = _settings(deps)
                     if settings.dry_run is not dry:
                         return  # the saved mode changed again; never start the other mode
-                    ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
+                    if ft is None:
+                        ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
                     config = ft.show_config()
                     if not isinstance(config, dict) or config.get("dry_run") is not dry:
                         continue
@@ -297,13 +327,39 @@ def create_app(deps: PanelDeps) -> FastAPI:
                             return
                         if deps.jobs.snapshot()["running"]:
                             continue
+                        if deps.clock() > deadline:
+                            return  # too late: never start long after the promised wait
                         ft.start()
+                        if generation != auto_generation[0]:
+                            # An emergency close (no lock) landed during start(): undo it.
+                            try:
+                                ft.pause()
+                            except Exception:
+                                pass
+                            result = 409
+                            return
                     result = 200
                     return
                 except Exception:
                     continue
         finally:
+            _close(ft)
             _write_audit(deps, kind, ident, "autotrade_auto", None, result)
+
+    def record_equity(settings: Settings, reader, ft) -> None:
+        deps.equity_log.maybe_record("dry" if settings.dry_run else "live", _equity_reader(settings, reader, ft))
+
+    def record_equity_on_startup() -> None:
+        ft = None
+        try:
+            settings = _settings(deps)
+            credentials = ("", "", "") if settings.dry_run else (settings.key, settings.secret, settings.password)
+            ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
+            record_equity(settings, deps.reader_factory(*credentials), ft)
+        except Exception:
+            pass  # startup never fails or blocks on an unreadable account
+        finally:
+            _close(ft)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, error):
@@ -434,7 +490,7 @@ def create_app(deps: PanelDeps) -> FastAPI:
         ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
         snapshot = ops.collect_status(settings, reader, ft)
         # Asset history: at most one snapshot per mode every 10 minutes while the panel is polled.
-        deps.equity_log.maybe_record("dry" if settings.dry_run else "live", _equity_reader(settings, reader, ft))
+        record_equity(settings, reader, ft)
         snapshot.update(
             keys_configured=deps.keys_configured(), pin_set=_pin_hash(deps.pin_store_path) is not None,
             docker_running=ops.docker_running(deps.runner), job=deps.jobs.snapshot(),

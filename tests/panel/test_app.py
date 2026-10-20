@@ -133,6 +133,10 @@ def panel(tmp_path, monkeypatch):
     options = {"block": False, "restart_error": False, "container": True, "compose_code": 0, "execute_error": False}
     background, sleeps, fx_calls = [], [], []
 
+    def sleep(seconds):
+        sleeps.append(seconds)
+        now[0] += seconds
+
     def krw_rate():
         fx_calls.append(now[0])
         return 1400.0, "2026-10-21T00:00:00Z"
@@ -187,7 +191,7 @@ def panel(tmp_path, monkeypatch):
         pin_store_path=tmp_path / ".panel" / "panel.json", clock=lambda: now[0],
         mode_setter=mode_setter, keys_setter=lambda *values: keys.append(values),
         keys_configured=lambda: {"key": True, "secret": True, "password": True},
-        background=background.append, sleep=sleeps.append, krw_rate=krw_rate,
+        background=background.append, sleep=sleep, krw_rate=krw_rate, record_on_startup=False,
     )
     application = module.create_app(deps)
     with TestClient(application, base_url="http://127.0.0.1:8090", client=("127.0.0.1", 12345)) as local:
@@ -1228,6 +1232,110 @@ def test_auto_start_gives_up_after_180_seconds_without_starting(panel):
     assert panel.sleeps == [3] * 60
     assert ("start",) not in panel.ft.calls
     assert [line["result"] for line in auto_lines(panel)] == [503]
+
+
+def test_auto_start_deadline_is_wall_clock_even_when_the_api_is_slow(panel):
+    local_login(panel)
+    switch(panel)
+    started_at = panel.now[0]
+    answers = []
+
+    def slow_show_config():
+        panel.now[0] += 10                           # each call hangs until the 10 s client timeout
+        answers.append(panel.now[0])
+        # Ready only after the promised wait: a start now would be far later than announced.
+        ready = panel.now[0] - started_at > 180
+        return {"state": "paused", "dry_run": not ready}
+
+    panel.ft.show_config = slow_show_config
+    panel.background.pop()()
+    assert ("start",) not in panel.ft.calls
+    assert len(answers) < 20                         # not 61 attempts of 13 s each
+    assert panel.now[0] - started_at <= 180 + 10
+    assert [line["result"] for line in auto_lines(panel)] == [503]
+
+
+def test_auto_start_with_slow_api_still_starts_inside_the_deadline(panel):
+    local_login(panel)
+    switch(panel)
+    started_at = panel.now[0]
+
+    def slow_show_config():
+        panel.now[0] += 10
+        ready = panel.now[0] - started_at >= 150
+        return {"state": "paused", "dry_run": not ready}
+
+    panel.ft.show_config = slow_show_config
+    panel.background.pop()()
+    assert panel.ft.calls.count(("start",)) == 1
+    assert [line["result"] for line in auto_lines(panel)] == [200]
+
+
+def test_auto_start_uses_one_client_and_closes_it(panel):
+    local_login(panel)
+    switch(panel)                                    # bot stays dry: the run times out
+    closed = []
+    panel.ft.close = lambda: closed.append(1)
+    panel.ft_calls.clear()
+    panel.background.pop()()
+    assert len(panel.ft_calls) == 1
+    assert closed == [1]
+
+
+def test_emergency_during_auto_start_request_pauses_again(panel):
+    local_login(panel)
+    panel.ft.dry, panel.ft.state = False, "paused"
+    switch(panel)
+    original_start = panel.ft.start
+    emergencies = []
+
+    def start_racing_emergency():
+        result = original_start()
+        # The emergency close (no lock) lands while the start request is in flight.
+        emergencies.append(panel.local.post("/api/emergency/close-all", headers=PANEL_HEADER).status_code)
+        return result
+
+    panel.ft.start = start_racing_emergency
+    panel.ft.calls.clear()
+    panel.background.pop()()
+    assert emergencies == [200]
+    assert panel.ft.calls == [("start",), ("all", "market"), ("pause",)]
+    assert [line["result"] for line in auto_lines(panel)] == [409]
+
+
+def make_startup_app(panel, **changes):
+    background = []
+    deps = replace(panel.deps, background=background.append, record_on_startup=True,
+                   jobs=None, sessions=None, lockout=None, **changes)
+    return panel.module.create_app(deps), background, deps
+
+
+def test_startup_records_one_equity_snapshot_in_the_background(panel):
+    application, background, deps = make_startup_app(panel)
+    panel.now[0] += 3600                             # the fixture app may have recorded nothing yet
+    with TestClient(application, base_url="http://127.0.0.1:8090"):
+        assert len(background) == 1                  # scheduled, not run inside startup
+        panel.reader_calls.clear()
+        background.pop()()
+    lines = deps.equity_log.path.read_text(encoding="utf-8").splitlines()
+    assert [json.loads(line)["mode"] for line in lines] == ["dry"]
+    assert json.loads(lines[0])["equity_usdt"] == 105.5
+    assert panel.reader_calls == [("", "", "")]
+
+
+def test_startup_snapshot_failure_is_silent(panel, capsys):
+    application, background, deps = make_startup_app(panel, settings_loader=raise_secret)
+    with TestClient(application, base_url="http://127.0.0.1:8090"):
+        background.pop()()
+    assert not deps.equity_log.path.exists()
+    captured = capsys.readouterr()
+    assert all(secret not in captured.out + captured.err for secret in SENTINELS)
+
+
+def test_startup_snapshot_is_on_by_default():
+    from bitgetbot.panel.app import PanelDeps
+
+    assert PanelDeps(token="x").record_on_startup is True
 
 
 def test_auto_start_does_nothing_when_bot_already_runs(panel):

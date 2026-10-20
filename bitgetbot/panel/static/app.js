@@ -305,7 +305,8 @@ function drawChart(id, points, {levels = [], markers = [], empty = "표시할 �
     root.append(svg("polyline", {points: valid.map(point => `${x(point[0])},${y(point[1])}`).join(" "),
         class: "chart-line", fill: "none", "vector-effect": "non-scaling-stroke"}));
     for (const time of markers.filter(finite)) {
-        if (time < first || time > valid.at(-1)[0]) continue;
+        // An entry after the newest close (the trade open right now) is drawn on the last point.
+        if (time < first) continue;
         // Mark the close of the candle the entry happened in.
         const near = valid.reduce((best, point) => point[0] <= time ? point : best, valid[0]);
         root.append(svg("circle", {cx: x(near[0]), cy: y(near[1]), r: 9, class: "chart-marker"}));
@@ -338,7 +339,9 @@ function renderAsset(asset) {
     const first = points.find(point => finite(point[1]));
     drawChart("asset-chart", points, {
         levels: first ? [{value: first[1], kind: "base"}] : [],
-        empty: "기록을 모으는 중입니다. 패널을 열어 두면 10분마다 한 점씩 늘어납니다."
+        empty: asset && typeof asset === "object"
+            ? "기록을 모으는 중입니다. 패널을 열어 두면 10분마다 한 점씩 늘어납니다."
+            : "자산을 조회하지 못했습니다."
     });
 }
 
@@ -375,6 +378,11 @@ async function refreshCharts() {
     try {
         renderCharts(await request("/api/charts"));
     } catch (error) {
+        if (!state.charts) {
+            // Never leave the card on "확인 중": show the unavailable states first.
+            renderAsset(null);
+            renderBtc(null);
+        }
         text("asset-change", "그래프를 불러오지 못했습니다. 1분 뒤 다시 시도합니다.");
     } finally {
         state.chartsPending = false;
