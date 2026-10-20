@@ -1,0 +1,191 @@
+{
+ "BTC/USDT:USDT": {
+  "1h-futures": {
+   "rows": 63810,
+   "first_utc": "2019-07-10 11:00:00+00:00",
+   "last_utc": "2026-10-20 05:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": 200,
+   "gaps": [
+    {
+     "after_utc": "2026-08-24 23:00:00+00:00",
+     "before_utc": "2026-08-25 01:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "1h-mark": {
+   "rows": 63832,
+   "first_utc": "2019-07-09 13:00:00+00:00",
+   "last_utc": "2026-10-20 05:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": null,
+   "gaps": [
+    {
+     "after_utc": "2026-08-24 23:00:00+00:00",
+     "before_utc": "2026-08-25 01:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "4h-futures": {
+   "rows": 15953,
+   "first_utc": "2019-07-10 08:00:00+00:00",
+   "last_utc": "2026-10-20 04:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": 0,
+   "gaps": [
+    {
+     "after_utc": "2026-03-16 12:00:00+00:00",
+     "before_utc": "2026-03-16 20:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "1d-futures": {
+   "rows": 2657,
+   "first_utc": "2019-07-10 00:00:00+00:00",
+   "last_utc": "2026-10-18 00:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": 0,
+   "gaps": [
+    {
+     "after_utc": "2022-12-15 00:00:00+00:00",
+     "before_utc": "2022-12-17 00:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "zero_funding": {
+   "first_utc": "2019-01-01 00:00:00+00:00",
+   "last_utc": "2026-10-20 16:00:00+00:00",
+   "rows": 8550
+  }
+ },
+ "ETH/USDT:USDT": {
+  "1h-futures": {
+   "rows": 63070,
+   "first_utc": "2019-08-10 07:00:00+00:00",
+   "last_utc": "2026-10-20 05:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": 1,
+   "gaps": [
+    {
+     "after_utc": "2026-08-24 23:00:00+00:00",
+     "before_utc": "2026-08-25 01:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "1h-mark": {
+   "rows": 63070,
+   "first_utc": "2019-08-10 07:00:00+00:00",
+   "last_utc": "2026-10-20 05:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": null,
+   "gaps": [
+    {
+     "after_utc": "2026-08-24 23:00:00+00:00",
+     "before_utc": "2026-08-25 01:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "4h-futures": {
+   "rows": 15769,
+   "first_utc": "2019-08-10 04:00:00+00:00",
+   "last_utc": "2026-10-20 08:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": 0,
+   "gaps": [
+    {
+     "after_utc": "2026-03-27 20:00:00+00:00",
+     "before_utc": "2026-03-28 04:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "1d-futures": {
+   "rows": 2626,
+   "first_utc": "2019-08-10 00:00:00+00:00",
+   "last_utc": "2026-10-18 00:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": 0,
+   "gaps": [
+    {
+     "after_utc": "2022-11-13 00:00:00+00:00",
+     "before_utc": "2022-11-15 00:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "zero_funding": {
+   "first_utc": "2019-01-01 00:00:00+00:00",
+   "last_utc": "2026-10-20 16:00:00+00:00",
+   "rows": 8550
+  }
+ },
+ "SOL/USDT:USDT": {
+  "1h-futures": {
+   "rows": 45964,
+   "first_utc": "2021-07-23 02:00:00+00:00",
+   "last_utc": "2026-10-20 06:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": 0,
+   "gaps": [
+    {
+     "after_utc": "2026-08-24 23:00:00+00:00",
+     "before_utc": "2026-08-25 01:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "1h-mark": {
+   "rows": 45978,
+   "first_utc": "2021-07-22 12:00:00+00:00",
+   "last_utc": "2026-10-20 06:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": null,
+   "gaps": [
+    {
+     "after_utc": "2026-08-24 23:00:00+00:00",
+     "before_utc": "2026-08-25 01:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "4h-futures": {
+   "rows": 11493,
+   "first_utc": "2021-07-23 00:00:00+00:00",
+   "last_utc": "2026-10-20 12:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": 0,
+   "gaps": [
+    {
+     "after_utc": "2026-03-27 20:00:00+00:00",
+     "before_utc": "2026-03-28 04:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "1d-futures": {
+   "rows": 1914,
+   "first_utc": "2021-07-23 00:00:00+00:00",
+   "last_utc": "2026-10-19 00:00:00+00:00",
+   "duplicates": 0,
+   "zero_volume_rows": 0,
+   "gaps": [
+    {
+     "after_utc": "2022-11-13 00:00:00+00:00",
+     "before_utc": "2022-11-15 00:00:00+00:00",
+     "missing_bars": 1
+    }
+   ]
+  },
+  "zero_funding": {
+   "first_utc": "2019-01-01 00:00:00+00:00",
+   "last_utc": "2026-10-20 16:00:00+00:00",
+   "rows": 8550
+  }
+ }
+}
