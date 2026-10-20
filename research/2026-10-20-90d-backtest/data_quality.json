@@ -1,7 +1,7 @@
 {
   "start_utc": "2022-01-01 00:00:00+00:00",
   "end_exclusive_utc": "2026-10-20 00:00:00+00:00",
-  "funding_model": "Synthetic +0.0100% per 8h at 00/08/16 UTC, signed (longs pay, shorts receive). NOT actual history: Bitget only serves ~270 recent funding records per pair.",
+  "funding_model": "Phase B headline: BOTH sides pay +0.0100% per 8h at each 00/08/16 UTC crossing, charged in analyze_b.py (engine datadir bitget_synth_funding_zero has zero funding). Sensitivity: phase A signed model (longs pay, shorts receive). NOT actual history: Bitget only serves ~100 recent funding records per pair.",
   "funding_real_recent_summary": {
     "BTC/USDT:USDT": {
       "records": 100,

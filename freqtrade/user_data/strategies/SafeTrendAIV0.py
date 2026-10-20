@@ -115,6 +115,7 @@ class SafeTrendAIV0(SafeTrendV0):
         blocked = ~(p >= self.ai_threshold)
         dataframe.loc[blocked, ["enter_long", "enter_short"]] = 0
         signal = (dataframe.enter_long == 1) | (dataframe.enter_short == 1)
-        dataframe.loc[signal, "enter_tag"] = dataframe.loc[signal, "enter_tag"] + "|p=" + p[signal].round(3).astype(str)
+        if signal.any():  # pandas cannot add an empty object Series to an empty str Series
+            dataframe.loc[signal, "enter_tag"] = dataframe.loc[signal, "enter_tag"] + "|p=" + p[signal].round(3).astype(str)
         dataframe.loc[~signal, "enter_tag"] = None
         return dataframe

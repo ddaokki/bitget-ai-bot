@@ -74,7 +74,7 @@
       "label_period_candles": 48,
       "include_shifted_candles": 0,
       "indicator_periods_candles": [
-        4800
+        6552
       ],
       "shuffle_after_split": false,
       "DI_threshold": 0,
@@ -97,7 +97,7 @@
       "random_state": 81,
       "verbosity": -1
     },
-    "_comment": "indicator_periods_candles=[4800] only tells FreqAI the longest lookback (daily EMA200 = 200 days of 1h bars) so it loads enough warmup before each training window; no expand_all features are defined."
+    "_comment": "indicator_periods_candles=[6552] only sets FreqAI's warmup: FreqAI loads startup (6552 h = 273 days) + train_period_days (365) before the timerange start, so a 20231001 start loads from exactly 2022-01-01 like the baseline (review fix 8; phase A used 4800 and started 2022-03-15). No expand_all features are defined."
   },
   "spike": {
     "entry_start": "2023-10-01T00:00:00+00:00"

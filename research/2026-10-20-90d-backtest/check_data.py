@@ -1,9 +1,12 @@
-"""Gap check for downloaded hourly futures/mark candles, then model funding.
+"""Gap check for downloaded hourly futures/mark candles + real funding summary.
 
-Bitget's public funding history only reaches back ~270 records (about 3 months
+Bitget's public funding history only reaches back ~100 records (about 1 month
 for 8h pairs), so a 4-year real funding series cannot be built from Bitget.
-The real recent records are summarised, then replaced with a fixed synthetic
-series (+0.01% per 8h at 00/08/16 UTC: longs pay, shorts receive).
+The real recent records are only summarised here; they are never overwritten.
+(Phase A overwrote them with a synthetic series; review fix 1 moved that series
+to data/bitget_synth_funding_signed_phaseA. Backtests now use the separate
+data/bitget_synth_funding_zero datadir built by make_funding_datadirs.py and
+charge funding in analyze_b.py.)
 """
 import hashlib
 import json
@@ -61,12 +64,9 @@ def main():
                 "mean_rate": float(real.funding_rate.mean()), "median_rate": float(real.funding_rate.median()),
                 "share_positive": float((real.funding_rate > 0).mean()),
             }
-        dates = pd.date_range(START, END, freq="8h", inclusive="left")
-        funding = pd.DataFrame({"date": dates, "funding_rate": FUNDING_RATE})
-        handler.ohlcv_store(pair, "1h", funding, candle_type=CandleType.FUNDING_RATE)
     result = {
         "start_utc": str(START), "end_exclusive_utc": str(END),
-        "funding_model": f"Synthetic {FUNDING_RATE:+.4%} per 8h at 00/08/16 UTC, signed (longs pay, shorts receive). NOT actual history: Bitget only serves ~270 recent funding records per pair.",
+        "funding_model": f"Phase B headline: BOTH sides pay {FUNDING_RATE:+.4%} per 8h at each 00/08/16 UTC crossing, charged in analyze_b.py (engine datadir bitget_synth_funding_zero has zero funding). Sensitivity: phase A signed model (longs pay, shorts receive). NOT actual history: Bitget only serves ~100 recent funding records per pair.",
         "funding_real_recent_summary": funding_real,
         "records": records,
     }

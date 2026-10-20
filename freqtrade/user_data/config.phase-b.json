@@ -1,0 +1,9 @@
+{
+  "datadir": "/freqtrade/user_data/data/bitget_synth_funding_zero",
+  "event_features": {
+    "enabled": false,
+    "path": "/freqtrade/user_data/events/events.csv"
+  },
+  "_note": "Phase B: zero-funding engine datadir; analyze_b.py charges funding at 00/08/16 UTC crossings (headline: both sides pay 0.01%/8h).",
+  "futures_funding_rate": 0
+}

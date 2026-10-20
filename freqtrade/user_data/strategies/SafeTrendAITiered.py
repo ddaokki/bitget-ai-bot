@@ -3,10 +3,14 @@
 Same features, labels and FreqAI identifier as SafeTrendAIV0, so FreqAI reuses
 the saved walk-forward predictions and p is identical between both runs.
 Tier thresholds are the spec's FIXED values; they were not tuned on the test
-period. The LLM ALLOW and event-blackout conditions of the 'high' tier do not
-exist in this backtest, so 'high' here means p >= 0.65 only.
+period. The LLM ALLOW condition of the 'high' tier does not exist in this
+backtest, so 'high' here means p >= 0.65 (plus, in the phase B TieredV1
+strategies, no §7.1 event blackout).
+
+Review fix 5: the low tier now matches §7.1a exactly (fixed 2xATR take-profit,
+1.5xATR stop, no trailing, NO Donchian exit). Phase A kept the Donchian exit
+for the low tier.
 """
-import numpy as np
 import pandas as pd
 from pandas import DataFrame
 from SafeTrendAIV0 import SafeTrendAIV0
@@ -18,8 +22,8 @@ TIER_PROFILES = {
     "high": {"risk": 0.015, "leverage": 3.0, "stop_atr": 2.0, "trail_atr": 4.0, "tp_atr": None, "donchian_exit": False},
     # mid: same as the baseline
     "mid": {"risk": 0.01, "leverage": 2.0, "stop_atr": 2.0, "trail_atr": 3.0, "tp_atr": None, "donchian_exit": True},
-    # low: 0.5% risk, 2x, 1.5xATR stop, fixed 2xATR take-profit, no trailing
-    "low": {"risk": 0.005, "leverage": 2.0, "stop_atr": 1.5, "trail_atr": None, "tp_atr": 2.0, "donchian_exit": True},
+    # low: 0.5% risk, 2x, 1.5xATR stop, fixed 2xATR take-profit, no trailing, no Donchian exit (§7.1a)
+    "low": {"risk": 0.005, "leverage": 2.0, "stop_atr": 1.5, "trail_atr": None, "tp_atr": 2.0, "donchian_exit": False},
 }
 THRESHOLDS = (("high", 0.65), ("mid", 0.55), ("low", 0.45))
 
@@ -31,7 +35,8 @@ def tier_for(p: pd.Series) -> pd.Series:
     return tiers
 
 
-class SafeTrendAITiered(SafeTrendAIV0):
+class TieredMixin:
+    """Tags each AI-filtered entry with its §7.1a tier; profiles() picks size/stop/exit by tier."""
     profiles = TIER_PROFILES
     ai_threshold = THRESHOLDS[-1][1]
 
@@ -40,7 +45,13 @@ class SafeTrendAITiered(SafeTrendAIV0):
         signal = (dataframe.enter_long == 1) | (dataframe.enter_short == 1)
         tiers = tier_for(dataframe.ai_p)
         dataframe["ai_tier"] = tiers
+        if not signal.any():
+            return dataframe
         name = dataframe.enter_tag.str.split("|").str[0]
         p = dataframe.ai_p.round(3).astype(str)
         dataframe.loc[signal, "enter_tag"] = name[signal] + "|tier=" + tiers[signal].astype(str) + "|p=" + p[signal]
         return dataframe
+
+
+class SafeTrendAITiered(TieredMixin, SafeTrendAIV0):
+    pass
