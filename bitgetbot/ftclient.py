@@ -38,6 +38,9 @@ class FreqtradeClient:
             timeout=timeout,
         )
 
+    def close(self) -> None:
+        self._client.close()
+
     def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
         try:
             response = self._client.request(method, f"/api/v1/{path}", **kwargs)
@@ -73,6 +76,15 @@ class FreqtradeClient:
         # order_by_id=false makes Freqtrade return the most recently closed trades first.
         return self._request(
             "GET", "trades", params={"limit": limit, "order_by_id": "false"},
+        ).json()
+
+    def balance(self) -> dict:
+        return self._request("GET", "balance").json()
+
+    def pair_candles(self, pair: str, timeframe: str, limit: int) -> dict:
+        # Read-only: the analyzed candles the running strategy already holds in memory.
+        return self._request(
+            "GET", "pair_candles", params={"pair": pair, "timeframe": timeframe, "limit": limit},
         ).json()
 
     def start(self) -> dict:

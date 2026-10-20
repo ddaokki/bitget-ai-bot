@@ -45,6 +45,7 @@ def client(tmp_path):
     deps = PanelDeps(
         token="static-test-only", settings_loader=forbidden, reader_factory=forbidden,
         ft_factory=forbidden, runner=forbidden, pin_store_path=tmp_path / "pin.json",
+        record_on_startup=False,
     )
     with TestClient(create_app(deps), base_url="http://127.0.0.1:8090") as browser:
         yield browser
@@ -141,6 +142,14 @@ const context = vm.createContext({
     document: {
         getElementById: element, querySelectorAll: () => [],
         createElement: tag => element(Symbol(tag)),
+        createElementNS: (namespace, tag) => Object.assign(element(Symbol(tag)), {
+            namespace, tagName: tag, attributes: {},
+            setAttribute(name, value) {
+                assert.equal(typeof value, "string");
+                assert.ok(!/^on/i.test(name) && name !== "style" && name !== "href", `unsafe SVG attribute: ${name}`);
+                this.attributes[name] = value;
+            }
+        }),
         addEventListener: (name, callback) => {listeners[name] = callback;},
         hidden: false
     },
@@ -615,4 +624,237 @@ assert.equal(calls.length, 3);
 assert.deepEqual(JSON.parse(calls[2].options.body), {action:"start", confirm:"LIVE"});
 run('fixture.freqtrade.dry_run=true; applyStatus(fixture)');
 assert.equal(run('autotradeAllowed("start")'), false);
+''')
+
+
+def test_container_button_shows_only_when_bot_is_down(client, javascript):
+    document = Elements(client.get("/").text)
+    button = next(attrs for tag, attrs in document.tags if attrs.get("id") == "docker-up")
+    assert "hidden" in button
+    assert "거래 봇 컨테이너 켜기" in client.get("/").text
+    assert ">거래 봇 시작<" not in client.get("/").text
+    javascript(r'''
+run('applyStatus(fixture)');
+assert.equal(element("docker-up").hidden, true);
+run('fixture.freqtrade.reachable=false; applyStatus(fixture)');
+assert.equal(element("docker-up").hidden, false);
+run('fixture.freqtrade.reachable=true; fixture.docker_running=false; applyStatus(fixture)');
+assert.equal(element("docker-up").hidden, false);
+run('fixture.docker_running=true; fixture.freqtrade=null; applyStatus(fixture)');
+assert.equal(element("docker-up").hidden, false);
+''')
+
+
+def test_live_switch_dialog_says_real_money_autotrade_starts_right_after(javascript):
+    javascript(r'''
+run('applyStatus(fixture); openConfirmation({kind:"mode",value:"live",live:true})');
+assert.match(element("confirm-title").textContent, /자동매매/);
+assert.match(element("confirm-description").textContent, /실제 돈으로 자동매매가 시작됩니다/);
+assert.match(element("confirm-description").textContent, /준비되는 즉시/);
+assert.equal(element("live-field").hidden, false);
+run('closeConfirmation(); fixture.mode="live"; fixture.freqtrade.dry_run=false; applyStatus(fixture); openConfirmation({kind:"mode",value:"dry",live:false})');
+assert.match(element("confirm-description").textContent, /모의 자동매매가 저절로 켜집니다/);
+assert.equal(element("live-field").hidden, true);
+''')
+
+
+def test_manual_autotrade_controls_remain(client):
+    html = client.get("/").text
+    assert "자동매매 켜기" in html and "자동매매 멈추기" in html
+
+
+def test_stats_exclude_manual_and_smoke_trades(javascript):
+    javascript(r'''
+status.stats = {closed_trades: 0, wins: 0, losses: 0, win_rate: null, avg_profit_pct: null,
+                win_rate_30d: null, closed_trades_30d: 0, other_trades: 1, partial: false};
+run('fixture.mode="live"; fixture.freqtrade.dry_run=false; applyStatus(fixture)');
+assert.equal(element("stats-main").textContent, "아직 전략 거래가 없습니다");
+assert.equal(element("stats-other").textContent, "수동·점검 거래 1건 별도 (승률 제외)");
+assert.doesNotMatch(element("stats-main").textContent, /패/);
+run('fixture.stats = {closed_trades: 2, wins: 1, losses: 1, win_rate: 0.5, avg_profit_pct: 0.1, win_rate_30d: 0.5, closed_trades_30d: 2, other_trades: 0, partial: true}; applyStatus(fixture)');
+assert.equal(element("stats-main").textContent, "승률 50% (1승 1패 · 2건)");
+assert.equal(element("stats-other").textContent, "");
+assert.match(element("stats-detail").textContent, /최근 500건 기준$/);
+''')
+
+
+def test_saved_keys_are_never_shown_back_and_status_says_saved(client, javascript):
+    html = client.get("/").text
+    assert "다시 보여 주지 않아" in html
+    document = Elements(html)
+    for name in ("api-key", "api-secret", "api-password"):
+        attrs = next(attrs for tag, attrs in document.tags if attrs.get("id") == name)
+        assert attrs["type"] == "password" and "value" not in attrs
+    javascript(r'''
+run('applyStatus(fixture)');
+assert.match(element("keys-state").textContent, /^저장됨/);
+for (const id of ["api-key", "api-secret", "api-password"]) assert.equal(element(id).value, "");
+run('fixture.keys_configured.secret=false; applyStatus(fixture)');
+assert.match(element("keys-state").textContent, /^미설정/);
+''')
+
+
+def test_key_hint_names_the_word_the_status_line_shows(client):
+    html = client.get("/").text
+    script = client.get("/static/app.js").text
+    assert '위 상태가 "저장됨"이면 다시 넣을 필요가 없습니다.' in html
+    assert '"저장됨 · 다시 넣지 않아도 됩니다"' in script
+    assert '"설정됨"이면' not in html
+
+
+def test_charts_card_is_at_the_top_and_csp_safe(client):
+    html = client.get("/").text
+    document = Elements(html)
+    ids = [attrs.get("id") for _, attrs in document.tags if attrs.get("id")]
+    for name in ("charts-card", "asset-main", "asset-sub", "asset-change", "asset-chart",
+                 "btc-last", "btc-levels", "btc-chart", "stats-other"):
+        assert name in ids
+    assert ids.index("charts-card") < ids.index("docker-state") < ids.index("stats-card")
+    assert "<svg" not in html                     # charts are drawn by DOM APIs at runtime
+    script = client.get("/static/app.js").text
+    assert "createElementNS" in script and "http://www.w3.org/2000/svg" in script
+    for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", ".style."):
+        assert forbidden not in script
+
+
+CHARTS = r'''
+const hour = 3600000, start = 1792000000000;
+const chartData = {
+    mode: "live",
+    asset: {mode: "live", equity_usdt: 114.25, krw_per_usdt: 1400, equity_krw: 159950,
+            history: [[1792000000, 100], [1792000600, 105]], since: 1792000000,
+            change_usdt: 14.25, change_pct: 14.25},
+    btc: {pair: "BTCUSDT", timeframe: "1h", closes: Array.from({length: 72}, (_, i) => [start + i * hour, 60000 + i]),
+          entry: 60050, stop: 58000, entries: [start + 50 * hour + 1, start - hour]}
+};
+const svgNodes = id => element(id).children[0]?.children || [];
+'''
+
+
+def test_asset_chart_shows_krw_large_usd_below_and_change(javascript):
+    javascript(CHARTS + r'''
+run('applyStatus(fixture)');
+context.chartData = chartData;
+run('renderCharts(chartData)');
+assert.equal(element("asset-mode").textContent, "실전");
+assert.equal(element("asset-main").textContent, "159,950원");
+assert.equal(element("asset-sub").textContent, "$114.25 · 1 USDT = 1,400원");
+assert.match(element("asset-change").textContent, /^기록 시작\(.+\) 대비 \+\$14\.25 \(\+14\.25%\)$/);
+const root = element("asset-chart").children[0];
+assert.equal(root.tagName, "svg");
+assert.equal(root.namespace, "http://www.w3.org/2000/svg");
+const line = root.children.find(child => child.tagName === "polyline");
+assert.equal(line.attributes.points.split(" ").length, 3);   // two history points + now
+assert.ok(root.children.some(child => child.tagName === "line" && /base/.test(child.attributes.class)));
+''')
+
+
+def test_asset_chart_falls_back_to_usd_only_and_waits_for_history(javascript):
+    javascript(CHARTS + r'''
+run('applyStatus(fixture)');
+chartData.asset = {mode: "dry", equity_usdt: 100, krw_per_usdt: null, equity_krw: null, history: [], since: null,
+                   change_usdt: null, change_pct: null};
+context.chartData = chartData;
+run('renderCharts(chartData)');
+assert.equal(element("asset-mode").textContent, "모의");
+assert.equal(element("asset-main").textContent, "$100.00");
+assert.match(element("asset-sub").textContent, /원화 환율 조회 불가/);
+assert.match(element("asset-chart").children[0].textContent, /기록을 모으는 중/);
+''')
+
+
+def test_btc_chart_draws_closes_entry_stop_and_markers(javascript):
+    javascript(CHARTS + r'''
+run('applyStatus(fixture)');
+context.chartData = chartData;
+run('renderCharts(chartData)');
+assert.equal(element("btc-last").textContent, "$60,071");
+assert.match(element("btc-levels").textContent, /진입 \$60,050 · 손절 \$58,000/);
+const nodes = svgNodes("btc-chart");
+assert.equal(nodes.find(n => n.tagName === "polyline").attributes.points.split(" ").length, 72);
+const levels = nodes.filter(n => n.tagName === "line").map(n => n.attributes.class);
+assert.deepEqual(levels, ["chart-level entry", "chart-level stop"]);
+const markers = nodes.filter(n => n.tagName === "circle");
+assert.equal(markers.length, 1);                              // the entry before the window is skipped
+assert.ok(nodes.every(n => Object.values(n.attributes).every(v => !/NaN|undefined/.test(v))));
+chartData.btc.entry = null; chartData.btc.stop = null; chartData.btc.entries = [];
+run('renderCharts(chartData)');
+assert.equal(element("btc-levels").textContent, "열린 전략 거래 없음");
+assert.equal(svgNodes("btc-chart").filter(n => n.tagName === "line").length, 0);
+''')
+
+
+@pytest.mark.parametrize("btc", ["null", '"<img src=x onerror=alert(1)>"', "{closes: 'x'}",
+                                 "{closes: [[1, NaN], [2, '3']], entry: '<b>'}"])
+def test_btc_chart_malformed_data_is_text_only(javascript, btc):
+    javascript(CHARTS + "chartData.btc = " + btc + ";" + r'''
+run('applyStatus(fixture)');
+context.chartData = chartData;
+run('renderCharts(chartData)');
+assert.equal(element("btc-chart").children[0].tagName, undefined);  // a muted <p>, not an <svg>
+assert.doesNotMatch(element("btc-levels").textContent + element("btc-last").textContent, /<|NaN/);
+''')
+
+
+def test_charts_poll_every_minute_after_login_and_refresh_after_mode_change(javascript):
+    javascript(CHARTS + r'''
+run('pollCharts()');
+assert.equal(timerDelays.at(-1), 3000);
+assert.equal(requests.length, 0);                             // not logged in yet: no request
+run('applyStatus(fixture); pollCharts()');
+assert.equal(timerDelays.at(-1), 60000);
+assert.deepEqual(requests.map(r => r.url), ["/api/charts"]);
+assert.equal(requests[0].options.method, "GET");
+await new Promise(resolve => setImmediate(resolve));
+run('state.charts = {mode: "dry"}; fixture.mode = "live"; fixture.freqtrade.dry_run = false; applyStatus(fixture)');
+assert.equal(timerDelays.at(-1), 0);
+''')
+
+
+def test_chart_failure_shows_message_without_details(javascript):
+    javascript(r'''
+run('applyStatus(fixture)');
+response={ok:false,status:503,json:async()=>({detail:"요청 실패"}),headers:{get:()=>null}};
+await run('refreshCharts()');
+assert.match(element("asset-change").textContent, /그래프를 불러오지 못했습니다/);
+assert.equal(run('state.chartsPending'), false);
+''')
+
+
+def test_first_chart_failure_never_leaves_the_card_checking(javascript):
+    javascript(r'''
+run('applyStatus(fixture)');
+for (const id of ["asset-main", "btc-last"]) element(id).textContent = "확인 중";
+response={ok:false,status:503,json:async()=>({detail:"요청 실패"}),headers:{get:()=>null}};
+await run('refreshCharts()');
+assert.equal(element("asset-main").textContent, "조회 불가");
+assert.equal(element("btc-last").textContent, "조회 불가");
+assert.match(element("asset-chart").children[0].textContent, /자산을 조회하지 못했습니다/);
+assert.match(element("btc-chart").children[0].textContent, /가격을 받지 못했습니다/);
+assert.match(element("asset-change").textContent, /그래프를 불러오지 못했습니다/);
+''')
+
+
+def test_later_chart_failure_keeps_the_last_good_charts(javascript):
+    javascript(CHARTS + r'''
+run('applyStatus(fixture)');
+context.chartData = chartData;
+run('renderCharts(chartData)');
+response={ok:false,status:503,json:async()=>({detail:"요청 실패"}),headers:{get:()=>null}};
+await run('refreshCharts()');
+assert.equal(element("asset-main").textContent, "159,950원");
+assert.equal(element("btc-last").textContent, "$60,071");
+''')
+
+
+def test_entry_after_the_newest_close_is_marked_on_the_last_point(javascript):
+    javascript(CHARTS + r'''
+run('applyStatus(fixture)');
+chartData.btc.entries = [start + 71 * hour + hour + 5000];   // the trade open right now
+context.chartData = chartData;
+run('renderCharts(chartData)');
+const nodes = svgNodes("btc-chart");
+const [marker] = nodes.filter(n => n.tagName === "circle");
+const points = nodes.find(n => n.tagName === "polyline").attributes.points.split(" ");
+assert.equal(`${marker.attributes.cx},${marker.attributes.cy}`, points.at(-1));
 ''')
