@@ -6,9 +6,12 @@ top 10% of ATR%, initial stop 2xATR(4h), 3xATR chandelier on 1h highs, exit on a
 close below the prior Donchian-10 low.
 
 Differences from the research code:
-- 4h and 1d candles come from the exchange (@informative), because Bitget serves only
-  ~990 startup 1h candles, too few for a daily EMA200. Bitget 4h/1d candles are UTC
-  aligned, matching the research resampling.
+- 4h and 1d candles come from the exchange, because Bitget serves only ~990 startup 1h
+  candles, too few for a daily EMA200. Bitget 4h/1d candles are UTC aligned, matching the
+  research resampling. 4h uses @informative (one request returns 90 days = 540 bars,
+  enough for the 180-bar ATR filter). Daily candles: in backtests they come from the data
+  directory; in dry-run/live the strategy pages through 90-day requests itself, because
+  Freqtrade's Bitget module asks once for 1000 daily candles and Bitget returns only 90.
 - Long only and 0.5% risk per trade (§7.1b). Entry caps from live_rules (§7.4).
 - Manual and smoke entries (tag not starting with "safe_") keep the stake they were
   given and a fixed stop 3% below the open, and are never closed by the exit signal.
@@ -25,7 +28,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import talib.abstract as ta
-from freqtrade.strategy import IStrategy, informative, stoploss_from_absolute
+from freqtrade.strategy import IStrategy, informative, merge_informative_pair, stoploss_from_absolute
 from pandas import DataFrame
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -65,6 +68,48 @@ class SafeTrendLive(IStrategy):
     def bot_start(self, **kwargs) -> None:
         self._releases = self._load_releases()
         self._calendar_warned = None
+        self._daily_cache: dict[str, tuple[float, DataFrame]] = {}
+        self._daily_client = None
+        if self._fetches_own_daily():
+            import ccxt  # public market data only: no keys
+            self._daily_client = ccxt.bitget({"enableRateLimit": True, "timeout": 15000,
+                                              "options": {"uta": False, "defaultType": "swap"}})
+
+    def _fetches_own_daily(self) -> bool:
+        runmode = getattr(getattr(self, "dp", None), "runmode", None) or self.config.get("runmode")
+        return str(getattr(runmode, "value", runmode)) in {"live", "dry_run"}
+
+    def informative_pairs(self):
+        # Backtests read daily candles from the data directory; live/dry-run fetch their own.
+        return [(pair, "1d") for pair in self.dp.current_whitelist()]
+
+    def _fetch_daily(self, pair: str) -> DataFrame | None:
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        try:
+            batches = [self._daily_client.fetch_ohlcv(pair, "1d", since=since, limit=rules.DAILY_WINDOW_DAYS)
+                       for since in rules.daily_since_list(now_ms)]
+        except Exception as exc:  # noqa: BLE001 - keep the last good frame, never trade on partial data
+            logger.warning("Daily candle fetch failed for %s: %s", pair, type(exc).__name__)
+            return None
+        rows = rules.completed_daily_rows(batches, now_ms)
+        if not rules.daily_rows_usable(rows):
+            logger.warning("Daily candles for %s are incomplete (%d rows): no trend, no entries.", pair, len(rows))
+            return None
+        frame = DataFrame(rows, columns=["date", "open", "high", "low", "close", "volume"])
+        frame["date"] = pd.to_datetime(frame.date, unit="ms", utc=True)
+        return frame
+
+    def _daily_frame(self, pair: str) -> DataFrame | None:
+        if not self._fetches_own_daily():
+            frame = self.dp.get_pair_dataframe(pair, "1d")
+            return None if frame is None or frame.empty else frame
+        cached = self._daily_cache.get(pair)
+        if cached is None or datetime.now(timezone.utc).timestamp() - cached[0] > 3600:
+            fresh = self._fetch_daily(pair)
+            if fresh is not None:
+                cached = (datetime.now(timezone.utc).timestamp(), fresh)
+                self._daily_cache[pair] = cached
+        return None if cached is None else cached[1]
 
     def _load_releases(self) -> list[datetime]:
         path = Path(self.config.get("user_data_dir", "/freqtrade/user_data")) / "events" / "upcoming_us_macro.csv"
@@ -94,17 +139,19 @@ class SafeTrendLive(IStrategy):
         dataframe["atr_q90"] = dataframe.atr_pct.rolling(180, min_periods=180).quantile(0.9).shift(1)
         return dataframe
 
-    @informative("1d")
-    def populate_indicators_1d(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        dataframe["ema50"] = ta.EMA(dataframe, timeperiod=50)
-        dataframe["ema200"] = ta.EMA(dataframe, timeperiod=200)
-        return dataframe
-
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # @informative shifts each 4h/1d bar onto the last 1h candle inside it, so a 4h value
-        # first appears on the 1h row whose close completes that 4h bar.
+        # @informative / merge_informative_pair shift each 4h/1d bar onto the last 1h candle
+        # inside it, so a value first appears on the 1h row whose close completes that bar.
         dataframe["four_close"] = dataframe.date == dataframe.date_4h + pd.Timedelta(hours=3)
-        return dataframe
+        daily = self._daily_frame(metadata["pair"])
+        if daily is None:
+            dataframe["ema50_1d"] = np.nan
+            dataframe["ema200_1d"] = np.nan
+            return dataframe
+        daily = daily[["date", "open", "high", "low", "close", "volume"]].copy()
+        daily["ema50"] = ta.EMA(daily, timeperiod=50)
+        daily["ema200"] = ta.EMA(daily, timeperiod=200)
+        return merge_informative_pair(dataframe, daily, self.timeframe, "1d", ffill=True)
 
     def _blackout_mask(self, dates: pd.Series) -> np.ndarray:
         releases = getattr(self, "_releases", [])

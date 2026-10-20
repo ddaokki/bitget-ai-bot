@@ -108,7 +108,8 @@ def test_live_strategy_files_exist_and_upcoming_calendar_has_header():
 
 
 def test_bitget_daily_candle_limit_matches_the_exchange():
-    # Bitget returns at most 90 daily candles per call; Freqtrade assumes 200 and would
-    # leave 110-day holes in the daily history used for the EMA200 trend filter.
+    # Bitget returns at most 90 daily candles per call. This setting keeps `download-data`
+    # (backtests) gap-free; live/dry-run pages daily candles inside SafeTrendLive because
+    # Freqtrade's Bitget module treats the last 4 years as 1000 candles per request.
     exchange = load_json(USER_DATA / "config.json")["exchange"]
     assert exchange["_ft_has_params"] == {"ohlcv_candle_limit_per_timeframe": {"1d": 90}}

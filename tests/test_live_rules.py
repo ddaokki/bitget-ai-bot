@@ -80,3 +80,30 @@ def test_blackout_window_is_two_hours_inclusive():
 def test_manual_stop_is_three_percent_below_open():
     assert live_rules.MANUAL_STOP_PRICE_PCT == pytest.approx(0.03)
     assert not math.isnan(live_rules.MANUAL_STOP_PRICE_PCT)
+
+
+DAY = 86_400_000
+
+
+def test_daily_windows_cover_history_in_90_day_steps_ending_today():
+    now = 1_760_000_000_000 + 5 * 3_600_000          # some time of day
+    sinces = live_rules.daily_since_list(now)
+    today = now - now % DAY
+    assert sinces[0] == today - 600 * DAY
+    assert all(b - a == 90 * DAY for a, b in zip(sinces, sinces[1:]))
+    assert sinces[-1] <= today < sinces[-1] + 90 * DAY
+
+
+def test_completed_daily_rows_dedupes_sorts_and_drops_open_day():
+    now = 10 * DAY + 3_600_000
+    batches = [[[2 * DAY, 1, 2, 0.5, 1.5, 10], [DAY, 1, 2, 0.5, 1.5, 10]], [[2 * DAY, 9, 9, 9, 9, 9], [10 * DAY, 1, 1, 1, 1, 1]], None]
+    rows = live_rules.completed_daily_rows(batches, now)
+    assert [r[0] for r in rows] == [DAY, 2 * DAY]          # today's open candle (10*DAY) dropped
+    assert rows[1][1] == 9                                 # later batch wins for a duplicate day
+
+
+def test_daily_rows_usable_needs_400_contiguous_days():
+    rows = [[i * DAY, 1, 1, 1, 1, 1] for i in range(400)]
+    assert live_rules.daily_rows_usable(rows)
+    assert not live_rules.daily_rows_usable(rows[:399])
+    assert not live_rules.daily_rows_usable(rows[:200] + rows[201:] + [[400 * DAY, 1, 1, 1, 1, 1]])

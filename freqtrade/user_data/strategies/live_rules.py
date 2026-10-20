@@ -85,3 +85,37 @@ def day_start(now: datetime) -> datetime:
 
 def week_start(now: datetime) -> datetime:
     return day_start(now) - timedelta(days=now.weekday())
+
+
+# ------------------------------------------------------------------ daily candles
+# Bitget USDT-M returns at most 90 daily candles per request, but Freqtrade's Bitget
+# module assumes 1000 for the last 4 years and asks once, so live/dry-run would see only
+# ~89 days, too few for EMA200. The strategy pages through 90-day windows itself.
+DAY_MS = 86_400_000
+DAILY_HISTORY_DAYS = 600
+DAILY_WINDOW_DAYS = 90
+DAILY_MIN_ROWS = 400
+
+
+def daily_since_list(now_ms: int, days: int = DAILY_HISTORY_DAYS, window: int = DAILY_WINDOW_DAYS) -> list[int]:
+    """UTC-midnight start times of consecutive `window`-day requests covering the last `days` days, oldest first."""
+    today = now_ms - now_ms % DAY_MS
+    start = today - days * DAY_MS
+    return list(range(start, today + 1, window * DAY_MS))
+
+
+def completed_daily_rows(batches: list, now_ms: int) -> list[list]:
+    """Merge ccxt OHLCV batches: one row per UTC day, sorted, only days that have closed."""
+    rows = {}
+    for batch in batches:
+        for row in batch or []:
+            if len(row) >= 6 and int(row[0]) % DAY_MS == 0 and int(row[0]) + DAY_MS <= now_ms:
+                rows[int(row[0])] = list(row[:6])
+    return [rows[key] for key in sorted(rows)]
+
+
+def daily_rows_usable(rows: list[list]) -> bool:
+    """Enough contiguous closed days for a daily EMA200."""
+    if len(rows) < DAILY_MIN_ROWS:
+        return False
+    return all(int(b[0]) - int(a[0]) == DAY_MS for a, b in zip(rows, rows[1:]))
