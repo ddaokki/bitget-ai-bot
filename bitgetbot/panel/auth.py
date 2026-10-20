@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import re
 import secrets
+import threading
 import time
 from collections.abc import Callable, Mapping
 from typing import Literal
@@ -27,7 +28,10 @@ def classify(
     if (
         client_host in {"127.0.0.1", "::1"}
         and host_header in LOCAL_HOSTS
-        and _header(headers, "Tailscale-User-Login") is None
+        and all(_header(headers, name) is None for name in (
+            "Tailscale-User-Login", "X-Forwarded-For", "X-Forwarded-Host",
+            "X-Forwarded-Proto", "Forwarded",
+        ))
     ):
         return "local"
     return "tailnet"
@@ -68,29 +72,46 @@ class Lockout:
 
     def __init__(self, clock: Callable[[], float] = time.monotonic):
         self._clock = clock
+        self._lock = threading.Lock()
         # Each entry holds failures, previous lock duration, and expiry.
         self._attempts: dict[str, tuple[int, float, float]] = {}
 
     def check(self, ident: str) -> float:
-        entry = self._attempts.get(ident)
-        if entry is None:
-            return 0.0
-        return max(0.0, entry[2] - self._clock())
+        with self._lock:
+            entry = self._attempts.get(ident)
+            if entry is None:
+                return 0.0
+            return max(0.0, entry[2] - self._clock())
+
+    def attempt(self, ident: str) -> float:
+        """Reserve a guess atomically; call success after valid authentication.
+
+        Do not call fail for a rejected guess reserved by this method.
+        """
+        with self._lock:
+            return self._attempt_locked(ident)
 
     def fail(self, ident: str) -> None:
+        with self._lock:
+            self._attempt_locked(ident)
+
+    def _attempt_locked(self, ident: str) -> float:
+        """Check and pre-count one attempt while the caller holds _lock."""
         now = self._clock()
         failures, duration, until = self._attempts.get(ident, (0, 0.0, 0.0))
         if until > now:
-            return
+            return until - now
         failures += 1
         if failures >= 5:
             duration = min(duration * 2, 86400.0) if duration else 900.0
             failures = 0
             until = now + duration
         self._attempts[ident] = (failures, duration, until)
+        return 0.0
 
     def success(self, ident: str) -> None:
-        self._attempts.pop(ident, None)
+        with self._lock:
+            self._attempts.pop(ident, None)
 
 
 class Sessions:

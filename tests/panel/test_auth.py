@@ -1,5 +1,7 @@
 import hashlib
 import re
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 from types import MappingProxyType
 
 import pytest
@@ -202,6 +204,49 @@ def test_csrf_rules_for_mutations(method):
         assert not csrf_ok(method, {
             "X-Panel-Request": "1", "Origin": origin,
         }, "http", host)
+
+
+@pytest.mark.parametrize("name", [
+    "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded",
+])
+@pytest.mark.parametrize("value", ["proxy", ""])
+def test_classify_proxy_headers_fail_closed(name, value):
+    for spelling in [name, name.lower(), name.swapcase()]:
+        headers = MappingProxyType({spelling: value})
+        assert classify("127.0.0.1", "127.0.0.1:8090", headers) == "tailnet"
+
+
+def test_concurrent_attempts_admit_only_five_logins():
+    lockout = Lockout(clock=lambda: 0.0)
+    barrier = Barrier(40)
+
+    def attempt(_):
+        barrier.wait(timeout=10)
+        return lockout.attempt("a")
+
+    with ThreadPoolExecutor(max_workers=40) as pool:
+        results = list(pool.map(attempt, range(40)))
+    assert results.count(0.0) == 5
+    assert results.count(900.0) == 35
+    assert lockout.check("a") == 900
+    assert lockout.attempt("b") == 0
+
+
+def test_attempt_escalation_expiry_and_success_reset():
+    now = [0.0]
+    lockout = Lockout(clock=lambda: now[0])
+    for duration in [900, 1800, 3600, 7200, 14400, 28800, 57600, 86400, 86400]:
+        for _ in range(5):
+            assert lockout.attempt("a") == 0
+        assert lockout.attempt("a") == duration
+        now[0] += duration
+    lockout.success("a")
+    for _ in range(4):
+        assert lockout.attempt("a") == 0
+    lockout.success("a")
+    for _ in range(5):
+        assert lockout.attempt("a") == 0
+    assert lockout.check("a") == 900
 
 
 def test_csrf_get_and_tailnet_origin():
