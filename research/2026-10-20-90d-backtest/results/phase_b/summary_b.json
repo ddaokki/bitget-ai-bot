@@ -270,26 +270,26 @@
    "kind": "phase B variant",
    "strategy": "SafeTrendAIV0",
    "window_start": "2023-10-01",
-   "trades": 12,
-   "win_rate": 25.0,
-   "net_usdt": -4.19,
-   "net_pct": -3.99,
-   "net_pct_signed_funding_phaseA": -3.99,
-   "net_pct_no_funding": -3.85,
-   "funding_paid_usdt": 0.14,
-   "mdd_mtm_pct": 5.37,
-   "mdd_closed_trade_pct": 4.03,
-   "pf": 0.31,
-   "avg_hold_hours": 48.7,
-   "net_2024_plus_pct": -3.96,
+   "trades": 7,
+   "win_rate": 14.3,
+   "net_usdt": -3.01,
+   "net_pct": -2.87,
+   "net_pct_signed_funding_phaseA": -2.87,
+   "net_pct_no_funding": -2.76,
+   "funding_paid_usdt": 0.11,
+   "mdd_mtm_pct": 4.27,
+   "mdd_closed_trade_pct": 2.91,
+   "pf": 0.02,
+   "avg_hold_hours": 57.0,
+   "net_2024_plus_pct": -2.84,
    "net_last6m_pct": 0.0,
-   "trades_2024_plus": 10,
+   "trades_2024_plus": 5,
    "trades_last6m": 0,
    "long_short": {
     "long": {
-     "trades": 12,
-     "win_rate": 25.0,
-     "net_usdt": -4.19
+     "trades": 7,
+     "win_rate": 14.3,
+     "net_usdt": -3.01
     },
     "short": {
      "trades": 0,
@@ -305,15 +305,15 @@
      "btc_hold_pct": 56.9
     },
     "2024": {
-     "trades": 5,
-     "net_pct": -2.83,
-     "mdd_mtm_pct": 3.32,
+     "trades": 1,
+     "net_pct": -0.53,
+     "mdd_mtm_pct": 0.96,
      "btc_hold_pct": 121.2
     },
     "2025": {
-     "trades": 5,
-     "net_pct": -1.17,
-     "mdd_mtm_pct": 2.75,
+     "trades": 4,
+     "net_pct": -2.32,
+     "mdd_mtm_pct": 2.72,
      "btc_hold_pct": -6.4
     },
     "2026": {
@@ -326,7 +326,7 @@
    "max_concurrent_positions": 2,
    "scale_in_orders": 0,
    "tiers": {
-    "base": 12
+    "base": 7
    },
    "blackout_blocked_signals": 0
   },
@@ -334,31 +334,31 @@
    "kind": "phase B variant",
    "strategy": "SafeTrendAIV1",
    "window_start": "2023-10-01",
-   "trades": 11,
-   "win_rate": 45.5,
-   "net_usdt": 0.09,
-   "net_pct": 0.08,
-   "net_pct_signed_funding_phaseA": 0.12,
-   "net_pct_no_funding": 0.29,
-   "funding_paid_usdt": 0.21,
-   "mdd_mtm_pct": 4.0,
-   "mdd_closed_trade_pct": 1.95,
-   "pf": 1.03,
-   "avg_hold_hours": 69.2,
-   "net_2024_plus_pct": -0.72,
-   "net_last6m_pct": -0.03,
-   "trades_2024_plus": 8,
-   "trades_last6m": 1,
+   "trades": 8,
+   "win_rate": 62.5,
+   "net_usdt": 1.81,
+   "net_pct": 1.72,
+   "net_pct_signed_funding_phaseA": 1.73,
+   "net_pct_no_funding": 1.91,
+   "funding_paid_usdt": 0.2,
+   "mdd_mtm_pct": 2.56,
+   "mdd_closed_trade_pct": 0.95,
+   "pf": 2.2,
+   "avg_hold_hours": 86.2,
+   "net_2024_plus_pct": 0.9,
+   "net_last6m_pct": 0.0,
+   "trades_2024_plus": 5,
+   "trades_last6m": 0,
    "long_short": {
     "long": {
-     "trades": 8,
-     "win_rate": 62.5,
-     "net_usdt": 1.74
+     "trades": 7,
+     "win_rate": 71.4,
+     "net_usdt": 2.83
     },
     "short": {
-     "trades": 3,
+     "trades": 1,
      "win_rate": 0.0,
-     "net_usdt": -1.65
+     "net_usdt": -1.02
     }
    },
    "per_year": {
@@ -369,28 +369,28 @@
      "btc_hold_pct": 56.9
     },
     "2024": {
-     "trades": 4,
-     "net_pct": -0.15,
-     "mdd_mtm_pct": 3.24,
+     "trades": 3,
+     "net_pct": 0.88,
+     "mdd_mtm_pct": 1.68,
      "btc_hold_pct": 121.2
     },
     "2025": {
-     "trades": 3,
-     "net_pct": -0.54,
-     "mdd_mtm_pct": 2.92,
+     "trades": 2,
+     "net_pct": 0.02,
+     "mdd_mtm_pct": 2.35,
      "btc_hold_pct": -6.4
     },
     "2026": {
-     "trades": 1,
-     "net_pct": -0.03,
-     "mdd_mtm_pct": 1.23,
+     "trades": 0,
+     "net_pct": 0.0,
+     "mdd_mtm_pct": 0.0,
      "btc_hold_pct": -6.5
     }
    },
-   "max_concurrent_positions": 2,
+   "max_concurrent_positions": 1,
    "scale_in_orders": 0,
    "tiers": {
-    "base": 11
+    "base": 8
    },
    "blackout_blocked_signals": 0
   },
@@ -398,31 +398,31 @@
    "kind": "phase B variant",
    "strategy": "SafeTrendTieredV1",
    "window_start": "2023-10-01",
-   "trades": 41,
-   "win_rate": 36.6,
-   "net_usdt": -5.2,
-   "net_pct": -4.96,
-   "net_pct_signed_funding_phaseA": -4.84,
-   "net_pct_no_funding": -4.75,
-   "funding_paid_usdt": 0.22,
-   "mdd_mtm_pct": 6.21,
-   "mdd_closed_trade_pct": 6.21,
-   "pf": 0.63,
-   "avg_hold_hours": 28.0,
-   "net_2024_plus_pct": -6.21,
-   "net_last6m_pct": -2.22,
-   "trades_2024_plus": 35,
-   "trades_last6m": 7,
+   "trades": 27,
+   "win_rate": 44.4,
+   "net_usdt": -1.37,
+   "net_pct": -1.3,
+   "net_pct_signed_funding_phaseA": -1.25,
+   "net_pct_no_funding": -1.15,
+   "funding_paid_usdt": 0.15,
+   "mdd_mtm_pct": 2.95,
+   "mdd_closed_trade_pct": 2.6,
+   "pf": 0.83,
+   "avg_hold_hours": 27.9,
+   "net_2024_plus_pct": -2.6,
+   "net_last6m_pct": -0.52,
+   "trades_2024_plus": 21,
+   "trades_last6m": 1,
    "long_short": {
     "long": {
-     "trades": 29,
-     "win_rate": 48.3,
-     "net_usdt": 0.06
+     "trades": 22,
+     "win_rate": 54.5,
+     "net_usdt": 1.59
     },
     "short": {
-     "trades": 12,
-     "win_rate": 8.3,
-     "net_usdt": -5.26
+     "trades": 5,
+     "win_rate": 0.0,
+     "net_usdt": -2.95
     }
    },
    "per_year": {
@@ -433,29 +433,29 @@
      "btc_hold_pct": 56.9
     },
     "2024": {
-     "trades": 17,
-     "net_pct": -2.85,
-     "mdd_mtm_pct": 2.85,
+     "trades": 11,
+     "net_pct": -2.1,
+     "mdd_mtm_pct": 2.11,
      "btc_hold_pct": 121.2
     },
     "2025": {
-     "trades": 11,
-     "net_pct": -1.27,
-     "mdd_mtm_pct": 2.75,
+     "trades": 9,
+     "net_pct": 0.01,
+     "mdd_mtm_pct": 2.08,
      "btc_hold_pct": -6.4
     },
     "2026": {
-     "trades": 7,
-     "net_pct": -2.22,
-     "mdd_mtm_pct": 2.79,
+     "trades": 1,
+     "net_pct": -0.52,
+     "mdd_mtm_pct": 0.52,
      "btc_hold_pct": -6.5
     }
    },
    "max_concurrent_positions": 2,
    "scale_in_orders": 0,
    "tiers": {
-    "low": 38,
-    "mid": 3
+    "low": 25,
+    "mid": 2
    },
    "blackout_blocked_signals": 19
   },
@@ -463,31 +463,31 @@
    "kind": "phase B variant",
    "strategy": "SafeTrendTieredV1Plus",
    "window_start": "2023-10-01",
-   "trades": 42,
-   "win_rate": 19.0,
-   "net_usdt": -7.64,
-   "net_pct": -7.27,
-   "net_pct_signed_funding_phaseA": -7.18,
-   "net_pct_no_funding": -7.13,
-   "funding_paid_usdt": 0.15,
-   "mdd_mtm_pct": 8.4,
-   "mdd_closed_trade_pct": 7.82,
-   "pf": 0.31,
-   "avg_hold_hours": 19.2,
-   "net_2024_plus_pct": -7.81,
-   "net_last6m_pct": -1.05,
-   "trades_2024_plus": 36,
-   "trades_last6m": 7,
+   "trades": 29,
+   "win_rate": 20.7,
+   "net_usdt": -4.43,
+   "net_pct": -4.22,
+   "net_pct_signed_funding_phaseA": -4.19,
+   "net_pct_no_funding": -4.12,
+   "funding_paid_usdt": 0.11,
+   "mdd_mtm_pct": 5.11,
+   "mdd_closed_trade_pct": 4.78,
+   "pf": 0.34,
+   "avg_hold_hours": 18.5,
+   "net_2024_plus_pct": -4.77,
+   "net_last6m_pct": -0.4,
+   "trades_2024_plus": 23,
+   "trades_last6m": 1,
    "long_short": {
     "long": {
-     "trades": 30,
-     "win_rate": 20.0,
-     "net_usdt": -4.69
+     "trades": 24,
+     "win_rate": 20.8,
+     "net_usdt": -2.61
     },
     "short": {
-     "trades": 12,
-     "win_rate": 16.7,
-     "net_usdt": -2.95
+     "trades": 5,
+     "win_rate": 20.0,
+     "net_usdt": -1.82
     }
    },
    "per_year": {
@@ -498,29 +498,29 @@
      "btc_hold_pct": 56.9
     },
     "2024": {
-     "trades": 17,
-     "net_pct": -4.99,
-     "mdd_mtm_pct": 4.99,
+     "trades": 12,
+     "net_pct": -3.71,
+     "mdd_mtm_pct": 3.72,
      "btc_hold_pct": 121.2
     },
     "2025": {
-     "trades": 12,
-     "net_pct": -1.94,
-     "mdd_mtm_pct": 2.34,
+     "trades": 10,
+     "net_pct": -0.71,
+     "mdd_mtm_pct": 1.69,
      "btc_hold_pct": -6.4
     },
     "2026": {
-     "trades": 7,
-     "net_pct": -1.05,
-     "mdd_mtm_pct": 1.94,
+     "trades": 1,
+     "net_pct": -0.4,
+     "mdd_mtm_pct": 0.4,
      "btc_hold_pct": -6.5
     }
    },
    "max_concurrent_positions": 2,
    "scale_in_orders": 0,
    "tiers": {
-    "low": 38,
-    "mid": 4
+    "low": 26,
+    "mid": 3
    },
    "blackout_blocked_signals": 19
   },
@@ -528,31 +528,31 @@
    "kind": "EXPLORATORY",
    "strategy": "SafeTrendTieredV1TP2",
    "window_start": "2023-10-01",
-   "trades": 42,
-   "win_rate": 35.7,
-   "net_usdt": -4.95,
-   "net_pct": -4.72,
-   "net_pct_signed_funding_phaseA": -4.6,
-   "net_pct_no_funding": -4.52,
-   "funding_paid_usdt": 0.2,
-   "mdd_mtm_pct": 5.97,
-   "mdd_closed_trade_pct": 5.97,
-   "pf": 0.66,
-   "avg_hold_hours": 26.3,
-   "net_2024_plus_pct": -5.97,
-   "net_last6m_pct": -2.21,
-   "trades_2024_plus": 36,
-   "trades_last6m": 7,
+   "trades": 28,
+   "win_rate": 42.9,
+   "net_usdt": -1.11,
+   "net_pct": -1.06,
+   "net_pct_signed_funding_phaseA": -1.01,
+   "net_pct_no_funding": -0.93,
+   "funding_paid_usdt": 0.14,
+   "mdd_mtm_pct": 2.95,
+   "mdd_closed_trade_pct": 2.53,
+   "pf": 0.87,
+   "avg_hold_hours": 25.4,
+   "net_2024_plus_pct": -2.36,
+   "net_last6m_pct": -0.52,
+   "trades_2024_plus": 22,
+   "trades_last6m": 1,
    "long_short": {
     "long": {
-     "trades": 30,
-     "win_rate": 46.7,
-     "net_usdt": 0.31
+     "trades": 23,
+     "win_rate": 52.2,
+     "net_usdt": 1.84
     },
     "short": {
-     "trades": 12,
-     "win_rate": 8.3,
-     "net_usdt": -5.26
+     "trades": 5,
+     "win_rate": 0.0,
+     "net_usdt": -2.95
     }
    },
    "per_year": {
@@ -563,29 +563,29 @@
      "btc_hold_pct": 56.9
     },
     "2024": {
-     "trades": 17,
-     "net_pct": -2.85,
-     "mdd_mtm_pct": 2.85,
+     "trades": 11,
+     "net_pct": -2.1,
+     "mdd_mtm_pct": 2.11,
      "btc_hold_pct": 121.2
     },
     "2025": {
-     "trades": 12,
-     "net_pct": -1.02,
-     "mdd_mtm_pct": 2.55,
+     "trades": 10,
+     "net_pct": 0.25,
+     "mdd_mtm_pct": 2.08,
      "btc_hold_pct": -6.4
     },
     "2026": {
-     "trades": 7,
-     "net_pct": -2.21,
-     "mdd_mtm_pct": 2.78,
+     "trades": 1,
+     "net_pct": -0.52,
+     "mdd_mtm_pct": 0.52,
      "btc_hold_pct": -6.5
     }
    },
    "max_concurrent_positions": 2,
    "scale_in_orders": 0,
    "tiers": {
-    "low": 39,
-    "mid": 3
+    "low": 26,
+    "mid": 2
    },
    "blackout_blocked_signals": 19
   },
@@ -851,7 +851,7 @@
    },
    "windows_btc": []
   },
-  "spike-p2-aiv0-cal": {
+  "spike-p2-aiv0-cal-v2": {
    "rows": 33395,
    "base_rate": 0.329,
    "pre": {
@@ -908,64 +908,71 @@
     }
    },
    "post": {
-    "bucket_gap": 0.0494,
-    "auc": 0.5065,
-    "brier": 0.2257,
-    "mean_p": 0.3252,
+    "bucket_gap": 0.033,
+    "auc": 0.5114,
+    "brier": 0.2235,
+    "mean_p": 0.3239,
     "table": [
      {
       "bucket": "[0.0, 0.3)",
-      "rows": 11372,
-      "mean_p": 0.246,
-      "realised": 0.325
+      "rows": 9063,
+      "mean_p": 0.251,
+      "realised": 0.321
      },
      {
       "bucket": "[0.3, 0.45)",
-      "rows": 20272,
-      "mean_p": 0.354,
-      "realised": 0.329
+      "rows": 23298,
+      "mean_p": 0.345,
+      "realised": 0.33
      },
      {
       "bucket": "[0.45, 0.55)",
-      "rows": 1489,
-      "mean_p": 0.485,
-      "realised": 0.36
+      "rows": 939,
+      "mean_p": 0.482,
+      "realised": 0.386
      },
      {
       "bucket": "[0.55, 0.65)",
-      "rows": 203,
-      "mean_p": 0.595,
-      "realised": 0.32
+      "rows": 71,
+      "mean_p": 0.589,
+      "realised": 0.31
      },
      {
       "bucket": "[0.65, 1.0)",
-      "rows": 59,
-      "mean_p": 0.681,
-      "realised": 0.339
+      "rows": 24,
+      "mean_p": 0.682,
+      "realised": 0.25
      }
     ],
     "signal_rows": 987,
-    "signal_auc": 0.5186,
+    "signal_auc": 0.4887,
     "signal_yes_rate": 0.3972,
     "signal_share_p_ge": {
-     "0.45": 0.0598,
-     "0.5": 0.0193,
-     "0.55": 0.002,
+     "0.45": 0.0314,
+     "0.5": 0.0101,
+     "0.55": 0.0,
      "0.65": 0.0
     },
     "signal_p_quantiles": {
-     "0.5": 0.3257,
-     "0.9": 0.4194,
-     "0.99": 0.5213,
-     "1.0": 0.5742
+     "0.5": 0.3274,
+     "0.9": 0.3928,
+     "0.99": 0.4965,
+     "1.0": 0.5318
     }
+   },
+   "non_fallback_windows": {
+    "rows": 20237,
+    "auc_raw": 0.5315,
+    "auc_cal": 0.5162,
+    "fallback_rows": 13158,
+    "fallback_rows_auc_raw": 0.5105
    },
    "windows_btc": [
     {
      "train_start": "2022-10-01 00:00:00+00:00",
      "train_end": "2023-10-01 00:00:00+00:00",
-     "platt_a": -0.516173305437139,
-     "platt_b": -1.4724472475421755,
+     "platt_a": 0.0,
+     "platt_b": -0.852550663010063,
      "holdout_yes_rate": 0.2702205882352941,
      "holdout_raw_mean": 0.31814031589455827,
      "kept_groups": []
@@ -1018,8 +1025,8 @@
     {
      "train_start": "2024-03-24 00:00:00+00:00",
      "train_end": "2025-03-24 00:00:00+00:00",
-     "platt_a": -0.0030959853272911355,
-     "platt_b": -0.9955170624359432,
+     "platt_a": 0.0,
+     "platt_b": -0.7536874035072749,
      "holdout_yes_rate": 0.2702205882352941,
      "holdout_raw_mean": 0.36592879728492955,
      "kept_groups": []
@@ -1027,8 +1034,8 @@
     {
      "train_start": "2024-06-22 00:00:00+00:00",
      "train_end": "2025-06-22 00:00:00+00:00",
-     "platt_a": -0.11701695051855254,
-     "platt_b": -0.7085705511335196,
+     "platt_a": 0.0,
+     "platt_b": -0.678718898659881,
      "holdout_yes_rate": 0.34558823529411764,
      "holdout_raw_mean": 0.3746870550118505,
      "kept_groups": []
@@ -1054,8 +1061,8 @@
     {
      "train_start": "2025-03-19 00:00:00+00:00",
      "train_end": "2026-03-19 00:00:00+00:00",
-     "platt_a": -0.008386900688668882,
-     "platt_b": -0.6578687943902097,
+     "platt_a": 0.0,
+     "platt_b": -0.6419239657127016,
      "holdout_yes_rate": 0.34191176470588236,
      "holdout_raw_mean": 0.4243799755106728,
      "kept_groups": []
@@ -1072,15 +1079,197 @@
     {
      "train_start": "2025-09-15 00:00:00+00:00",
      "train_end": "2026-09-15 00:00:00+00:00",
-     "platt_a": -0.26262575059256654,
-     "platt_b": -0.9171703380759986,
+     "platt_a": 0.0,
+     "platt_b": -0.617626778792881,
      "holdout_yes_rate": 0.3474264705882353,
      "holdout_raw_mean": 0.27858023144126776,
      "kept_groups": []
     }
-   ]
+   ],
+   "platt_fallback": {
+    "windows_total": 65,
+    "windows_fallback": 25,
+    "btc_fallback": 5,
+    "list": [
+     {
+      "pair": "BTC/USDT:USDT",
+      "train_start": "2022-10-01 00:00:00+00:00",
+      "train_end": "2023-10-01 00:00:00+00:00",
+      "platt_raw_slope": -0.516173305437139,
+      "train_yes_rate": 0.2988980716253444
+     },
+     {
+      "pair": "BTC/USDT:USDT",
+      "train_start": "2024-03-24 00:00:00+00:00",
+      "train_end": "2025-03-24 00:00:00+00:00",
+      "platt_raw_slope": -0.0030959853272911355,
+      "train_yes_rate": 0.3200183654729109
+     },
+     {
+      "pair": "BTC/USDT:USDT",
+      "train_start": "2024-06-22 00:00:00+00:00",
+      "train_end": "2025-06-22 00:00:00+00:00",
+      "platt_raw_slope": -0.11701695051855254,
+      "train_yes_rate": 0.3365472910927456
+     },
+     {
+      "pair": "BTC/USDT:USDT",
+      "train_start": "2025-03-19 00:00:00+00:00",
+      "train_end": "2026-03-19 00:00:00+00:00",
+      "platt_raw_slope": -0.008386900688668882,
+      "train_yes_rate": 0.344811753902663
+     },
+     {
+      "pair": "BTC/USDT:USDT",
+      "train_start": "2025-09-15 00:00:00+00:00",
+      "train_end": "2026-09-15 00:00:00+00:00",
+      "platt_raw_slope": -0.26262575059256654,
+      "train_yes_rate": 0.35032139577594124
+     },
+     {
+      "pair": "ETH/USDT:USDT",
+      "train_start": "2023-03-30 00:00:00+00:00",
+      "train_end": "2024-03-29 00:00:00+00:00",
+      "platt_raw_slope": -0.007820764873649324,
+      "train_yes_rate": 0.3149678604224059
+     },
+     {
+      "pair": "ETH/USDT:USDT",
+      "train_start": "2023-09-26 00:00:00+00:00",
+      "train_end": "2024-09-25 00:00:00+00:00",
+      "platt_raw_slope": -0.08438576180153798,
+      "train_yes_rate": 0.31313131313131315
+     },
+     {
+      "pair": "ETH/USDT:USDT",
+      "train_start": "2024-09-20 00:00:00+00:00",
+      "train_end": "2025-09-20 00:00:00+00:00",
+      "platt_raw_slope": -0.28444301479823336,
+      "train_yes_rate": 0.3273645546372819
+     },
+     {
+      "pair": "NEAR/USDT:USDT",
+      "train_start": "2023-06-28 00:00:00+00:00",
+      "train_end": "2024-06-27 00:00:00+00:00",
+      "platt_raw_slope": -0.33603311772366784,
+      "train_yes_rate": 0.3590449954086318
+     },
+     {
+      "pair": "NEAR/USDT:USDT",
+      "train_start": "2023-09-26 00:00:00+00:00",
+      "train_end": "2024-09-25 00:00:00+00:00",
+      "platt_raw_slope": -0.4343500906257164,
+      "train_yes_rate": 0.3484848484848485
+     },
+     {
+      "pair": "NEAR/USDT:USDT",
+      "train_start": "2023-12-25 00:00:00+00:00",
+      "train_end": "2024-12-24 00:00:00+00:00",
+      "platt_raw_slope": -0.07573274750999634,
+      "train_yes_rate": 0.325068870523416
+     },
+     {
+      "pair": "NEAR/USDT:USDT",
+      "train_start": "2025-03-19 00:00:00+00:00",
+      "train_end": "2026-03-19 00:00:00+00:00",
+      "platt_raw_slope": -0.02089150977126921,
+      "train_yes_rate": 0.32920110192837465
+     },
+     {
+      "pair": "NEAR/USDT:USDT",
+      "train_start": "2025-06-17 00:00:00+00:00",
+      "train_end": "2026-06-17 00:00:00+00:00",
+      "platt_raw_slope": -0.20161743643960756,
+      "train_yes_rate": 0.32323232323232326
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2022-12-30 00:00:00+00:00",
+      "train_end": "2023-12-30 00:00:00+00:00",
+      "platt_raw_slope": -0.675174603864139,
+      "train_yes_rate": 0.3305785123966942
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2023-03-30 00:00:00+00:00",
+      "train_end": "2024-03-29 00:00:00+00:00",
+      "platt_raw_slope": -0.21798249511882478,
+      "train_yes_rate": 0.344811753902663
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2023-06-28 00:00:00+00:00",
+      "train_end": "2024-06-27 00:00:00+00:00",
+      "platt_raw_slope": -0.2067850278539381,
+      "train_yes_rate": 0.3273645546372819
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2023-09-26 00:00:00+00:00",
+      "train_end": "2024-09-25 00:00:00+00:00",
+      "platt_raw_slope": -0.06749789348686899,
+      "train_yes_rate": 0.3402203856749311
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2023-12-25 00:00:00+00:00",
+      "train_end": "2024-12-24 00:00:00+00:00",
+      "platt_raw_slope": -0.3109495006039965,
+      "train_yes_rate": 0.3273645546372819
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2024-09-20 00:00:00+00:00",
+      "train_end": "2025-09-20 00:00:00+00:00",
+      "platt_raw_slope": -0.26167646600341826,
+      "train_yes_rate": 0.3287419651056015
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2025-03-19 00:00:00+00:00",
+      "train_end": "2026-03-19 00:00:00+00:00",
+      "platt_raw_slope": -0.11782802800069725,
+      "train_yes_rate": 0.3200183654729109
+     },
+     {
+      "pair": "XRP/USDT:USDT",
+      "train_start": "2023-03-30 00:00:00+00:00",
+      "train_end": "2024-03-29 00:00:00+00:00",
+      "platt_raw_slope": -0.037908423239042255,
+      "train_yes_rate": 0.2695133149678604
+     },
+     {
+      "pair": "XRP/USDT:USDT",
+      "train_start": "2023-06-28 00:00:00+00:00",
+      "train_end": "2024-06-27 00:00:00+00:00",
+      "platt_raw_slope": -0.28160046753605295,
+      "train_yes_rate": 0.2800734618916437
+     },
+     {
+      "pair": "XRP/USDT:USDT",
+      "train_start": "2023-09-26 00:00:00+00:00",
+      "train_end": "2024-09-25 00:00:00+00:00",
+      "platt_raw_slope": -0.08163755241159482,
+      "train_yes_rate": 0.29338842975206614
+     },
+     {
+      "pair": "XRP/USDT:USDT",
+      "train_start": "2024-03-24 00:00:00+00:00",
+      "train_end": "2025-03-24 00:00:00+00:00",
+      "platt_raw_slope": -0.07175974238461881,
+      "train_yes_rate": 0.2956841138659321
+     },
+     {
+      "pair": "XRP/USDT:USDT",
+      "train_start": "2025-06-17 00:00:00+00:00",
+      "train_end": "2026-06-17 00:00:00+00:00",
+      "platt_raw_slope": -0.08315316084337768,
+      "train_yes_rate": 0.3512396694214876
+     }
+    ]
+   }
   },
-  "spike-p2-aiv1-cal": {
+  "spike-p2-aiv1-cal-v2": {
    "rows": 33395,
    "base_rate": 0.329,
    "pre": {
@@ -1137,34 +1326,34 @@
     }
    },
    "post": {
-    "bucket_gap": 0.0502,
-    "auc": 0.5009,
-    "brier": 0.2259,
-    "mean_p": 0.3256,
+    "bucket_gap": 0.0349,
+    "auc": 0.5074,
+    "brier": 0.2233,
+    "mean_p": 0.3219,
     "table": [
      {
       "bucket": "[0.0, 0.3)",
-      "rows": 11967,
-      "mean_p": 0.25,
-      "realised": 0.324
+      "rows": 10827,
+      "mean_p": 0.258,
+      "realised": 0.322
      },
      {
       "bucket": "[0.3, 0.45)",
-      "rows": 19674,
-      "mean_p": 0.357,
-      "realised": 0.33
+      "rows": 21693,
+      "mean_p": 0.347,
+      "realised": 0.329
      },
      {
       "bucket": "[0.45, 0.55)",
-      "rows": 1608,
-      "mean_p": 0.484,
-      "realised": 0.341
+      "rows": 792,
+      "mean_p": 0.482,
+      "realised": 0.407
      },
      {
       "bucket": "[0.55, 0.65)",
-      "rows": 136,
-      "mean_p": 0.577,
-      "realised": 0.36
+      "rows": 73,
+      "mean_p": 0.581,
+      "realised": 0.342
      },
      {
       "bucket": "[0.65, 1.0)",
@@ -1174,27 +1363,34 @@
      }
     ],
     "signal_rows": 987,
-    "signal_auc": 0.4788,
+    "signal_auc": 0.4582,
     "signal_yes_rate": 0.3972,
     "signal_share_p_ge": {
-     "0.45": 0.0608,
-     "0.5": 0.0213,
-     "0.55": 0.0051,
+     "0.45": 0.0375,
+     "0.5": 0.0162,
+     "0.55": 0.0041,
      "0.65": 0.0
     },
     "signal_p_quantiles": {
-     "0.5": 0.3216,
-     "0.9": 0.4215,
-     "0.99": 0.5249,
+     "0.5": 0.3274,
+     "0.9": 0.3878,
+     "0.99": 0.5223,
      "1.0": 0.57
     }
+   },
+   "non_fallback_windows": {
+    "rows": 21318,
+    "auc_raw": 0.5262,
+    "auc_cal": 0.5129,
+    "fallback_rows": 12077,
+    "fallback_rows_auc_raw": 0.5207
    },
    "windows_btc": [
     {
      "train_start": "2022-10-01 00:00:00+00:00",
      "train_end": "2023-10-01 00:00:00+00:00",
-     "platt_a": -0.3373669258009582,
-     "platt_b": -1.3374819478312256,
+     "platt_a": 0.0,
+     "platt_b": -0.852550663010063,
      "holdout_yes_rate": 0.2702205882352941,
      "holdout_raw_mean": 0.3026856979830304,
      "kept_groups": [
@@ -1306,8 +1502,8 @@
     {
      "train_start": "2024-06-22 00:00:00+00:00",
      "train_end": "2025-06-22 00:00:00+00:00",
-     "platt_a": -0.2023256023788755,
-     "platt_b": -0.7251438109521035,
+     "platt_a": 0.0,
+     "platt_b": -0.678718898659881,
      "holdout_yes_rate": 0.34558823529411764,
      "holdout_raw_mean": 0.40903584659964887,
      "kept_groups": [
@@ -1397,8 +1593,8 @@
     {
      "train_start": "2025-09-15 00:00:00+00:00",
      "train_end": "2026-09-15 00:00:00+00:00",
-     "platt_a": -0.11054339656018938,
-     "platt_b": -0.7584556013845898,
+     "platt_a": 0.0,
+     "platt_b": -0.617626778792881,
      "holdout_yes_rate": 0.3474264705882353,
      "holdout_raw_mean": 0.2647585351998825,
      "kept_groups": [
@@ -1413,7 +1609,175 @@
       "US:PCE"
      ]
     }
-   ]
+   ],
+   "platt_fallback": {
+    "windows_total": 65,
+    "windows_fallback": 23,
+    "btc_fallback": 3,
+    "list": [
+     {
+      "pair": "BTC/USDT:USDT",
+      "train_start": "2022-10-01 00:00:00+00:00",
+      "train_end": "2023-10-01 00:00:00+00:00",
+      "platt_raw_slope": -0.3373669258009582,
+      "train_yes_rate": 0.2988980716253444
+     },
+     {
+      "pair": "BTC/USDT:USDT",
+      "train_start": "2024-06-22 00:00:00+00:00",
+      "train_end": "2025-06-22 00:00:00+00:00",
+      "platt_raw_slope": -0.2023256023788755,
+      "train_yes_rate": 0.3365472910927456
+     },
+     {
+      "pair": "BTC/USDT:USDT",
+      "train_start": "2025-09-15 00:00:00+00:00",
+      "train_end": "2026-09-15 00:00:00+00:00",
+      "platt_raw_slope": -0.11054339656018938,
+      "train_yes_rate": 0.35032139577594124
+     },
+     {
+      "pair": "ETH/USDT:USDT",
+      "train_start": "2022-12-30 00:00:00+00:00",
+      "train_end": "2023-12-30 00:00:00+00:00",
+      "platt_raw_slope": -0.02200260582525606,
+      "train_yes_rate": 0.283287419651056
+     },
+     {
+      "pair": "ETH/USDT:USDT",
+      "train_start": "2023-09-26 00:00:00+00:00",
+      "train_end": "2024-09-25 00:00:00+00:00",
+      "platt_raw_slope": -0.06978290573067786,
+      "train_yes_rate": 0.31313131313131315
+     },
+     {
+      "pair": "ETH/USDT:USDT",
+      "train_start": "2024-06-22 00:00:00+00:00",
+      "train_end": "2025-06-22 00:00:00+00:00",
+      "platt_raw_slope": -0.027256912091722516,
+      "train_yes_rate": 0.31267217630853994
+     },
+     {
+      "pair": "ETH/USDT:USDT",
+      "train_start": "2024-09-20 00:00:00+00:00",
+      "train_end": "2025-09-20 00:00:00+00:00",
+      "platt_raw_slope": -0.3163390624526849,
+      "train_yes_rate": 0.3273645546372819
+     },
+     {
+      "pair": "ETH/USDT:USDT",
+      "train_start": "2024-12-19 00:00:00+00:00",
+      "train_end": "2025-12-19 00:00:00+00:00",
+      "platt_raw_slope": -0.08987402942358859,
+      "train_yes_rate": 0.3282828282828283
+     },
+     {
+      "pair": "NEAR/USDT:USDT",
+      "train_start": "2023-06-28 00:00:00+00:00",
+      "train_end": "2024-06-27 00:00:00+00:00",
+      "platt_raw_slope": -0.5969745532145834,
+      "train_yes_rate": 0.3590449954086318
+     },
+     {
+      "pair": "NEAR/USDT:USDT",
+      "train_start": "2023-09-26 00:00:00+00:00",
+      "train_end": "2024-09-25 00:00:00+00:00",
+      "platt_raw_slope": -0.3176377488744533,
+      "train_yes_rate": 0.3484848484848485
+     },
+     {
+      "pair": "NEAR/USDT:USDT",
+      "train_start": "2025-03-19 00:00:00+00:00",
+      "train_end": "2026-03-19 00:00:00+00:00",
+      "platt_raw_slope": -0.14419338691691544,
+      "train_yes_rate": 0.32920110192837465
+     },
+     {
+      "pair": "NEAR/USDT:USDT",
+      "train_start": "2025-06-17 00:00:00+00:00",
+      "train_end": "2026-06-17 00:00:00+00:00",
+      "platt_raw_slope": -0.24066097171757303,
+      "train_yes_rate": 0.32323232323232326
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2022-12-30 00:00:00+00:00",
+      "train_end": "2023-12-30 00:00:00+00:00",
+      "platt_raw_slope": -0.3636004380924878,
+      "train_yes_rate": 0.3305785123966942
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2023-03-30 00:00:00+00:00",
+      "train_end": "2024-03-29 00:00:00+00:00",
+      "platt_raw_slope": -0.24127221275573102,
+      "train_yes_rate": 0.344811753902663
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2023-06-28 00:00:00+00:00",
+      "train_end": "2024-06-27 00:00:00+00:00",
+      "platt_raw_slope": -0.20640097914122862,
+      "train_yes_rate": 0.3273645546372819
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2023-12-25 00:00:00+00:00",
+      "train_end": "2024-12-24 00:00:00+00:00",
+      "platt_raw_slope": -0.17215393045301491,
+      "train_yes_rate": 0.3273645546372819
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2024-09-20 00:00:00+00:00",
+      "train_end": "2025-09-20 00:00:00+00:00",
+      "platt_raw_slope": -0.3692679175569088,
+      "train_yes_rate": 0.3287419651056015
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2025-03-19 00:00:00+00:00",
+      "train_end": "2026-03-19 00:00:00+00:00",
+      "platt_raw_slope": -0.16670320291317875,
+      "train_yes_rate": 0.3200183654729109
+     },
+     {
+      "pair": "SOL/USDT:USDT",
+      "train_start": "2025-06-17 00:00:00+00:00",
+      "train_end": "2026-06-17 00:00:00+00:00",
+      "platt_raw_slope": -0.305304492173985,
+      "train_yes_rate": 0.34618916437098257
+     },
+     {
+      "pair": "XRP/USDT:USDT",
+      "train_start": "2023-06-28 00:00:00+00:00",
+      "train_end": "2024-06-27 00:00:00+00:00",
+      "platt_raw_slope": -0.39131090575179844,
+      "train_yes_rate": 0.2800734618916437
+     },
+     {
+      "pair": "XRP/USDT:USDT",
+      "train_start": "2023-09-26 00:00:00+00:00",
+      "train_end": "2024-09-25 00:00:00+00:00",
+      "platt_raw_slope": -0.14603774424134489,
+      "train_yes_rate": 0.29338842975206614
+     },
+     {
+      "pair": "XRP/USDT:USDT",
+      "train_start": "2024-03-24 00:00:00+00:00",
+      "train_end": "2025-03-24 00:00:00+00:00",
+      "platt_raw_slope": -0.06109994483515081,
+      "train_yes_rate": 0.2956841138659321
+     },
+     {
+      "pair": "XRP/USDT:USDT",
+      "train_start": "2025-06-17 00:00:00+00:00",
+      "train_end": "2026-06-17 00:00:00+00:00",
+      "platt_raw_slope": -0.13398155588777413,
+      "train_yes_rate": 0.3512396694214876
+     }
+    ]
+   }
   },
   "spike-p2-aiv1-raw": {
    "rows": 33395,
@@ -1523,6 +1887,13 @@
      "0.99": 0.8049,
      "1.0": 0.8922
     }
+   },
+   "non_fallback_windows": {
+    "rows": 33395,
+    "auc_raw": 0.5159,
+    "auc_cal": 0.5159,
+    "fallback_rows": 0,
+    "fallback_rows_auc_raw": null
    },
    "windows_btc": [
     {
@@ -1748,15 +2119,21 @@
       "US:PCE"
      ]
     }
-   ]
+   ],
+   "platt_fallback": {
+    "windows_total": 65,
+    "windows_fallback": 0,
+    "btc_fallback": 0,
+    "list": []
+   }
   }
  },
  "postmortem_cause_counts": {
   "aiv0_cal": {
    "event_shock": 1,
-   "noise_stop": 2,
+   "noise_stop": 0,
    "take_profit": 0,
-   "trailing_exit": 8,
+   "trailing_exit": 5,
    "trend_reversal": 1
   },
   "aiv0_raw": {
@@ -1770,8 +2147,8 @@
    "event_shock": 0,
    "noise_stop": 0,
    "take_profit": 0,
-   "trailing_exit": 9,
-   "trend_reversal": 2
+   "trailing_exit": 7,
+   "trend_reversal": 1
   },
   "aiv1_raw": {
    "event_shock": 3,
@@ -1803,17 +2180,17 @@
   },
   "tiered_v1": {
    "event_shock": 2,
-   "noise_stop": 21,
-   "take_profit": 14,
+   "noise_stop": 11,
+   "take_profit": 11,
    "trailing_exit": 1,
-   "trend_reversal": 3
+   "trend_reversal": 2
   },
   "tiered_v1_plus": {
    "event_shock": 1,
-   "noise_stop": 15,
-   "take_profit": 6,
-   "trailing_exit": 16,
-   "trend_reversal": 4
+   "noise_stop": 8,
+   "take_profit": 4,
+   "trailing_exit": 13,
+   "trend_reversal": 3
   },
   "tiered_v1_plus_raw": {
    "event_shock": 7,
@@ -1831,10 +2208,10 @@
   },
   "tiered_v1_tp2": {
    "event_shock": 2,
-   "noise_stop": 22,
-   "take_profit": 15,
+   "noise_stop": 12,
+   "take_profit": 12,
    "trailing_exit": 0,
-   "trend_reversal": 3
+   "trend_reversal": 2
   }
  }
 }
