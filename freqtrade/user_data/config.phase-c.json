@@ -1,0 +1,18 @@
+{
+  "_note": "Phase C: 10 coins, zero-funding engine datadir (analyze_c.py charges both-sides 0.01%/8h), entries from 2023-10-01 only.",
+  "exchange": {
+    "pair_whitelist": [
+      "BTC/USDT:USDT", "ETH/USDT:USDT", "SOL/USDT:USDT", "XRP/USDT:USDT", "NEAR/USDT:USDT",
+      "DOGE/USDT:USDT", "ADA/USDT:USDT", "UNI/USDT:USDT", "LINK/USDT:USDT", "AVAX/USDT:USDT"
+    ]
+  },
+  "datadir": "/freqtrade/user_data/data/bitget_synth_funding_zero",
+  "futures_funding_rate": 0,
+  "event_features": {
+    "enabled": false,
+    "path": "/freqtrade/user_data/events/events.csv"
+  },
+  "spike": {
+    "entry_start": "2023-10-01T00:00:00+00:00"
+  }
+}

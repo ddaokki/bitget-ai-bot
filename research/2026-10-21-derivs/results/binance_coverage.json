@@ -1,0 +1,204 @@
+{
+ "BTCUSDT": {
+  "pair": "BTC/USDT:USDT",
+  "metrics_rows": 504731,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.8181,
+   "sum_toptrader_long_short_ratio": 0.8182,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.927
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5259,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ },
+ "ETHUSDT": {
+  "pair": "ETH/USDT:USDT",
+  "metrics_rows": 504731,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.8181,
+   "sum_toptrader_long_short_ratio": 0.8182,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.927
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5259,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ },
+ "SOLUSDT": {
+  "pair": "SOL/USDT:USDT",
+  "metrics_rows": 504714,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.8181,
+   "sum_toptrader_long_short_ratio": 0.8182,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.927
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5334,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ },
+ "XRPUSDT": {
+  "pair": "XRP/USDT:USDT",
+  "metrics_rows": 504730,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.8187,
+   "sum_toptrader_long_short_ratio": 0.8187,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.9276
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5259,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ },
+ "NEARUSDT": {
+  "pair": "NEAR/USDT:USDT",
+  "metrics_rows": 504443,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [
+   "2023-12-18"
+  ],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.818,
+   "sum_toptrader_long_short_ratio": 0.8181,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.9269
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5259,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ },
+ "DOGEUSDT": {
+  "pair": "DOGE/USDT:USDT",
+  "metrics_rows": 504731,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.8181,
+   "sum_toptrader_long_short_ratio": 0.8182,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.927
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5259,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ },
+ "ADAUSDT": {
+  "pair": "ADA/USDT:USDT",
+  "metrics_rows": 504731,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.8181,
+   "sum_toptrader_long_short_ratio": 0.8182,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.927
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5259,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ },
+ "UNIUSDT": {
+  "pair": "UNI/USDT:USDT",
+  "metrics_rows": 504722,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.8181,
+   "sum_toptrader_long_short_ratio": 0.8182,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.927
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5259,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ },
+ "LINKUSDT": {
+  "pair": "LINK/USDT:USDT",
+  "metrics_rows": 504731,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.8181,
+   "sum_toptrader_long_short_ratio": 0.8182,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.927
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5259,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ },
+ "AVAXUSDT": {
+  "pair": "AVAX/USDT:USDT",
+  "metrics_rows": 504672,
+  "metrics_first": "2022-01-01 00:00:00+00:00",
+  "metrics_last": "2026-10-19 23:55:00+00:00",
+  "metrics_missing_days": [],
+  "non_null_share": {
+   "sum_open_interest": 1.0,
+   "sum_open_interest_value": 1.0,
+   "count_toptrader_long_short_ratio": 0.8181,
+   "sum_toptrader_long_short_ratio": 0.8181,
+   "count_long_short_ratio": 0.9893,
+   "sum_taker_long_short_vol_ratio": 0.927
+  },
+  "first_full_ls_day": "2022-01-30 00:00:00+00:00",
+  "funding_rows": 5259,
+  "funding_first": "2022-01-01 00:00:00.006000+00:00",
+  "funding_last": "2026-10-19 16:00:00.003000+00:00",
+  "funding_source": "fapi.binance.com"
+ }
+}

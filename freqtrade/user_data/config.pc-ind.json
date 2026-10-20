@@ -1,0 +1,6 @@
+{
+  "precomputed": {
+    "path": "/freqtrade/user_data/models/phase_c/pred_ind.feather",
+    "column": "p_cal"
+  }
+}

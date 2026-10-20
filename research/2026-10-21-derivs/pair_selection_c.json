@@ -1,0 +1,358 @@
+{
+  "selection_utc": "2026-10-20T12:21:59.165439+00:00",
+  "volume_start_utc": "2026-09-20T00:00:00.000Z",
+  "volume_end_exclusive_utc": "2026-10-20T00:00:00+00:00",
+  "history_required_utc": "2022-01-01T00:00:00.000Z",
+  "method": "1. Active linear USDT perpetuals on Bitget, stable/fiat/pegged bases excluded.\n  2. Pre-rank by 24h quote volume (one tickers call), keep the top 80.\n  3. Rank those by summed quote volume over the last 30 complete UTC days.\n  4. Walk down that ranking and keep a pair only if\n     - Bitget serves a 1h candle at or before 2022-01-01T00:00Z (no new alts; daily\n       EMA200 warmup), and\n     - Binance USDT-M publishes daily \"metrics\" (open interest, long/short ratios)\n       for it on 2022-01-01 (data.binance.vision). Phase C features need them.\n  5. Stop at 10 pairs. BTC and ETH are always kept.",
+  "selected": [
+    {
+      "pair": "BTC/USDT:USDT",
+      "base": "BTC",
+      "quote_volume_30d": 75158543118.5198,
+      "minimum_amount": 0.0001,
+      "minimum_cost": 5.0,
+      "volume_rank": 1,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "BTCUSDT"
+    },
+    {
+      "pair": "ETH/USDT:USDT",
+      "base": "ETH",
+      "quote_volume_30d": 49115300837.8982,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 2,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "ETHUSDT"
+    },
+    {
+      "pair": "SOL/USDT:USDT",
+      "base": "SOL",
+      "quote_volume_30d": 7677820587.9805,
+      "minimum_amount": 0.1,
+      "minimum_cost": 5.0,
+      "volume_rank": 3,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "SOLUSDT"
+    },
+    {
+      "pair": "XRP/USDT:USDT",
+      "base": "XRP",
+      "quote_volume_30d": 6266563496.966,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 5,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "XRPUSDT"
+    },
+    {
+      "pair": "NEAR/USDT:USDT",
+      "base": "NEAR",
+      "quote_volume_30d": 3281048842.6756,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 9,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "NEARUSDT"
+    },
+    {
+      "pair": "DOGE/USDT:USDT",
+      "base": "DOGE",
+      "quote_volume_30d": 1714918049.05239,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 16,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "DOGEUSDT"
+    },
+    {
+      "pair": "ADA/USDT:USDT",
+      "base": "ADA",
+      "quote_volume_30d": 1053913512.0633,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 22,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "ADAUSDT"
+    },
+    {
+      "pair": "UNI/USDT:USDT",
+      "base": "UNI",
+      "quote_volume_30d": 815439265.273,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 28,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "UNIUSDT"
+    },
+    {
+      "pair": "LINK/USDT:USDT",
+      "base": "LINK",
+      "quote_volume_30d": 733136165.27,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 31,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "LINKUSDT"
+    },
+    {
+      "pair": "AVAX/USDT:USDT",
+      "base": "AVAX",
+      "quote_volume_30d": 723193601.3024,
+      "minimum_amount": 0.1,
+      "minimum_cost": 5.0,
+      "volume_rank": 32,
+      "first_candle_probe_utc": "2021-12-31T18:00:00.000Z",
+      "binance_symbol": "AVAXUSDT"
+    }
+  ],
+  "dropped": [
+    {
+      "pair": "ZEC/USDT:USDT",
+      "base": "ZEC",
+      "quote_volume_30d": 6883352683.24489,
+      "minimum_amount": 0.001,
+      "minimum_cost": 5.0,
+      "volume_rank": 4,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "SOXL/USDT:USDT",
+      "base": "SOXL",
+      "quote_volume_30d": 6054058531.8917,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 6,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "XAU/USDT:USDT",
+      "base": "XAU",
+      "quote_volume_30d": 3783947664.4251,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 7,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "SNDK/USDT:USDT",
+      "base": "SNDK",
+      "quote_volume_30d": 3711413768.67879,
+      "minimum_amount": 0.001,
+      "minimum_cost": 5.0,
+      "volume_rank": 8,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "KORU/USDT:USDT",
+      "base": "KORU",
+      "quote_volume_30d": 2395278062.06025,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 10,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "MU/USDT:USDT",
+      "base": "MU",
+      "quote_volume_30d": 2054797992.5064,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 11,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "SUI/USDT:USDT",
+      "base": "SUI",
+      "quote_volume_30d": 1991614644.71408,
+      "minimum_amount": 0.1,
+      "minimum_cost": 5.0,
+      "volume_rank": 12,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "CL/USDT:USDT",
+      "base": "CL",
+      "quote_volume_30d": 1979955453.08494,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 13,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "MSTR/USDT:USDT",
+      "base": "MSTR",
+      "quote_volume_30d": 1801801029.8038,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 14,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "HYPE/USDT:USDT",
+      "base": "HYPE",
+      "quote_volume_30d": 1749667722.3401601,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 15,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "SPCX/USDT:USDT",
+      "base": "SPCX",
+      "quote_volume_30d": 1576726150.3532,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 17,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "QNT/USDT:USDT",
+      "base": "QNT",
+      "quote_volume_30d": 1473419214.6189,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 18,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "ENA/USDT:USDT",
+      "base": "ENA",
+      "quote_volume_30d": 1239917576.93723,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 19,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "XAG/USDT:USDT",
+      "base": "XAG",
+      "quote_volume_30d": 1205739203.406,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 20,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "PEPE/USDT:USDT",
+      "base": "PEPE",
+      "quote_volume_30d": 1125874021.590484,
+      "minimum_amount": 1000.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 21,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "WLD/USDT:USDT",
+      "base": "WLD",
+      "quote_volume_30d": 987685151.8922,
+      "minimum_amount": 1.0,
+      "minimum_cost": 5.0,
+      "volume_rank": 23,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "SKHYNIX/USDT:USDT",
+      "base": "SKHYNIX",
+      "quote_volume_30d": 962092804.7906,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 24,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "SKHY/USDT:USDT",
+      "base": "SKHY",
+      "quote_volume_30d": 864349946.1912,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 25,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "ONDO/USDT:USDT",
+      "base": "ONDO",
+      "quote_volume_30d": 860489986.00447,
+      "minimum_amount": 0.1,
+      "minimum_cost": 5.0,
+      "volume_rank": 26,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "BZ/USDT:USDT",
+      "base": "BZ",
+      "quote_volume_30d": 831775963.9108,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 27,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "SOXS/USDT:USDT",
+      "base": "SOXS",
+      "quote_volume_30d": 809963617.28031,
+      "minimum_amount": 0.01,
+      "minimum_cost": 5.0,
+      "volume_rank": 29,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    },
+    {
+      "pair": "STRK/USDT:USDT",
+      "base": "STRK",
+      "quote_volume_30d": 745426463.809492,
+      "minimum_amount": 0.1,
+      "minimum_cost": 5.0,
+      "volume_rank": 30,
+      "first_candle_probe_utc": null,
+      "binance_symbol": null,
+      "dropped_reason": "no_bitget_2022_history"
+    }
+  ],
+  "failures": [],
+  "caveats": [
+    "Survivorship bias: the list is today's winners applied to the past.",
+    "Open interest, long/short ratios and funding features come from Binance (largest venue), used as a market-wide proxy; trades are still simulated on Bitget candles."
+  ]
+}
