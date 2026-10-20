@@ -339,7 +339,7 @@
 - **비밀값**: Docker secrets(`/run/secrets`, 컨테이너 실행 uid 소유, 0400), 컨테이너별로 필요한 것만 — 비트겟 키는 freqtrade와 companion(비상 경로용), Claude 토큰은 llm-runner, 텔레그램·위젯·PIN 해시는 companion. compose 파일·.env·로그·LLM 프롬프트에 비밀값 금지. 비밀값이 들어갔는지 grep으로 검사하는 테스트.
 - **네트워크**: OCI 보안 목록에서 인바운드 전부 차단(SSH도 Tailscale로만). Freqtrade API는 companion과만 공유하는 내부 Docker 네트워크(포트 공개 안 함), 강한 API 계정·`jwt_secret_key`. 시작 시 Freqtrade API가 tailnet IP에서 응답하면 실패하는 자체 검사. companion은 `tailscale serve`로만, Funnel 꺼짐을 시작 시 확인.
 - **Tailscale ACL**: companion 포트는 사용자의 폰·PC 태그만 접근.
-- **앱 인증**: PIN 6자리 이상(argon2 해시). 실패 제한은 IP가 아니라 Tailscale 신원(`Tailscale-User-Login` 헤더 등) 기준, 지수 백오프, 실패 시 텔레그램 알림. 세션은 httpOnly·Secure·SameSite=Strict 쿠키(12시간). 주문 요청은 커스텀 헤더 + 확인 화면 + 멱등 키. 모든 주문은 서버에서 rails 재검사.
+- **앱 인증**: PIN 6자리 이상(scrypt 해시, §10.6과 같음). 실패 제한은 IP가 아니라 Tailscale 신원(`Tailscale-User-Login` 헤더 등) 기준, 지수 백오프, 실패 시 텔레그램 알림. 세션은 httpOnly·Secure·SameSite=Strict 쿠키(12시간). 주문 요청은 커스텀 헤더 + 확인 화면 + 멱등 키. 모든 주문은 서버에서 rails 재검사.
 - **긴급 정지는 PIN 잠금에 막히지 않는다**: 처음 로그인할 때 등록된 기기 토큰으로 긴급 정지 가능, 텔레그램 `/stop`도 있음.
 - **위젯 토큰**: 보기 전용, 주문 API 호출 불가.
 - **감사 로그**: 모든 주문·설정 변경을 출처(phone/desktop/telegram/strategy/llm/watchdog)와 함께.
