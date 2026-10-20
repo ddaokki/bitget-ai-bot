@@ -131,29 +131,29 @@ def test_tailscale_status_returns_only_safe_fields(ops):
     runner.done()
 
 
-@pytest.mark.parametrize("status,serve,funnel", [
-    ({}, {}, {}),
-    ({"BackendState": "NeedsLogin", "Self": None}, {"Web": {}}, {"AllowFunnel": {"pc:443": False}}),
-    ([], [], []),
-    ({"BackendState": True, "Self": {"DNSName": SECRET}}, {"TCP": None}, {"AllowFunnel": {"pc:443": "true"}}),
+@pytest.mark.parametrize("status,serve,funnel,want_funnel", [
+    ({}, {}, {}, False),
+    ({"BackendState": "NeedsLogin", "Self": None}, {"Web": {}}, {"AllowFunnel": {"pc:443": False}}, False),
+    ([], [], [], None),
+    ({"BackendState": True, "Self": {"DNSName": SECRET}}, {"TCP": None}, {"AllowFunnel": {"pc:443": "true"}}, None),
 ])
-def test_tailscale_status_handles_missing_and_malformed_fields(ops, status, serve, funnel):
+def test_tailscale_status_handles_missing_and_malformed_fields(ops, status, serve, funnel, want_funnel):
     result = ops.tailscale_status(Runner(ts_steps(status, serve, funnel)))
-    assert result == {"installed": True, "logged_in": False, "dns_name": None, "serving": False, "funnel": False}
+    assert result == {"installed": True, "logged_in": False, "dns_name": None, "serving": False, "funnel": want_funnel}
 
 
 @pytest.mark.parametrize("payload", ["not json " + SECRET, "null", "true"])
 def test_tailscale_status_hides_command_output(ops, payload):
     runner = Runner([(argv, (0, payload)) for argv, _ in ts_steps()])
     assert ops.tailscale_status(runner) == {
-        "installed": True, "logged_in": False, "dns_name": None, "serving": False, "funnel": False,
+        "installed": True, "logged_in": False, "dns_name": None, "serving": False, "funnel": None,
     }
 
 
 def test_tailscale_status_ignores_failed_command_json(ops):
     runner = Runner([(argv, (1, output)) for argv, (_, output) in ts_steps()])
     assert ops.tailscale_status(runner) == {
-        "installed": True, "logged_in": False, "dns_name": None, "serving": False, "funnel": False,
+        "installed": True, "logged_in": False, "dns_name": None, "serving": False, "funnel": None,
     }
 
 
@@ -200,7 +200,8 @@ def test_phone_access_serves_8090_and_verifies_url(ops):
     ts_steps(status={"BackendState": "Running", "Self": {"DNSName": "https://evil.invalid/"}}),
 ])
 def test_phone_access_requires_safe_recheck(ops, after):
-    runner = Runner(ts_steps(serve={}) + [(["tailscale", "serve", "--bg", "8090"], (0, SECRET))] + after)
+    runner = Runner(ts_steps(serve={}) + [(["tailscale", "serve", "--bg", "8090"], (0, SECRET))]
+                    + after + [(["tailscale", "serve", "reset"], (0, SECRET))])
     ok, message = ops.enable_phone_access(runner)
     assert ok is False
     assert SECRET not in message
@@ -209,10 +210,70 @@ def test_phone_access_requires_safe_recheck(ops, after):
 
 
 def test_phone_access_hides_serve_failure(ops):
-    runner = Runner(ts_steps(serve={}) + [(["tailscale", "serve", "--bg", "8090"], (1, SECRET + ERROR))])
+    runner = Runner(ts_steps(serve={}) + [
+        (["tailscale", "serve", "--bg", "8090"], (1, SECRET + ERROR)),
+        (["tailscale", "serve", "reset"], (0, SECRET)),
+    ])
     ok, message = ops.enable_phone_access(runner)
     assert not ok
     assert SECRET not in message and ERROR not in message
+    runner.done()
+
+
+@pytest.mark.parametrize("command_index", [1, 2], ids=["serve-status", "funnel-status"])
+@pytest.mark.parametrize("failure", [
+    (1, SECRET + ERROR), (124, ""), (0, "not json " + SECRET),
+    (0, "[]"), (0, "null"), (0, "true"),
+    (0, '{"AllowFunnel":{"pc:443":"true"}}'),
+    OSError(SECRET + ERROR),
+])
+def test_phone_access_refuses_unknown_funnel_without_serve(ops, command_index, failure):
+    steps = ts_steps(serve={})
+    steps[command_index] = (steps[command_index][0], failure)
+    status = ops.tailscale_status(Runner(steps))
+    assert status["funnel"] is None
+    runner = Runner(steps)
+    ok, message = ops.enable_phone_access(runner)
+    assert ok is False
+    assert runner.calls == [argv for argv, _ in steps]
+    assert "Funnel" in message
+    assert SECRET not in message and ERROR not in message
+    runner.done()
+
+
+def test_phone_access_refuses_funnel_present_only_in_serve_config(ops):
+    steps = ts_steps(serve={"Web": {"pc:443": {}}, "AllowFunnel": {"pc:443": True}})
+    assert ops.tailscale_status(Runner(steps))["funnel"] is True
+    runner = Runner(steps)
+    ok, message = ops.enable_phone_access(runner)
+    assert ok is False
+    assert runner.calls == [argv for argv, _ in steps]
+    assert "Funnel" in message
+    runner.done()
+
+
+@pytest.mark.parametrize("command_index", [1, 2], ids=["serve-status", "funnel-status"])
+def test_known_public_funnel_takes_precedence_over_unknown_command(ops, command_index):
+    public = {"AllowFunnel": {"pc:443": True}}
+    steps = ts_steps(serve=public, funnel=public)
+    steps[command_index] = (steps[command_index][0], (1, SECRET))
+    assert ops.tailscale_status(Runner(steps))["funnel"] is True
+
+
+@pytest.mark.parametrize("command_index", [1, 2], ids=["serve-status", "funnel-status"])
+@pytest.mark.parametrize("reset_code", [0, 1])
+def test_phone_access_rolls_back_unknown_postcheck(ops, command_index, reset_code):
+    after = ts_steps()
+    after[command_index] = (after[command_index][0], (1, SECRET + ERROR))
+    steps = (ts_steps(serve={}) + [(["tailscale", "serve", "--bg", "8090"], (0, SECRET))]
+             + after + [(["tailscale", "serve", "reset"], (reset_code, SECRET + ERROR))])
+    runner = Runner(steps)
+    ok, message = ops.enable_phone_access(runner)
+    assert ok is False
+    assert runner.calls == [argv for argv, _ in steps]
+    assert SECRET not in message and ERROR not in message
+    if reset_code:
+        assert "초기화" in message and "실패" in message
     runner.done()
 
 

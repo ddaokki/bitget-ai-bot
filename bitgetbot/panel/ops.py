@@ -78,25 +78,38 @@ def _resolve_tailscale() -> str | None:
 TAILSCALE = _resolve_tailscale()
 
 
-def _tailscale_json(run: Runner, *args: str) -> dict:
+def _tailscale_json(run: Runner, *args: str) -> dict | None:
     code, output = _run(run, [TAILSCALE, *args], 15)
     if code == 0:
         try:
             value = json.loads(output)
             if isinstance(value, dict):
                 return value
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, RecursionError):
             pass
-    return {}
+    return None
 
 
-def _funnel_enabled(value) -> bool:
+def _funnel_enabled(value) -> bool | None:
+    """Distinguish confirmed disabled config from failed or malformed observations."""
     if not isinstance(value, dict):
-        return False
-    allowed = value.get("AllowFunnel")
-    if isinstance(allowed, dict) and any(item is True for item in allowed.values()):
-        return True
-    return any(_funnel_enabled(item) for item in value.values() if isinstance(item, dict))
+        return None
+    pending = [value]
+    unknown = False
+    while pending:
+        config = pending.pop()
+        if "AllowFunnel" in config:
+            allowed = config["AllowFunnel"]
+            if not isinstance(allowed, dict):
+                unknown = True
+            elif any(item is True for item in allowed.values()):
+                return True
+            elif any(type(item) is not bool for item in allowed.values()):
+                unknown = True
+        if any(name in config and not isinstance(config[name], dict) for name in ("Web", "TCP")):
+            unknown = True
+        pending.extend(item for item in config.values() if isinstance(item, dict))
+    return None if unknown else False
 
 
 def tailscale_status(run: Runner = default_runner) -> dict:
@@ -104,7 +117,7 @@ def tailscale_status(run: Runner = default_runner) -> dict:
               "dns_name": None, "serving": False, "funnel": False}
     if TAILSCALE is None:
         return result
-    status = _tailscale_json(run, "status", "--json")
+    status = _tailscale_json(run, "status", "--json") or {}
     result["logged_in"] = status.get("BackendState") == "Running"
     own = status.get("Self")
     dns = own.get("DNSName") if isinstance(own, dict) else None
@@ -113,9 +126,13 @@ def tailscale_status(run: Runner = default_runner) -> dict:
         if re.fullmatch(r"[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.[a-zA-Z0-9-]+\.ts\.net", dns):
             result["dns_name"] = dns
     serve = _tailscale_json(run, "serve", "status", "--json")
-    result["serving"] = any(isinstance(serve.get(name), dict) and bool(serve[name])
-                            for name in ("Web", "TCP"))
-    result["funnel"] = _funnel_enabled(_tailscale_json(run, "funnel", "status", "--json"))
+    result["serving"] = isinstance(serve, dict) and any(
+        isinstance(serve.get(name), dict) and bool(serve[name]) for name in ("Web", "TCP")
+    )
+    funnel_states = [_funnel_enabled(serve),
+                     _funnel_enabled(_tailscale_json(run, "funnel", "status", "--json"))]
+    result["funnel"] = (True if any(state is True for state in funnel_states)
+                        else None if any(state is None for state in funnel_states) else False)
     return result
 
 
@@ -123,17 +140,21 @@ def enable_phone_access(run: Runner = default_runner) -> tuple[bool, str]:
     status = tailscale_status(run)
     if not status["installed"]:
         return False, "Tailscale을 설치하세요."
-    if status["funnel"]:
+    if status["funnel"] is True:
         return False, "Funnel이 켜져 있어 휴대폰 접속을 켤 수 없습니다. 먼저 Funnel을 끄세요."
+    if status["funnel"] is not False:
+        return False, "Funnel이 꺼져 있는지 확인할 수 없어 휴대폰 접속을 켤 수 없습니다. Tailscale 설정을 확인하세요."
     if not status["logged_in"]:
         return False, "Tailscale에 로그인하세요."
-    if _run(run, [TAILSCALE, "serve", "--bg", "8090"], 30)[0] != 0:
-        return False, "휴대폰 접속 설정에 실패했습니다. Tailscale 설정을 확인하세요."
-    status = tailscale_status(run)
-    if (status["installed"] and status["logged_in"] and status["serving"]
-            and not status["funnel"] and status["dns_name"]):
-        return True, f"휴대폰 접속 주소: https://{status['dns_name']}"
-    return False, "휴대폰 접속을 확인하지 못했습니다. Tailscale 설정을 확인하세요."
+    if _run(run, [TAILSCALE, "serve", "--bg", "8090"], 30)[0] == 0:
+        status = tailscale_status(run)
+        if (status["installed"] and status["logged_in"] and status["serving"]
+                and status["funnel"] is False and status["dns_name"]):
+            return True, f"휴대폰 접속 주소: https://{status['dns_name']}"
+    # A failed command or unsafe recheck may still have changed the mapping.
+    if _run(run, [TAILSCALE, "serve", "reset"], 30)[0] == 0:
+        return False, "안전한 휴대폰 접속을 확인하지 못해 공개 설정을 초기화했습니다. Tailscale 설정을 확인하세요."
+    return False, "휴대폰 접속 확인과 공개 설정 초기화에 실패했습니다. Tailscale Serve/Funnel 설정을 직접 확인하고 끄세요."
 
 
 def _observe(read: Callable):
