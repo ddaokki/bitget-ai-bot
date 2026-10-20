@@ -66,6 +66,15 @@ class FreqtradeClient:
     def status(self) -> list[dict]:
         return self._request("GET", "status").json()
 
+    def profit(self) -> dict:
+        return self._request("GET", "profit").json()
+
+    def trades(self, limit: int = 500) -> dict:
+        # order_by_id=false makes Freqtrade return the most recently closed trades first.
+        return self._request(
+            "GET", "trades", params={"limit": limit, "order_by_id": "false"},
+        ).json()
+
     def start(self) -> dict:
         return self._request("POST", "start").json()
 

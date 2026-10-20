@@ -1,5 +1,6 @@
 import json
 import subprocess
+import time
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -324,10 +325,30 @@ class FT:
                  "open_rate": 100, "current_rate": 99, "liquidation_price": 150,
                  "leverage": 2, "stop_loss_abs": 110, "secret": SECRET}]
 
+    def profit(self):
+        return {"closed_trade_count": 13, "winning_trades": 8, "losing_trades": 5,
+                "winrate": 8 / 13, "profit_closed_ratio_mean": 0.008,
+                "profit_closed_percent_mean": 0.8, "best_pair": SECRET, "bot_start_date": SECRET}
+
+    def trades(self, limit=500):
+        assert limit == 500
+        now = time.time() * 1000
+        rows = [(1, 0.02), (2, 0.0), (3, -0.01), (40, 0.05)]
+        return {"trades": [{"close_timestamp": int(now - days * DAY_MS), "profit_ratio": ratio,
+                            "is_open": False, "pair": SECRET} for days, ratio in rows],
+                "trades_count": len(rows), "offset": 0, "total_trades": 13}
+
+
+DAY_MS = 86_400_000
+STATS = {"closed_trades": 13, "wins": 8, "losses": 5, "win_rate": pytest.approx(8 / 13),
+         "avg_profit_pct": pytest.approx(0.8), "win_rate_30d": pytest.approx(2 / 3),
+         "closed_trades_30d": 3}
+
 
 def test_collect_dry_status_never_calls_private_reader(ops, settings):
     reader = Reader(error=AssertionError("private read forbidden"))
     result = ops.collect_status(settings, reader, FT())
+    assert result.pop("stats") == STATS
     assert result == {
         "mode": "dry", "freqtrade": {"reachable": True, "state": "running", "dry_run": True},
         "account": None, "positions": [{"symbol": "BTCUSDT", "side": "short", "size": 0.002,
@@ -358,6 +379,7 @@ def test_collect_hides_all_exceptions_and_secrets(ops, settings, dry, capsys):
     result = ops.collect_status(replace(settings, dry_run=dry), Reader(failure), FT(failure))
     assert result["freqtrade"] == {"reachable": False, "state": None, "dry_run": None}
     assert result["account"] is None and result["positions"] is None and result["stops"] is None
+    assert result["stats"] is None
     assert SECRET not in repr(result) and ERROR not in repr(result)
     captured = capsys.readouterr()
     assert captured.out == captured.err == ""
@@ -420,3 +442,120 @@ def test_smoke_state_unreadable_never_raises(ops, settings):
     assert ops.collect_status(settings, Reader(), FT())["smoke_state"] == {
         "exists": True, "trade_id": None, "mode": None, "close_confirmed": False,
     }
+
+
+@pytest.mark.parametrize("dry", [True, False])
+def test_collect_stats_for_current_mode_from_allowlisted_fields(ops, settings, dry):
+    reader = Reader(error=AssertionError("stats never use the exchange reader")) if dry else Reader()
+    result = ops.collect_status(replace(settings, dry_run=dry), reader, FT())
+    assert result["mode"] == ("dry" if dry else "live")
+    assert result["stats"] == STATS
+    assert set(result["stats"]) == set(STATS)
+    assert SECRET not in repr(result)
+
+
+def test_stats_fall_back_to_counts_and_percent_mean(ops, settings):
+    ft = FT()
+    ft.profit = lambda: {"closed_trade_count": 4, "winning_trades": 1, "losing_trades": 3,
+                         "profit_closed_percent_mean": -1.25}
+    assert ops.collect_status(settings, Reader(), ft)["stats"] == {
+        "closed_trades": 4, "wins": 1, "losses": 3, "win_rate": 0.25, "avg_profit_pct": -1.25,
+        "win_rate_30d": pytest.approx(2 / 3), "closed_trades_30d": 3,
+    }
+
+
+def test_stats_without_closed_trades_skip_trade_history(ops, settings):
+    ft = FT()
+    ft.profit = lambda: {"closed_trade_count": 0, "winning_trades": 0, "losing_trades": 0,
+                         "winrate": 0, "profit_closed_ratio_mean": 0.0}
+    ft.trades = lambda limit=500: pytest.fail("no closed trades means no history request")
+    assert ops.collect_status(settings, Reader(), ft)["stats"] == {
+        "closed_trades": 0, "wins": 0, "losses": 0, "win_rate": None, "avg_profit_pct": None,
+        "win_rate_30d": None, "closed_trades_30d": 0,
+    }
+
+
+def test_stats_sanitize_malformed_profit_fields(ops, settings):
+    ft = FT()
+    ft.profit = lambda: {"closed_trade_count": 4, "winning_trades": True, "losing_trades": -1,
+                         "winrate": 1.5, "profit_closed_ratio_mean": SECRET,
+                         "profit_closed_percent_mean": float("inf")}
+    stats = ops.collect_status(settings, Reader(), ft)["stats"]
+    assert {key: stats[key] for key in ("wins", "losses", "win_rate", "avg_profit_pct")} == {
+        "wins": None, "losses": None, "win_rate": None, "avg_profit_pct": None,
+    }
+    assert SECRET not in repr(stats)
+
+
+@pytest.mark.parametrize("profit", [
+    {"closed_trade_count": SECRET}, {"closed_trade_count": -1}, {"closed_trade_count": True},
+    {}, [SECRET], None,
+])
+def test_stats_without_valid_closed_count_are_none(ops, settings, profit):
+    ft = FT()
+    ft.profit = lambda: profit
+    assert ops.collect_status(settings, Reader(), ft)["stats"] is None
+
+
+@pytest.mark.parametrize("history", [
+    {"trades": [{"close_timestamp": "recent", "profit_ratio": 0.1}], "total_trades": 1},
+    {"trades": [{"close_timestamp": None, "profit_ratio": 0.1}], "total_trades": 1},
+    {"trades": [{"close_timestamp": 1, "profit_ratio": SECRET}], "total_trades": 1},
+    {"trades": [SECRET], "total_trades": 1},
+    {"trades": SECRET, "total_trades": 1},
+    {"trades": [], "total_trades": SECRET},
+    [SECRET],
+])
+def test_unclear_recent_history_hides_only_30d_numbers(ops, settings, history):
+    ft = FT()
+    ft.trades = lambda limit=500: history
+    stats = ops.collect_status(settings, Reader(), ft)["stats"]
+    assert stats["closed_trades"] == 13 and stats["win_rate"] == pytest.approx(8 / 13)
+    assert stats["win_rate_30d"] is None and stats["closed_trades_30d"] is None
+    assert SECRET not in repr(stats)
+
+
+def test_truncated_recent_page_hides_30d_numbers(ops, settings):
+    ft = FT()
+    now = time.time() * 1000
+    ft.trades = lambda limit=500: {
+        "trades": [{"close_timestamp": int(now - DAY_MS), "profit_ratio": 0.01}] * 2,
+        "trades_count": 2, "offset": 0, "total_trades": 13,
+    }
+    stats = ops.collect_status(settings, Reader(), ft)["stats"]
+    assert stats["win_rate_30d"] is None and stats["closed_trades_30d"] is None
+
+
+def test_recent_window_with_no_trades_has_zero_count(ops, settings):
+    ft = FT()
+    old = int(time.time() * 1000 - 45 * DAY_MS)
+    ft.trades = lambda limit=500: {"trades": [{"close_timestamp": old, "profit_ratio": None}],
+                                   "trades_count": 1, "offset": 0, "total_trades": 13}
+    stats = ops.collect_status(settings, Reader(), ft)["stats"]
+    assert stats["closed_trades_30d"] == 0 and stats["win_rate_30d"] is None
+
+
+@pytest.mark.parametrize("dry", [True, False])
+@pytest.mark.parametrize("failing", ["profit", "trades"])
+def test_stats_errors_are_none_without_details(ops, settings, dry, failing, capsys):
+    from bitgetbot.ftclient import FreqtradeError
+
+    ft = FT()
+
+    def fail(*args, **kwargs):
+        raise FreqtradeError(500, SECRET + ERROR)
+
+    setattr(ft, failing, fail)
+    result = ops.collect_status(replace(settings, dry_run=dry), Reader(), ft)
+    assert result["stats"] is None
+    assert result["freqtrade"]["reachable"] is True
+    assert SECRET not in repr(result) and ERROR not in repr(result)
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ""
+
+
+def test_unreachable_freqtrade_skips_stats_requests(ops, settings):
+    ft = FT()
+    ft.ping = lambda: False
+    ft.profit = lambda: pytest.fail("unreachable Freqtrade must not be asked for stats")
+    assert ops.collect_status(settings, Reader(), ft)["stats"] is None

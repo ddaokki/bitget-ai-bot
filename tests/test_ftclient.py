@@ -70,6 +70,7 @@ def test_force_exit_payload(trade_id, ordertype):
     ("health", "GET", {"bot_startup_ts": 1792396800}),
     ("health", "GET", {"bot_startup_ts": None}),
     ("status", "GET", [{"trade_id": 5}]),
+    ("profit", "GET", {"closed_trade_count": 3, "winning_trades": 2, "winrate": 0.66}),
     ("start", "POST", {"status": "starting trader ..."}),
     ("stop", "POST", {"status": "stopping trader ..."}),
     ("pause", "POST", {"status": "pausing trader ..."}),
@@ -84,6 +85,25 @@ def test_authenticated_routes(method, verb, payload, base_url):
 
     client = FreqtradeClient(base_url, "u", "p", transport=httpx.MockTransport(handler))
     assert getattr(client, method)() == payload
+
+
+@pytest.mark.parametrize("limit", [None, 50])
+def test_trades_requests_newest_closed_trades_with_auth(limit):
+    payload = {"trades": [{"trade_id": 1}], "trades_count": 1, "offset": 0, "total_trades": 1}
+
+    def handler(req):
+        assert req.method == "GET"
+        assert req.url.path == "/api/v1/trades"
+        assert dict(req.url.params) == {
+            "limit": str(500 if limit is None else limit), "order_by_id": "false",
+        }
+        assert req.headers["authorization"] == "Basic dTpw"
+        return httpx.Response(200, json=payload)
+
+    client = FreqtradeClient(
+        "http://127.0.0.1:8080", "u", "p", transport=httpx.MockTransport(handler),
+    )
+    assert (client.trades() if limit is None else client.trades(limit)) == payload
 
 
 def test_ping_succeeds_without_authentication():

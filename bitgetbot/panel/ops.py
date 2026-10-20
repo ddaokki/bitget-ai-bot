@@ -5,6 +5,7 @@ import math
 import re
 import shutil
 import subprocess
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -245,6 +246,68 @@ def smoke_state_exists() -> bool:
     return _smoke_state()["exists"]
 
 
+DAY_MS = 86_400_000
+RECENT_DAYS = 30
+
+
+def _count(value) -> int | None:
+    return value if type(value) is int and value >= 0 else None
+
+
+def _recent(ft, closed: int, now_ms: float) -> tuple[int | None, float | None]:
+    """Closed-trade count and win rate for the last 30 days; (None, None) when unclear."""
+    if closed == 0:
+        return 0, None
+    history = ft.trades(500)
+    rows = history.get("trades") if isinstance(history, dict) else None
+    total = history.get("total_trades") if isinstance(history, dict) else None
+    if not isinstance(rows, list) or _count(total) is None:
+        return None, None
+    cutoff = now_ms - RECENT_DAYS * DAY_MS
+    oldest, profits = None, []
+    for row in rows:
+        if not isinstance(row, dict):
+            return None, None
+        if row.get("is_open") is True:
+            continue
+        closed_at = row.get("close_timestamp")
+        # Freqtrade counts a closed trade with no profit ratio as 0, which is a win.
+        profit = 0.0 if row.get("profit_ratio") is None else _number(row.get("profit_ratio"))
+        if type(closed_at) is not int or profit is None:
+            return None, None
+        oldest = closed_at if oldest is None else min(oldest, closed_at)
+        if closed_at >= cutoff:
+            profits.append(profit)
+    # The newest page may not reach back 30 days when older closed trades were left out.
+    if total > len(rows) and (oldest is None or oldest >= cutoff):
+        return None, None
+    wins = sum(1 for profit in profits if profit >= 0)
+    return len(profits), (wins / len(profits) if profits else None)
+
+
+def _stats(ft) -> dict | None:
+    """Current-mode trade statistics from allow-listed numeric Freqtrade fields."""
+    profit = ft.profit()
+    if not isinstance(profit, dict):
+        return None
+    closed = _count(profit.get("closed_trade_count"))
+    if closed is None:
+        return None
+    wins, losses = _count(profit.get("winning_trades")), _count(profit.get("losing_trades"))
+    win_rate = average = None
+    if closed:
+        win_rate = _number(profit.get("winrate"))
+        if win_rate is None or not 0 <= win_rate <= 1:
+            win_rate = wins / closed if wins is not None and wins <= closed else None
+        mean = _number(profit.get("profit_closed_ratio_mean"))
+        average = (_number(mean * 100) if mean is not None
+                   else _number(profit.get("profit_closed_percent_mean")))
+    recent_count, recent_rate = _recent(ft, closed, time.time() * 1000)
+    return {"closed_trades": closed, "wins": wins, "losses": losses, "win_rate": win_rate,
+            "avg_profit_pct": average, "win_rate_30d": recent_rate,
+            "closed_trades_30d": recent_count}
+
+
 def collect_status(settings: Settings, reader, ft) -> dict:
     """Collect independent snapshots; dry mode never touches private exchange APIs."""
     reachable = _observe(ft.ping) is True
@@ -262,4 +325,6 @@ def collect_status(settings: Settings, reader, ft) -> dict:
         if settings.dry_run else _observe(lambda: _live_positions(reader)),
         "stops": None if settings.dry_run else _observe(lambda: _stops(reader)),
         "smoke_state": _smoke_state(),
+        # Dry and live use separate Freqtrade databases, so these are current-mode stats.
+        "stats": _observe(lambda: _stats(ft)) if reachable else None,
     }

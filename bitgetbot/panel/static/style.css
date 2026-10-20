@@ -47,6 +47,14 @@ form button { width: 100%; margin-top: 16px; }
 .status-chip { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: var(--surface); }
 .status-chip span { display: block; color: var(--muted); font-size: 12px; }
 .status-chip strong { display: block; margin-top: 4px; font-size: 15px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.stats-card { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-top: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.stats-card h2 { margin: 0; font-size: 12px; font-weight: 400; color: var(--muted); }
+.stats-card p + p { margin-top: 0; }
+.stats-mode { margin-left: 6px; padding: 0 6px; border: 1px solid currentColor; border-radius: 4px; }
+.stats-mode.dry { color: var(--dry); }
+.stats-mode.live { color: var(--down); }
+.stats-main { font-weight: 700; font-variant-numeric: tabular-nums; }
+#stats-detail { font-variant-numeric: tabular-nums; }
 .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0; }
 .toolbar p { flex: 1 1 240px; color: var(--muted); font-size: 13px; }
 .panel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }

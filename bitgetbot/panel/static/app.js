@@ -207,6 +207,33 @@ function renderPositions(status) {
     }
 }
 
+const isCount = value => Number.isInteger(value) && value >= 0;
+const isRatio = value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+
+function percent(ratio) {
+    return `${new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0}).format(ratio * 100)}%`;
+}
+
+function renderStats(status) {
+    // Stats come from the running Freqtrade database, so label them by its mode.
+    const dryRun = status.freqtrade?.dry_run;
+    const source = dryRun === true ? "dry" : dryRun === false ? "live" : "";
+    text("stats-mode", source === "dry" ? "모의" : source === "live" ? "실전" : "모드 불명");
+    $("stats-mode").className = `stats-mode ${source}`.trim();
+    text("stats-detail", "");
+    const stats = status.stats;
+    if (!stats || typeof stats !== "object" || !isCount(stats.closed_trades)) { text("stats-main", "–"); return; }
+    if (stats.closed_trades === 0) { text("stats-main", "아직 닫힌 거래가 없습니다"); return; }
+    const record = isCount(stats.wins) && isCount(stats.losses) ? `${stats.wins}승 ${stats.losses}패 · ` : "";
+    text("stats-main", `승률 ${isRatio(stats.win_rate) ? percent(stats.win_rate) : "–"} (${record}${stats.closed_trades}건)`);
+    const recent = stats.closed_trades_30d === 0 ? "거래 없음"
+        : isCount(stats.closed_trades_30d) && isRatio(stats.win_rate_30d) ? percent(stats.win_rate_30d) : "–";
+    const average = typeof stats.avg_profit_pct === "number" && Number.isFinite(stats.avg_profit_pct)
+        ? `${new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 2, signDisplay: "exceptZero"}).format(stats.avg_profit_pct)}%`
+        : "–";
+    text("stats-detail", `최근 30일 ${recent} · 평균 ${average}`);
+}
+
 function renderSettings(status) {
     const local = status.session_kind === "local";
     $("local-settings").hidden = !local;
@@ -284,6 +311,7 @@ function applyStatus(status) {
     const smoke = status.smoke_state;
     text("smoke-state", smoke?.exists ? `진행 상태 파일 있음 · ${smoke.close_confirmed ? "청산 확인됨" : "청산 미확인"}` : "진행 상태 파일 없음");
     renderPositions(status);
+    renderStats(status);
     renderSettings(status);
     acceptJob(status.job);
     text("step-help", state.job?.running ? "작업 중입니다. 다른 단계와 모드 전환을 잠갔습니다."

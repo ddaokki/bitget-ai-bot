@@ -544,3 +544,47 @@ assert.match(element("emergency-message").textContent, /모의 거래만 청산�
 assert.match(element("emergency-message").textContent, /체결 보장이 아닙니다/);
 assert.doesNotMatch(element("emergency-message").textContent, /전부/);
 ''')
+
+
+def test_bot_stats_card_is_csp_safe_and_text_only(client):
+    document = Elements(client.get("/").text)
+    ids = {attrs.get("id") for _, attrs in document.tags}
+    assert {"stats-card", "stats-mode", "stats-main", "stats-detail"} <= ids
+    script = client.get("/static/app.js").text
+    for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"):
+        assert forbidden not in script
+
+
+def test_bot_stats_show_current_mode_win_rate(javascript):
+    javascript(r'''
+status.stats = {closed_trades: 13, wins: 8, losses: 5, win_rate: 8 / 13, avg_profit_pct: 0.8,
+                 win_rate_30d: 0.55, closed_trades_30d: 9};
+run('applyStatus(fixture)');
+assert.equal(element("stats-mode").textContent, "모의");
+assert.equal(element("stats-main").textContent, "승률 62% (8승 5패 · 13건)");
+assert.equal(element("stats-detail").textContent, "최근 30일 55% · 평균 +0.8%");
+run('fixture.mode="live"; fixture.freqtrade.dry_run=false; fixture.stats.avg_profit_pct=-1.25; applyStatus(fixture)');
+assert.equal(element("stats-mode").textContent, "실전");
+assert.equal(element("stats-detail").textContent, "최근 30일 55% · 평균 -1.25%");
+run('fixture.stats.win_rate_30d=null; fixture.stats.closed_trades_30d=0; applyStatus(fixture)');
+assert.match(element("stats-detail").textContent, /^최근 30일 거래 없음 · /);
+run('fixture.stats.closed_trades_30d=null; fixture.stats.avg_profit_pct=null; applyStatus(fixture)');
+assert.equal(element("stats-detail").textContent, "최근 30일 – · 평균 –");
+''')
+
+
+@pytest.mark.parametrize("stats, main", [
+    ("{closed_trades: 0, wins: 0, losses: 0, win_rate: null, avg_profit_pct: null, win_rate_30d: null, closed_trades_30d: 0}",
+     "아직 닫힌 거래가 없습니다"),
+    ("null", "–"),
+    ("undefined", "–"),
+    ('{closed_trades: "<img src=x onerror=alert(1)>", wins: 1, losses: 0, win_rate: 1}', "–"),
+], ids=["no-closed-trades", "null", "missing", "malformed"])
+def test_bot_stats_empty_or_unavailable(javascript, stats, main):
+    javascript(r'''
+status.stats = ''' + stats + r''';
+run('applyStatus(fixture)');
+assert.equal(element("stats-main").textContent, ''' + repr(main) + r''');
+assert.equal(element("stats-detail").textContent, "");
+assert.doesNotMatch(element("stats-main").textContent, /img/);
+''')
