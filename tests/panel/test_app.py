@@ -34,15 +34,19 @@ class FT:
         self.calls = []
         self.error = None
         self.dry = True
+        self.trades = []
+        self.ping_error = None
 
     def ping(self):
+        if self.ping_error:
+            raise self.ping_error
         return True
 
     def show_config(self):
         return {"state": "running", "dry_run": self.dry, "api_server": {"password": SENTINELS[5]}}
 
     def status(self):
-        return []
+        return list(self.trades)
 
     def force_exit(self, trade_id, ordertype):
         self.calls.append((trade_id, ordertype))
@@ -441,7 +445,7 @@ def test_keys_and_pin_and_phone_are_local_only(panel):
     assert not panel.keys and not panel.runner_calls
     local_login(panel)
     response = panel.local.post("/api/keys", json={"key": "k", "secret": "s", "password": "p"}, headers=PANEL_HEADER)
-    assert response.json() == {"saved": True}
+    assert response.json() == {"saved": True, "message": "거래 봇을 재시작해야 새 키가 적용됩니다."}
     assert panel.keys == [("k", "s", "p")]
     assert panel.local.post("/api/phone/enable", headers=PANEL_HEADER).status_code == 200
     assert ["tailscale", "serve", "--bg", "8090"] in panel.runner_calls
@@ -465,7 +469,8 @@ def test_pin_saved_hashed_and_replaced_atomically(panel, monkeypatch):
     response = panel.local.post("/api/pin", json={"pin": "654321"}, headers=PANEL_HEADER)
     assert response.status_code == 503
     assert panel.deps.pin_store_path.read_bytes() == old
-    assert list(panel.deps.pin_store_path.parent.iterdir()) == [panel.deps.pin_store_path]
+    audit = panel.deps.pin_store_path.with_name("audit.log")
+    assert sorted(panel.deps.pin_store_path.parent.iterdir()) == sorted([panel.deps.pin_store_path, audit])
 
 
 def test_emergency_close_all_calls_force_exit_once(panel):
@@ -783,3 +788,259 @@ def test_entrypoint_permission_failure_stops_without_writing_token(tmp_path, mon
     assert not (tmp_path / ".panel" / "token").exists()
     captured = capsys.readouterr()
     assert TOKEN not in captured.out + captured.err
+
+
+EVIL = "http://evil.example:8090"
+
+
+def refuse_connection(*args, **kwargs):
+    raise ConnectionRefusedError
+
+
+@pytest.mark.parametrize("path,method", [
+    ("/", "GET"), ("/api/ping", "GET"), ("/api/login", "POST"), ("/api/status", "GET"),
+    ("/static/app.js", "GET"), ("/sw.js", "GET"), ("/api/emergency/close-all", "POST"),
+])
+def test_foreign_host_is_rejected_before_csrf_and_auth(panel, path, method):
+    tailnet_login(panel)
+    with TestClient(panel.app, base_url=EVIL, client=("127.0.0.1", 12350)) as evil:
+        headers = {**PANEL_HEADER, "Origin": EVIL} if method == "POST" else {}
+        response = evil.request(method, path, json={"pin": PIN} if method == "POST" else None, headers=headers)
+    assert response.status_code == 421
+    assert response.json() == {"detail": "허용하지 않는 접속 주소입니다. 바로가기나 테일스케일 주소로 여세요."}
+    assert "set-cookie" not in response.headers
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert not panel.ft.calls
+
+
+def test_foreign_host_cannot_lock_out_phone_login(panel):
+    tailnet_login(panel)
+    panel.tailnet.cookies.clear()
+    with TestClient(panel.app, base_url=EVIL, client=("127.0.0.1", 12351)) as evil:
+        for _ in range(10):
+            response = evil.post("/api/login", json={"pin": "000000"}, headers={**PANEL_HEADER, "Origin": EVIL})
+            assert response.status_code == 421
+    assert panel.deps.lockout.check("*") == 0
+    response = panel.tailnet.post("/api/login", json={"pin": PIN}, headers={**PANEL_HEADER, "Tailscale-User-Login": "phone"})
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("base_url", [
+    "http://127.0.0.1:8090", "http://localhost:8090", "https://pc.tail1234.ts.net", "https://PC.TAIL1234.TS.NET",
+])
+def test_allowed_hosts_still_reach_public_routes(panel, base_url):
+    with TestClient(panel.app, base_url=base_url, client=("127.0.0.1", 12352)) as client:
+        assert client.get("/api/ping").json() == {"ok": True}
+        assert client.get("/").status_code == 200
+
+
+def test_mode_switch_refused_while_smoke_state_exists(panel):
+    local_login(panel)
+    panel.state_path.write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "dry"}), encoding="utf-8")
+    response = panel.local.post("/api/mode", json={"mode": "live", "confirm": "LIVE"}, headers=PANEL_HEADER)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "진행 중인 거래를 먼저 청산하세요"
+    assert not panel.modes and not panel.runner_calls
+    panel.state_path.write_text("not json", encoding="utf-8")
+    assert panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER).status_code == 409
+    assert not panel.modes
+
+
+def test_mode_switch_refused_while_freqtrade_reports_open_trades(panel):
+    local_login(panel)
+    panel.ft.trades = [{"trade_id": 3, "pair": "BTC/USDT:USDT"}]
+    response = panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER)
+    assert response.status_code == 409
+    assert response.json()["detail"] == "진행 중인 거래를 먼저 청산하세요"
+    assert not panel.modes and not panel.runner_calls
+
+
+def test_mode_switch_allowed_when_freqtrade_unreachable_and_no_smoke_state(panel):
+    local_login(panel)
+    panel.ft.ping_error = FreqtradeUnreachable(SENTINELS[3])
+    response = panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER)
+    assert response.status_code == 200
+    assert panel.modes == ["dry"]
+    assert SENTINELS[3] not in response.text
+
+
+@pytest.mark.parametrize("dry,expected", [
+    (True, "모의 거래만 청산했습니다. 실거래 포지션은 비트겟 웹에서 확인하세요."),
+    (False, "봇이 모르는 포지션은 비트겟 웹에서 확인하세요."),
+])
+def test_emergency_message_names_freqtrade_trades_and_current_mode(panel, dry, expected):
+    local_login(panel)
+    panel.settings[0] = replace(panel.settings[0], dry_run=dry)
+    response = panel.local.post("/api/emergency/close-all", headers=PANEL_HEADER)
+    assert response.status_code == 200
+    message = response.json()["message"]
+    assert "거래 봇(Freqtrade)이 연 거래를 시장가로 청산 요청" in message
+    assert expected in message
+    assert "모든 포지션" not in message and "전부" not in message
+    assert ("모의 거래만" in message) is dry
+    assert panel.ft.calls == [("all", "market")]
+
+
+def test_keys_and_docker_up_refused_while_job_runs(panel):
+    local_login(panel)
+    panel.options["block"] = True
+    assert panel.local.post("/api/steps/check", json={}, headers=PANEL_HEADER).status_code == 200
+    assert panel.entered.wait(5)
+    response = panel.local.post("/api/keys", json={"key": "k", "secret": "s", "password": "p"}, headers=PANEL_HEADER)
+    assert response.status_code == 409
+    assert not panel.keys
+    assert panel.local.post("/api/docker/up", headers=PANEL_HEADER).status_code == 409
+    assert not any(argv[-2:] == ["up", "-d"] for argv in panel.runner_calls)
+
+
+def test_keys_wait_for_operation_lock(panel):
+    local_login(panel)
+    setter_started, release_setter = Event(), Event()
+
+    def setter(mode):
+        setter_started.set()
+        assert release_setter.wait(5)
+
+    panel.deps.mode_setter = setter
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            mode = pool.submit(panel.local.post, "/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER)
+            assert setter_started.wait(5)
+            keys = pool.submit(
+                panel.local.post, "/api/keys", json={"key": "k", "secret": "s", "password": "p"}, headers=PANEL_HEADER,
+            )
+            Event().wait(0.2)
+            assert not keys.done() and not panel.keys
+            release_setter.set()
+            assert mode.result(timeout=5).status_code == 200
+            assert keys.result(timeout=5).status_code == 200
+    finally:
+        release_setter.set()
+    assert panel.keys == [("k", "s", "p")]
+
+
+def test_pin_save_revokes_phone_sessions_but_keeps_desktop(panel):
+    tailnet_login(panel)
+    assert panel.tailnet.get("/api/status").status_code == 200
+    local_login(panel)
+    assert panel.local.post("/api/pin", json={"pin": "123456"}, headers=PANEL_HEADER).status_code == 200
+    assert panel.tailnet.get("/api/status").status_code == 401
+    assert panel.local.get("/api/status").status_code == 200
+
+
+def audit_lines(panel):
+    path = panel.deps.pin_store_path.with_name("audit.log")
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_audit_log_records_actions_with_source_and_no_values(panel):
+    import re as regex
+
+    local_login(panel)
+    panel.local.post("/api/pin", json={"pin": PIN}, headers=PANEL_HEADER)
+    panel.local.post("/api/keys", json={"key": SENTINELS[2], "secret": SENTINELS[3], "password": SENTINELS[4]}, headers=PANEL_HEADER)
+    panel.local.post("/api/mode", json={"mode": "live", "confirm": "LIVE"}, headers=PANEL_HEADER)
+    panel.local.post("/api/mode", json={"mode": "dry"}, headers=PANEL_HEADER)
+    panel.local.post("/api/steps/preflight", json={}, headers=PANEL_HEADER)
+    finished(panel.deps.jobs)
+    panel.local.post("/api/steps/" + SENTINELS[3], json={}, headers=PANEL_HEADER)
+    panel.local.post("/api/docker/up", headers=PANEL_HEADER)
+    panel.local.post("/api/phone/enable", headers=PANEL_HEADER)
+    panel.local.post("/api/emergency/close-all", headers=PANEL_HEADER)
+    phone = {**PANEL_HEADER, "Tailscale-User-Login": "me@example.com"}
+    panel.tailnet.post("/api/login", json={"pin": "000000"}, headers=phone)
+    panel.tailnet.post("/api/login", json={"pin": PIN}, headers=phone)
+    panel.tailnet.post("/api/emergency/close-all", headers=phone)
+    panel.local.get("/api/status")
+    lines = audit_lines(panel)
+    assert [(line["source"], line["action"], line["result"]) for line in lines] == [
+        ("local", "pin_set", 200), ("local", "keys_saved", 200), ("local", "mode", 200),
+        ("local", "mode", 200), ("local", "step", 200), ("local", "step", 400),
+        ("local", "docker_up", 200), ("local", "phone_enable", 200), ("local", "emergency", 200),
+        ("tailnet", "login_fail", 401), ("tailnet", "login_ok", 200), ("tailnet", "emergency", 200),
+    ]
+    assert lines[4]["step"] == "preflight" and "step" not in lines[5]
+    for line in lines:
+        assert regex.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z", line["ts"])
+        assert ("identity" in line) is (line["source"] == "tailnet")
+        assert set(line) <= {"ts", "source", "identity", "action", "step", "result"}
+    assert lines[-1]["identity"] == "me@example.com"
+    text = panel.deps.pin_store_path.with_name("audit.log").read_text(encoding="utf-8")
+    assert all(secret not in text for secret in SENTINELS)
+    assert "LIVE" not in text and '"live"' not in text
+
+
+def test_audit_write_failure_never_breaks_the_action(panel):
+    local_login(panel)
+    panel.deps.audit_path = panel.deps.pin_store_path.parent / "missing" / "\0bad" / "audit.log"
+    response = panel.local.post("/api/emergency/close-all", headers=PANEL_HEADER)
+    assert response.status_code == 200
+    assert panel.ft.calls == [("all", "market")]
+
+
+def test_default_jobs_run_smoke_with_panel_hints(panel):
+    seen = []
+
+    def command(name, io):
+        seen.append(io.hint_style)
+        return 0
+
+    deps = replace(panel.deps, jobs=None, smoke_command=command)
+    app = panel.module.create_app(deps)
+    with TestClient(app, base_url="http://127.0.0.1:8090", client=("127.0.0.1", 12353)) as client:
+        client.get("/", params={"t": TOKEN}, follow_redirects=False)
+        assert client.post("/api/steps/check", json={}, headers=PANEL_HEADER).status_code == 200
+        finished(deps.jobs)
+    assert seen == ["panel"]
+
+
+def test_entrypoint_reopens_missing_pythonw_streams_to_private_logs(tmp_path, monkeypatch):
+    import sys
+    from bitgetbot.panel import __main__ as entry
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(entry.ops, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(socket, "create_connection", refuse_connection)
+    monkeypatch.setattr(entry, "create_app", lambda deps: "fake-app")
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+    seen = []
+
+    def run(app, **kwargs):
+        seen.append((sys.stdout, sys.stderr))
+        print("stdout probe")
+        print("stderr probe", file=sys.stderr)
+
+    monkeypatch.setattr(entry.uvicorn, "run", run)
+    try:
+        assert entry.main([]) == 0
+        out, err = seen[0]
+        assert out is not None and err is not None
+        assert Path(out.name).resolve() == (tmp_path / ".panel" / "panel.out.log").resolve()
+        assert Path(err.name).resolve() == (tmp_path / ".panel" / "panel.err.log").resolve()
+        out.flush()
+        err.flush()
+        assert "stdout probe" in (tmp_path / ".panel" / "panel.out.log").read_text(encoding="utf-8")
+        assert "stderr probe" in (tmp_path / ".panel" / "panel.err.log").read_text(encoding="utf-8")
+        token = (tmp_path / ".panel" / "token").read_text(encoding="utf-8").strip()
+        assert token not in (tmp_path / ".panel" / "panel.out.log").read_text(encoding="utf-8")
+    finally:
+        for stream in seen[0] if seen else ():
+            if stream is not None:
+                stream.close()
+
+
+def test_entrypoint_keeps_existing_streams(tmp_path, monkeypatch):
+    import sys
+    from bitgetbot.panel import __main__ as entry
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(entry.ops, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(socket, "create_connection", refuse_connection)
+    monkeypatch.setattr(entry, "create_app", lambda deps: "fake-app")
+    before = (sys.stdout, sys.stderr)
+    seen = []
+    monkeypatch.setattr(entry.uvicorn, "run", lambda app, **kwargs: seen.append((sys.stdout, sys.stderr)))
+    assert entry.main([]) == 0
+    assert seen == [before]
+    assert not (tmp_path / ".panel" / "panel.out.log").exists()

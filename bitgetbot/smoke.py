@@ -25,6 +25,12 @@ SYMBOL = "BTCUSDT"
 PAIR = "BTC/USDT:USDT"
 STATE_PATH = Path(".smoke_state.json")
 EXIT_WARNING = "손절 확인 실패. 지금 바로 'python -m bitgetbot.smoke exit'을 실행하세요."
+PANEL_EXIT_WARNING = '손절 확인 실패. 지금 바로 패널의 "청산" 버튼을 누르세요.'
+LEDGER_RETRY = "청산은 완료됐습니다. 장부 저장에 실패했으니 'python -m bitgetbot.smoke ledger'를 다시 실행하세요."
+PANEL_LEDGER_RETRY = '청산은 완료됐습니다. 장부 저장에 실패했으니 패널의 "장부 저장" 버튼을 누르세요.'
+NO_FILLS = "조회된 체결이 없습니다. 잠시 후 ledger를 다시 실행하세요."
+PANEL_NO_FILLS = '조회된 체결이 없습니다. 잠시 후 패널의 "장부 저장" 버튼을 누르세요.'
+RESTART_FAILED = "컨테이너 재시작에 실패했습니다. 패널을 새로 고친 뒤 상태를 확인하세요."
 FT_UNREACHABLE = "Freqtrade에 연결할 수 없습니다 (Docker Desktop과 `docker compose up -d` 확인)"
 FT_MANUAL_CLOSE = (
     "Freqtrade에 연결할 수 없습니다. Docker Desktop과 컨테이너를 확인하세요. "
@@ -39,10 +45,20 @@ class SmokeIO:
     out: Callable[[str], None]
     ask: Callable[[str], str]
     restart: Callable[[], None] | None = None
+    # "cli" keeps the terminal text byte-identical; "panel" points to panel buttons instead.
+    hint_style: str = "cli"
 
     @staticmethod
     def console() -> "SmokeIO":
         return SmokeIO(print, input, None)
+
+
+def _hint(io: SmokeIO, cli: str, panel: str) -> str:
+    return panel if io.hint_style == "panel" else cli
+
+
+def _exit_warning(io: SmokeIO) -> str:
+    return _hint(io, EXIT_WARNING, PANEL_EXIT_WARNING)
 
 
 def _positive(value) -> bool:
@@ -141,7 +157,7 @@ def run_check(
 ) -> int:
     io = io if io is not None else SmokeIO.console()
     if out is not None:
-        io = SmokeIO(out, io.ask, io.restart)
+        io = SmokeIO(out, io.ask, io.restart, io.hint_style)
 
     def protected():
         try:
@@ -171,7 +187,7 @@ def run_check(
 
     if wait_until(protected, timeout_s, interval_s, sleep, clock):
         return 0
-    io.out(EXIT_WARNING)
+    io.out(_exit_warning(io))
     return 1
 
 
@@ -265,7 +281,7 @@ def _state_mode_matches(
     io = io if io is not None else SmokeIO.console()
     if state and state.get("mode") != ("dry" if settings.dry_run else "live"):
         next_step = ("Freqtrade 청산을 계속하고 비트겟 웹(PC)에서 포지션을 직접 확인하세요."
-                     if exiting else "먼저 exit으로 정리하세요.")
+                     if exiting else _hint(io, "먼저 exit으로 정리하세요.", '먼저 패널의 "청산" 버튼을 누르세요.'))
         io.out("경고: 스모크 상태 파일의 모드가 현재 모드와 다르거나 확인되지 않았습니다. " + next_step)
         return False
     return True
@@ -278,7 +294,8 @@ def _same_trade(trade: dict, trade_id) -> bool:
 def _enter(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
     io = io if io is not None else SmokeIO.console()
     if STATE_PATH.exists():
-        io.out("이전 스모크 상태 파일이 남아 있습니다. 먼저 exit으로 정리하세요")
+        io.out(_hint(io, "이전 스모크 상태 파일이 남아 있습니다. 먼저 exit으로 정리하세요",
+                     '이전 스모크 상태 파일이 남아 있습니다. 먼저 패널의 "청산" 버튼을 누르세요.'))
         return 1
     ready, config = _preflight(settings, reader, ft, io=io)
     if not ready:
@@ -322,7 +339,7 @@ def _enter(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
 
         if not _wait(visible, 60):
             io.out("60초 내 거래를 확인하지 못했습니다. enter를 반복하지 마세요.")
-            io.out(EXIT_WARNING)
+            io.out(_exit_warning(io))
             return 1
         _save_state(state)
         io.out(f"진입 확인: 거래 번호 {state['trade_id']}, 증거금 {stake:.2f} USDT")
@@ -330,7 +347,7 @@ def _enter(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
     except (Exception, KeyboardInterrupt):
         # The saved attempt marks the boundary after which the POST may have reached Freqtrade.
         io.out("진입 확인 실패: 비밀값 보호를 위해 오류 원문은 표시하지 않습니다.")
-        io.out(EXIT_WARNING)
+        io.out(_exit_warning(io))
         return 1
 
 
@@ -343,7 +360,7 @@ def _check(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
     if not _state_mode_matches(settings, state, io=io):
         return 1
     if not _mode_matches(settings, ft.show_config(), io=io):
-        io.out(EXIT_WARNING)
+        io.out(_exit_warning(io))
         return 1
     trades = [trade for trade in ft.status() if trade.get("pair") == PAIR
               and (not state.get("trade_id") or _same_trade(trade, state["trade_id"]))]
@@ -352,7 +369,7 @@ def _check(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
         return 1
     if len(trades) != 1:
         io.out("검사할 스모크 거래를 하나로 확인할 수 없습니다.")
-        io.out(EXIT_WARNING)
+        io.out(_exit_warning(io))
         return 1
     if not settings.dry_run:
         return run_check(reader, SYMBOL, 120, 5, time.sleep, time.monotonic, io=io)
@@ -361,7 +378,7 @@ def _check(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
     _print_checks(checks, io=io)
     result = overall(checks)
     if result == "FAIL":
-        io.out(EXIT_WARNING)
+        io.out(_exit_warning(io))
         return 1
     if result == "UNKNOWN":
         io.out("경고: 청산가를 알 수 없거나 판정 자료가 부족합니다. 모의 점검만 계속하며 실전에서는 PASS가 필요합니다.")
@@ -379,14 +396,14 @@ def _restart_check(settings: Settings, reader, ft, *, io: SmokeIO | None = None)
     trade_id = state.get("trade_id")
     if trade_id is None:
         io.out("저장된 거래 번호가 없습니다.")
-        io.out(EXIT_WARNING)
+        io.out(_exit_warning(io))
         return 1
     config = ft.show_config()
     if config.get("state") != "running":
         io.out("재시작 점검 전 Freqtrade 실행 상태가 running이어야 합니다.")
         return 1
     if not _mode_matches(settings, config, io=io):
-        io.out(EXIT_WARNING)
+        io.out(_exit_warning(io))
         return 1
     unconfirmed = "재시작이 확인되지 않았습니다. 컨테이너를 재시작한 뒤 다시 실행하세요."
     startup_before = ft.health().get("bot_startup_ts")
@@ -398,7 +415,12 @@ def _restart_check(settings: Settings, reader, ft, *, io: SmokeIO | None = None)
         return 1
     if io.restart is not None:
         io.out("컨테이너를 재시작합니다…")
-        io.restart()
+        try:
+            io.restart()
+        except Exception:
+            # A restart failure is not a stop-check failure; the trade is still protected by its stop.
+            io.out(RESTART_FAILED)
+            return 1
     else:
         io.out("다음 명령을 직접 실행하세요: docker compose -f freqtrade/docker-compose.yml restart freqtrade")
         io.ask("재시작 명령 실행 후 Enter를 누르세요: ")
@@ -410,7 +432,7 @@ def _restart_check(settings: Settings, reader, ft, *, io: SmokeIO | None = None)
         io.out(unconfirmed)
         return 1
     if not _mode_matches(settings, config, io=io):
-        io.out(EXIT_WARNING)
+        io.out(_exit_warning(io))
         return 1
     ft.start()
     if not _wait(lambda: ft.show_config().get("state") == "running", 10, 1):
@@ -445,7 +467,7 @@ def _ledger(settings: Settings, reader, *, io: SmokeIO | None = None) -> int:
         return 1
     fills = reader.fetch_fills(SYMBOL, state["started_ms"])
     if not fills:
-        io.out("조회된 체결이 없습니다. 잠시 후 ledger를 다시 실행하세요.")
+        io.out(_hint(io, NO_FILLS, PANEL_NO_FILLS))
         return 1
     rate, at = fetch_krw_per_usdt()
     rows = fills_to_rows(fills, rate, at)
@@ -501,7 +523,7 @@ def _exit(settings: Settings, reader, ft, *, io: SmokeIO | None = None) -> int:
             raise ValueError("장부 저장 실패")
     except (Exception, KeyboardInterrupt):
         # Keep the saved start time so the standalone ledger command remains usable.
-        io.out("청산은 완료됐습니다. 장부 저장에 실패했으니 'python -m bitgetbot.smoke ledger'를 다시 실행하세요.")
+        io.out(_hint(io, LEDGER_RETRY, PANEL_LEDGER_RETRY))
         return 1
     STATE_PATH.unlink(missing_ok=True)
     return 0
@@ -532,7 +554,7 @@ def run_command(command: str, io: SmokeIO) -> int:
             return 1
         io.out("명령 실패: 설정·연결·응답을 확인하세요. 비밀값 보호를 위해 오류 원문은 표시하지 않습니다.")
         if command in {"check", "restart-check"}:
-            io.out(EXIT_WARNING)
+            io.out(_exit_warning(io))
         if command == "exit":
             io.out("비트겟 웹(PC)에서 서브계정 선물 포지션을 직접 확인하고 시장가 청산하세요.")
         return 1

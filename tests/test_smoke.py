@@ -1310,3 +1310,114 @@ def test_run_command_injected_io_sanitizes_errors(cli, monkeypatch, capsys, comm
         expected.append("비트겟 웹(PC)에서 서브계정 선물 포지션을 직접 확인하고 시장가 청산하세요.")
     assert lines == expected
     assert capsys.readouterr().out == ""
+
+
+PANEL_EXIT = '손절 확인 실패. 지금 바로 패널의 "청산" 버튼을 누르세요.'
+PANEL_LEDGER = '청산은 완료됐습니다. 장부 저장에 실패했으니 패널의 "장부 저장" 버튼을 누르세요.'
+
+
+def panel_io(lines, restart=None):
+    return smoke.SmokeIO(out=lines.append, ask=lambda _: "", restart=restart, hint_style="panel")
+
+
+def test_smoke_io_defaults_to_cli_hints():
+    assert smoke.SmokeIO(print, input).hint_style == "cli"
+    assert smoke.SmokeIO.console().hint_style == "cli"
+
+
+@pytest.mark.parametrize("command", ["preflight", "enter", "check", "restart-check", "exit", "ledger"])
+def test_panel_hints_replace_cli_commands_after_failure(cli, monkeypatch, capsys, command):
+    def fail():
+        raise RuntimeError("SECRET-SENTINEL")
+
+    monkeypatch.setattr(smoke, "load_settings", fail)
+    lines = []
+    assert smoke.run_command(command, panel_io(lines)) == 1
+    expected = ["명령 실패: 설정·연결·응답을 확인하세요. 비밀값 보호를 위해 오류 원문은 표시하지 않습니다."]
+    if command in {"check", "restart-check"}:
+        expected.append(PANEL_EXIT)
+    if command == "exit":
+        expected.append("비트겟 웹(PC)에서 서브계정 선물 포지션을 직접 확인하고 시장가 청산하세요.")
+    assert lines == expected
+    assert capsys.readouterr().out == ""
+
+
+def test_panel_run_check_failure_points_to_panel_exit_button():
+    reader = FakeReader()
+    reader.plans = []
+    t, sleep, clock = fake_clock()
+    lines = []
+    assert run_check(reader, "BTCUSDT", 10, 5, sleep, clock, io=panel_io(lines)) == 1
+    assert lines[-1] == PANEL_EXIT
+    assert not any("python -m" in line for line in lines)
+
+
+@pytest.mark.parametrize("raises", [True, False])
+def test_panel_exit_ledger_failure_points_to_panel_ledger_button(cli, tmp_path, monkeypatch, capsys, raises):
+    settings, reader, ft, _, _ = cli
+    ft.dry_run = False
+    reader.position = None
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "live"}), encoding="utf-8")
+
+    def ledger_failure(*_, **__):
+        if raises:
+            raise OSError("SECRET-SENTINEL")
+        return 1
+
+    monkeypatch.setattr(smoke, "_ledger", ledger_failure)
+    lines = []
+    assert smoke.run_command("exit", panel_io(lines)) == 1
+    assert PANEL_LEDGER in lines
+    assert not any("python -m" in line or "SECRET-SENTINEL" in line for line in lines)
+    assert capsys.readouterr().out == ""
+
+
+def test_panel_ledger_without_fills_points_to_panel_ledger_button(cli, tmp_path, monkeypatch):
+    settings, reader, _, _, _ = cli
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "live"}), encoding="utf-8")
+    lines = []
+    assert smoke.run_command("ledger", panel_io(lines)) == 1
+    assert '조회된 체결이 없습니다. 잠시 후 패널의 "장부 저장" 버튼을 누르세요.' in lines
+    assert not any("ledger를" in line for line in lines)
+
+
+def test_panel_stale_state_points_to_panel_exit_button(cli, tmp_path, monkeypatch):
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({"started_ms": 1, "trade_id": 7, "mode": "dry"}), encoding="utf-8")
+    lines = []
+    assert smoke.run_command("enter", panel_io(lines)) == 1
+    assert '이전 스모크 상태 파일이 남아 있습니다. 먼저 패널의 "청산" 버튼을 누르세요.' in lines
+    settings, _, _, _, _ = cli
+    monkeypatch.setattr(smoke, "load_settings", lambda: replace(
+        settings, dry_run=False, db_url="sqlite:////freqtrade/user_data/tradesv3.sqlite",
+    ))
+    lines.clear()
+    assert smoke.run_command("check", panel_io(lines)) == 1
+    assert any(line.endswith('먼저 패널의 "청산" 버튼을 누르세요.') for line in lines)
+    assert not any("exit으로" in line for line in lines)
+
+
+@pytest.mark.parametrize("hint_style", ["cli", "panel"])
+def test_failed_injected_restart_reports_restart_failure_not_stop_failure(cli, monkeypatch, tmp_path, capsys, hint_style):
+    settings, reader, ft, _, _ = cli
+    ft.state = "running"
+    ft.trades = [dict(TRADE)]
+    (tmp_path / ".smoke_state.json").write_text(json.dumps({
+        "started_ms": 1, "trade_id": 7, "mode": "dry",
+    }), encoding="utf-8")
+
+    def restart():
+        raise RuntimeError("SECRET-SENTINEL")
+
+    lines = []
+    io = smoke.SmokeIO(out=lines.append, ask=lambda _: pytest.fail("must not prompt"), restart=restart, hint_style=hint_style)
+    assert smoke.run_command("restart-check", io) == 1
+    assert lines[-1] == "컨테이너 재시작에 실패했습니다. 패널을 새로 고친 뒤 상태를 확인하세요."
+    assert not any("손절 확인 실패" in line or "SECRET-SENTINEL" in line or "python -m" in line for line in lines)
+    assert "ping" not in ft.calls[3:]
+    assert capsys.readouterr().out == ""

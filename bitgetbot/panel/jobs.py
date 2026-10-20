@@ -52,7 +52,8 @@ class JobRunner:
 
     def _run(self, name: str, answers: dict[str, str], restart: Callable[[], None] | None) -> None:
         try:
-            io = SmokeIO(self._out, lambda question: answers.get(question, ""), restart)
+            # Panel jobs point to panel buttons, never to CLI commands the phone cannot run.
+            io = SmokeIO(self._out, lambda question: answers.get(question, ""), restart, "panel")
             code = self._execute(name, io)
         except (Exception, KeyboardInterrupt):
             self._out("작업 실패: 오류 원문은 표시하지 않습니다")

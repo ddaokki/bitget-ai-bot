@@ -76,6 +76,9 @@ def _write_private(config: dict[str, Any], path: Path) -> None:
             temporary_path = Path(temporary.name)
             json.dump(config, temporary, indent=2, ensure_ascii=False)
             temporary.write("\n")
+            # Durable before the rename: a crash must not leave a renamed but empty config.
+            temporary.flush()
+            os.fsync(temporary.fileno())
         os.replace(temporary_path, path)
     finally:
         if temporary_path is not None:

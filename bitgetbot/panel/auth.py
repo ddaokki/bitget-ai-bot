@@ -11,7 +11,14 @@ from collections.abc import Callable, Mapping
 from typing import Literal
 
 
-LOCAL_HOSTS = {"127.0.0.1:8090", "localhost:8090"}
+LOCAL_HOSTS = frozenset({"127.0.0.1:8090", "localhost:8090"})
+# One machine label under one tailnet label, as Tailscale Serve presents it (default HTTPS port only).
+TAILNET_HOST = re.compile(r"[a-z0-9-]+\.[a-z0-9-]+\.ts\.net(?::443)?", re.IGNORECASE)
+
+
+def allowed_host(host_header: str) -> bool:
+    """Reject DNS-rebinding names before any cookie, CSRF or PIN logic sees the request."""
+    return host_header in LOCAL_HOSTS or TAILNET_HOST.fullmatch(host_header) is not None
 
 
 def _header(headers: Mapping[str, str], name: str) -> str | None:
@@ -127,25 +134,35 @@ class Sessions:
     def __init__(self, clock: Callable[[], float] = time.time, ttl: float = 43200):
         self._clock = clock
         self._ttl = ttl
+        self._lock = threading.Lock()
         self._sessions: dict[str, tuple[str, float]] = {}
 
     def create(self, kind: str) -> str:
         sid = secrets.token_urlsafe(32)
-        self._sessions[sid] = (kind, self._clock() + self._ttl)
+        with self._lock:
+            self._sessions[sid] = (kind, self._clock() + self._ttl)
         return sid
 
     def get(self, sid: str) -> str | None:
-        session = self._sessions.get(sid)
-        if session is None:
-            return None
-        kind, expires = session
-        if self._clock() >= expires:
-            self.revoke(sid)
-            return None
-        return kind
+        with self._lock:
+            session = self._sessions.get(sid)
+            if session is None:
+                return None
+            kind, expires = session
+            if self._clock() >= expires:
+                self._sessions.pop(sid, None)
+                return None
+            return kind
 
     def revoke(self, sid: str) -> None:
-        self._sessions.pop(sid, None)
+        with self._lock:
+            self._sessions.pop(sid, None)
+
+    def revoke_kind(self, kind: str) -> None:
+        """Log out every session of one kind, e.g. all phones after a PIN change."""
+        with self._lock:
+            for sid in [sid for sid, (value, _) in self._sessions.items() if value == kind]:
+                del self._sessions[sid]
 
 
 def effective_scheme(

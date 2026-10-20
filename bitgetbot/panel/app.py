@@ -9,6 +9,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,8 @@ from bitgetbot.bitget_read import BitgetReader, make_exchange
 from bitgetbot.ftclient import FreqtradeClient
 from bitgetbot.panel import ops
 from bitgetbot.panel.auth import (
-    Lockout, Sessions, classify, csrf_ok, effective_scheme, hash_pin, identity, valid_pin, verify_pin,
+    Lockout, Sessions, allowed_host, classify, csrf_ok, effective_scheme, hash_pin, identity, valid_pin,
+    verify_pin,
 )
 from bitgetbot.panel.jobs import JobRunner
 from bitgetbot.privcfg import Settings, keys_configured, load_settings, set_exchange_keys, set_mode
@@ -34,6 +36,18 @@ STEPS = {"preflight", "enter", "check", "restart-check", "exit", "ledger"}
 LIVE_PROMPT = "실전 주문을 냅니다. 계속하려면 LIVE 입력:"
 MANUAL_LINK = "https://www.bitget.com/futures/usdt/BTCUSDT"
 FAILURE = "요청 실패: 설정·연결 상태를 확인하세요. 오류 원문은 표시하지 않습니다"
+BAD_HOST = "허용하지 않는 접속 주소입니다. 바로가기나 테일스케일 주소로 여세요."
+OPEN_TRADE = "진행 중인 거래를 먼저 청산하세요"
+KEYS_SAVED = "거래 봇을 재시작해야 새 키가 적용됩니다."
+EMERGENCY_SCOPE = "거래 봇(Freqtrade)이 연 거래를 시장가로 청산 요청했습니다 (현재 모드: {mode})."
+EMERGENCY_DRY = "모의 거래만 청산했습니다. 실거래 포지션은 비트겟 웹에서 확인하세요."
+EMERGENCY_LIVE = "봇이 모르는 포지션은 비트겟 웹에서 확인하세요."
+# Audit actions by exact POST path. Request bodies, keys, PINs and tokens are never recorded.
+AUDIT_ACTIONS = {
+    "/api/pin": "pin_set", "/api/keys": "keys_saved", "/api/mode": "mode",
+    "/api/docker/up": "docker_up", "/api/emergency/close-all": "emergency",
+    "/api/phone/enable": "phone_enable",
+}
 
 
 class _PanelError(HTTPException):
@@ -61,8 +75,11 @@ class PanelDeps:
     keys_configured: Callable[[], dict[str, bool]] = keys_configured
     static_dir: Path = STATIC_DIR
     smoke_command: Callable[[str, SmokeIO], int] = run_command
+    audit_path: Path | None = None
 
     def __post_init__(self):
+        if self.audit_path is None:
+            self.audit_path = self.pin_store_path.with_name("audit.log")
         if self.jobs is None:
             self.jobs = JobRunner(self._execute, clock=self.clock)
         if self.sessions is None:
@@ -81,7 +98,7 @@ class PanelDeps:
                 line = line.replace(value, "[REDACTED]")
             io.out(line)
 
-        return self.smoke_command(name, SmokeIO(out, io.ask, io.restart))
+        return self.smoke_command(name, SmokeIO(out, io.ask, io.restart, io.hint_style))
 
 
 def _pin_hash(path: Path) -> str | None:
@@ -105,6 +122,8 @@ def _save_pin(path: Path, pin: str) -> None:
             temporary_path = Path(temporary.name)
             json.dump({"pin_hash": value}, temporary)
             temporary.write("\n")
+            temporary.flush()
+            os.fsync(temporary.fileno())
         os.replace(temporary_path, path)
     finally:
         if temporary_path is not None:
@@ -141,9 +160,68 @@ def _ft(deps: PanelDeps):
     return deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
 
 
+_audit_lock = threading.Lock()
+
+
+def _audit_action(method: str, path: str, status: int) -> tuple[str, str | None] | None:
+    if method != "POST":
+        return None
+    if path == "/api/login":
+        return ("login_ok" if status == 200 else "login_fail"), None
+    if path.startswith("/api/steps/"):
+        name = path.removeprefix("/api/steps/")
+        return "step", name if name in STEPS else None
+    action = AUDIT_ACTIONS.get(path)
+    return None if action is None else (action, None)
+
+
+def _audit(deps: PanelDeps, request: Request, kind: str, status: int) -> None:
+    """Append one JSON line per panel action; a failed write never changes the response."""
+    try:
+        found = _audit_action(request.method, request.url.path, status)
+        if found is None:
+            return
+        action, step = found
+        entry = {
+            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            "source": kind,
+        }
+        if kind == "tailnet":
+            entry["identity"] = identity(request.headers)[:256]
+        entry["action"] = action
+        if step is not None:
+            entry["step"] = step
+        entry["result"] = status
+        line = json.dumps(entry, ensure_ascii=False) + "\n"
+        with _audit_lock:
+            deps.audit_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            with open(deps.audit_path, "a", encoding="utf-8") as log:
+                log.write(line)
+    except Exception:
+        pass
+
+
+def _open_trade_blocks_mode(deps: PanelDeps) -> bool:
+    """A mode switch must never hide an open smoke trade or a Freqtrade trade."""
+    if ops.smoke_state_exists():
+        return True
+    ft = _ft(deps)
+    try:
+        if ft.ping() is not True:
+            return False
+    except Exception:
+        # Unreachable Freqtrade cannot report trades; the smoke state file is the record then.
+        return False
+    try:
+        return bool(ft.status())
+    except Exception:
+        # Reachable but unreadable is ambiguous: refuse rather than hide a position.
+        return True
+
+
 def create_app(deps: PanelDeps) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
-    # Serialize mode writes with job admission, not with long-running jobs or emergency exits.
+    # Serialize config writes with job admission, not with long-running jobs or emergency exits.
     operation_lock = threading.Lock()
 
     @app.exception_handler(RequestValidationError)
@@ -168,7 +246,10 @@ def create_app(deps: PanelDeps) -> FastAPI:
         is_api = request.url.path == "/api" or request.url.path.startswith("/api/")
         response = None
         try:
-            if is_api:
+            if not allowed_host(host):
+                # DNS rebinding: a foreign name on loopback must not reach CSRF, login or static files.
+                response = JSONResponse({"detail": BAD_HOST}, status_code=421)
+            elif is_api:
                 # csrf_ok's legacy method allowlist does not cover PATCH/OPTIONS or unknown verbs.
                 # Every unsafe verb must pass the same check as POST before routing/authentication.
                 method = "GET" if request.method in {"GET", "HEAD"} else "POST"
@@ -189,6 +270,7 @@ def create_app(deps: PanelDeps) -> FastAPI:
         except Exception:
             # Catch before ServerErrorMiddleware logs an exception with upstream secrets.
             response = JSONResponse({"detail": FAILURE}, status_code=503)
+        _audit(deps, request, request_kind, response.status_code)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -255,6 +337,8 @@ def create_app(deps: PanelDeps) -> FastAPI:
         if not isinstance(pin, str) or not valid_pin(pin):
             raise _PanelError(400, "PIN은 숫자 6~12자리로 입력하세요")
         _save_pin(deps.pin_store_path, pin)
+        # A lost or shared phone must not keep a session after the PIN changes.
+        deps.sessions.revoke_kind("tailnet")
         return {"saved": True}
 
     @app.get("/api/job")
@@ -315,6 +399,8 @@ def create_app(deps: PanelDeps) -> FastAPI:
                 raise _PanelError(400, "모드는 dry 또는 live로 입력하세요")
             if value == "live" and body.get("confirm") != "LIVE":
                 raise _PanelError(400, "실전 전환에는 LIVE 확인이 필요합니다")
+            if _open_trade_blocks_mode(deps):
+                raise _PanelError(409, OPEN_TRADE)
             deps.mode_setter(value)
             ok = (ops.compose_restart(deps.runner) if ops.freqtrade_container_running(deps.runner)
                   else ops.compose_up(deps.runner))
@@ -325,6 +411,8 @@ def create_app(deps: PanelDeps) -> FastAPI:
     @app.post("/api/docker/up")
     def docker_up():
         with operation_lock:
+            if deps.jobs.snapshot()["running"]:
+                raise _PanelError(409, "다른 작업이 실행 중입니다")
             if not ops.compose_up(deps.runner):
                 raise _PanelError(503, "컨테이너 시작에 실패했습니다. Docker Desktop을 확인하세요")
         return {"ok": True}
@@ -332,14 +420,17 @@ def create_app(deps: PanelDeps) -> FastAPI:
     @app.post("/api/emergency/close-all")
     def emergency():
         # No job/mode lock and no POST retries, even on an ambiguous timeout.
+        # force_exit("all") reaches only the trades of the Freqtrade instance (mode/DB) now running.
         try:
-            _ft(deps).force_exit("all", "market")
+            settings = _settings(deps)
+            deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass).force_exit("all", "market")
         except Exception:
             return JSONResponse({
                 "detail": "청산 요청을 확인할 수 없습니다. 비트겟 웹(PC)에서 직접 시장가 청산하세요",
                 "link": MANUAL_LINK,
             }, status_code=503)
-        return {"ok": True, "message": "시장가 전부 청산을 요청했습니다. 포지션을 확인하세요"}
+        scope = EMERGENCY_SCOPE.format(mode="모의" if settings.dry_run else "실전")
+        return {"ok": True, "message": f"{scope} {EMERGENCY_DRY if settings.dry_run else EMERGENCY_LIVE}"}
 
     @app.post("/api/keys")
     def save_keys(request: Request, body: dict = Depends(_body)):
@@ -347,8 +438,12 @@ def create_app(deps: PanelDeps) -> FastAPI:
         values = [body.get(name) for name in ("key", "secret", "password")]
         if not all(isinstance(value, str) and value and not any(char.isspace() for char in value) for value in values):
             raise _PanelError(400, "거래소 키는 비어 있거나 공백을 포함할 수 없습니다")
-        deps.keys_setter(*values)
-        return {"saved": True}
+        # The private config is read-modify-written; serialize with mode writes and job admission.
+        with operation_lock:
+            if deps.jobs.snapshot()["running"]:
+                raise _PanelError(409, "다른 작업이 실행 중입니다")
+            deps.keys_setter(*values)
+        return {"saved": True, "message": KEYS_SAVED}
 
     @app.post("/api/phone/enable")
     def phone_enable(request: Request):

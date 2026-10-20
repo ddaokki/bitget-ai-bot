@@ -61,6 +61,15 @@ def _write_token(path: Path, token: str) -> None:
             temporary_path.unlink(missing_ok=True)
 
 
+def _ensure_stdio(directory: Path) -> None:
+    """pythonw has no console streams; uvicorn's logging setup fails on None, so give it files."""
+    # Access logging is off, so these files never receive the launch token.
+    if sys.stdout is None:
+        sys.stdout = open(directory / "panel.out.log", "a", encoding="utf-8", buffering=1)
+    if sys.stderr is None:
+        sys.stderr = open(directory / "panel.err.log", "a", encoding="utf-8", buffering=1)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv:
@@ -79,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         token = secrets.token_urlsafe(32)
         _write_token(Path(".panel/token"), token)
         app = create_app(PanelDeps(token=token))
+        _ensure_stdio(Path(".panel"))
         uvicorn.run(
             app, host="127.0.0.1", port=8090, log_level="warning", access_log=False,
             proxy_headers=False,

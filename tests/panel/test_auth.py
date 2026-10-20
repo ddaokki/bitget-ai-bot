@@ -7,8 +7,10 @@ from types import MappingProxyType
 import pytest
 
 from bitgetbot.panel.auth import (
+    LOCAL_HOSTS,
     Lockout,
     Sessions,
+    allowed_host,
     classify,
     csrf_ok,
     effective_scheme,
@@ -283,3 +285,49 @@ def test_csrf_get_and_tailnet_origin():
     assert csrf_ok("POST", {
         "X-Panel-Request": "1", "Origin": "https://pc.tail1234.ts.net",
     }, effective_scheme("http", host, {}), host)
+
+
+@pytest.mark.parametrize("host", [
+    "127.0.0.1:8090", "localhost:8090", "pc.tail1234.ts.net", "PC.Tail1234.TS.NET",
+    "my-pc.tail-net.ts.net:443",
+])
+def test_allowed_host_accepts_loopback_and_single_level_tailnet_names(host):
+    assert allowed_host(host) is True
+
+
+@pytest.mark.parametrize("host", [
+    "", "evil.example:8090", "evil.example", "127.0.0.1", "127.0.0.1:8091", "localhost",
+    "[::1]:8090", "0.0.0.0:8090", "pc.tail1234.ts.net:8090", "pc.tail1234.ts.net:80",
+    "pc.tail1234.ts.net.", "a.b.pc.tail1234.ts.net", "tail1234.ts.net", "pc.tail1234.ts.net.evil.example",
+    "pc_x.tail1234.ts.net", "pc.tail1234.ts.net\n", "pc.tail1234.ts.net:443:443",
+    "evil.example/pc.tail1234.ts.net", "pc.tail1234.ts.net@evil.example",
+])
+def test_allowed_host_rejects_everything_else(host):
+    assert allowed_host(host) is False
+
+
+def test_local_hosts_cannot_be_mutated():
+    with pytest.raises(AttributeError):
+        LOCAL_HOSTS.add("evil.example:8090")
+
+
+def test_sessions_revoke_kind_only_removes_that_kind():
+    sessions = Sessions(clock=lambda: 0)
+    local = sessions.create("local")
+    phones = [sessions.create("tailnet") for _ in range(3)]
+    sessions.revoke_kind("tailnet")
+    assert sessions.get(local) == "local"
+    assert all(sessions.get(sid) is None for sid in phones)
+
+
+def test_sessions_are_safe_under_concurrent_create_and_revoke_kind():
+    sessions = Sessions(clock=lambda: 0)
+
+    def work(index):
+        for _ in range(200):
+            sessions.create("tailnet" if index % 2 else "local")
+            sessions.revoke_kind("tailnet")
+        return True
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        assert all(pool.map(work, range(8)))

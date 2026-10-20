@@ -304,3 +304,25 @@ def test_keys_configured_missing_file_is_false(tmp_path):
     assert privcfg.keys_configured(tmp_path / "missing.json") == {
         "key": False, "secret": False, "password": False,
     }
+
+
+def test_private_write_is_flushed_and_fsynced_before_replace(tmp_path, monkeypatch):
+    path = tmp_path / "config.private.json"
+    path.write_text('{"dry_run":true}\n', encoding="utf-8")
+    events = []
+    fsync, replace_file = privcfg.os.fsync, privcfg.os.replace
+
+    def checked_fsync(descriptor):
+        events.append("fsync")
+        return fsync(descriptor)
+
+    def checked_replace(source, destination):
+        assert events == ["fsync"]
+        assert json.loads(Path(source).read_text(encoding="utf-8"))["dry_run"] is False
+        events.append("replace")
+        return replace_file(source, destination)
+
+    monkeypatch.setattr(privcfg.os, "fsync", checked_fsync)
+    monkeypatch.setattr(privcfg.os, "replace", checked_replace)
+    privcfg.set_mode("live", path)
+    assert events == ["fsync", "replace"]

@@ -240,6 +240,11 @@ def _smoke_state() -> dict:
     return result
 
 
+def smoke_state_exists() -> bool:
+    """Fail closed: an unreadable or invalid state file still counts as an open smoke trade."""
+    return _smoke_state()["exists"]
+
+
 def collect_status(settings: Settings, reader, ft) -> dict:
     """Collect independent snapshots; dry mode never touches private exchange APIs."""
     reachable = _observe(ft.ping) is True

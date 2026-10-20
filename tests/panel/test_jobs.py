@@ -106,3 +106,18 @@ def test_job_keeps_only_last_500_lines():
     result = finished(jobs)
     assert result["lines"] == [f"줄 {number}" for number in range(250, 750)]
     assert result["exit_code"] == 0
+
+
+def test_job_io_uses_panel_hints():
+    from bitgetbot.panel.jobs import JobRunner
+
+    seen = []
+
+    def execute(name, io):
+        seen.append(io.hint_style)
+        return 0
+
+    jobs = JobRunner(execute)
+    assert jobs.start("check", {}, None)
+    finished(jobs)
+    assert seen == ["panel"]
