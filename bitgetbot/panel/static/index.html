@@ -34,6 +34,22 @@
     </section>
 
     <div id="panel" hidden>
+      <section id="charts-card" class="charts-card" aria-label="내 자산과 비트코인 가격">
+        <div class="chart-block">
+          <div class="section-heading"><h2 id="asset-title">내 자산 <span id="asset-mode" class="stats-mode">확인 중</span></h2><span id="asset-source">확인 중</span></div>
+          <p id="asset-main" class="asset-main">확인 중</p>
+          <p id="asset-sub" class="asset-sub"></p>
+          <p id="asset-change" class="muted"></p>
+          <div id="asset-chart" class="chart" role="img" aria-labelledby="asset-title"></div>
+        </div>
+        <div class="chart-block">
+          <div class="section-heading"><h2 id="btc-title">BTC 가격</h2><span>1시간봉 · 최근 3일 · 달러</span></div>
+          <p id="btc-last" class="asset-main">확인 중</p>
+          <p id="btc-levels" class="muted"></p>
+          <div id="btc-chart" class="chart" role="img" aria-labelledby="btc-title"></div>
+          <p class="chart-legend muted"><span class="key entry">진입가</span><span class="key stop">손절가</span><span class="key marker">진입 시점</span></p>
+        </div>
+      </section>
       <section class="status-grid" aria-label="연결 및 계정 상태">
         <div class="status-chip"><span>도커</span><strong id="docker-state">확인 중</strong></div>
         <div class="status-chip"><span>거래 봇</span><strong id="ft-state">확인 중</strong></div>
@@ -44,11 +60,12 @@
         <h2 id="stats-title">봇 승률 <span id="stats-mode" class="stats-mode">확인 중</span></h2>
         <p id="stats-main" class="stats-main">확인 중</p>
         <p id="stats-detail" class="muted"></p>
+        <p id="stats-other" class="muted"></p>
       </section>
       <div class="toolbar">
         <p id="mode-help">모드와 연결 상태를 확인하세요.</p>
         <button id="mode-switch" type="button" class="secondary" disabled>모드 전환</button>
-        <button id="docker-up" type="button" class="secondary" disabled>거래 봇 시작</button>
+        <button id="docker-up" type="button" class="secondary" hidden disabled>거래 봇 컨테이너 켜기</button>
         <button id="autotrade-start" type="button" disabled>자동매매 켜기</button>
         <button id="autotrade-pause" type="button" class="secondary" disabled>자동매매 멈추기</button>
       </div>
@@ -86,6 +103,7 @@
         <div class="settings-grid">
           <section aria-labelledby="keys-title">
             <h2 id="keys-title">거래소 API 키</h2><p id="keys-state">확인 중</p>
+            <p class="muted">저장한 키는 보안상 다시 보여 주지 않아 칸이 늘 비어 있습니다. 위 상태가 "설정됨"이면 다시 넣을 필요가 없습니다.</p>
             <form id="keys-form" autocomplete="off">
               <label for="api-key">API 키</label><input id="api-key" type="password" autocomplete="off" required>
               <label for="api-secret">시크릿</label><input id="api-secret" type="password" autocomplete="off" required>

@@ -9,8 +9,11 @@ const state = {
     pending: false, emergencyPending: false, lastStatusAt: 0, epoch: 0,
     preflightMode: null, preflightJobStart: null, pendingPreflight: null,
     confirmation: null, emergencyDeadline: 0, loginDeadline: 0,
-    pollTimer: null, polling: false
+    pollTimer: null, polling: false,
+    charts: null, chartsPending: false, chartsTimer: null
 };
+const SVG_NS = "http://www.w3.org/2000/svg";
+const CHART = {width: 600, height: 200, pad: 10};
 const $ = id => document.getElementById(id);
 const text = (id, value) => { $(id).textContent = value; };
 
@@ -145,6 +148,8 @@ function updateControls() {
     const busy = !canAct() || state.pending || state.job?.running === true;
     $("mode-switch").disabled = busy || !["dry", "live"].includes(state.status?.mode)
         || state.status?.smoke_state?.exists !== false;
+    // Only needed when the container (or Docker) is down; the launcher starts it otherwise.
+    $("docker-up").hidden = state.status?.docker_running !== false && state.status?.freqtrade?.reachable === true;
     $("docker-up").disabled = busy;
     $("autotrade-start").disabled = !autotradeAllowed("start");
     $("autotrade-pause").disabled = !autotradeAllowed("pause");
@@ -235,9 +240,13 @@ function renderStats(status) {
     text("stats-mode", source === "dry" ? "모의" : source === "live" ? "실전" : "모드 불명");
     $("stats-mode").className = `stats-mode ${source}`.trim();
     text("stats-detail", "");
+    text("stats-other", "");
     const stats = status.stats;
     if (!stats || typeof stats !== "object" || !isCount(stats.closed_trades)) { text("stats-main", "–"); return; }
-    if (stats.closed_trades === 0) { text("stats-main", "아직 닫힌 거래가 없습니다"); return; }
+    // Manual and smoke-test trades never count as strategy wins or losses.
+    const others = isCount(stats.other_trades) ? stats.other_trades : 0;
+    if (others) text("stats-other", `수동·점검 거래 ${others}건 별도 (승률 제외)`);
+    if (stats.closed_trades === 0) { text("stats-main", others ? "아직 전략 거래가 없습니다" : "아직 닫힌 거래가 없습니다"); return; }
     const record = isCount(stats.wins) && isCount(stats.losses) ? `${stats.wins}승 ${stats.losses}패 · ` : "";
     text("stats-main", `승률 ${isRatio(stats.win_rate) ? percent(stats.win_rate) : "–"} (${record}${stats.closed_trades}건)`);
     const recent = stats.closed_trades_30d === 0 ? "거래 없음"
@@ -245,7 +254,138 @@ function renderStats(status) {
     const average = typeof stats.avg_profit_pct === "number" && Number.isFinite(stats.avg_profit_pct)
         ? `${new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 2, signDisplay: "exceptZero"}).format(stats.avg_profit_pct)}%`
         : "–";
-    text("stats-detail", `최근 30일 ${recent} · 평균 ${average}`);
+    text("stats-detail", `최근 30일 ${recent} · 평균 ${average}${stats.partial === true ? " · 최근 500건 기준" : ""}`);
+}
+
+const finite = value => typeof value === "number" && Number.isFinite(value);
+
+function krw(value) {
+    return `${new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 0}).format(value)}원`;
+}
+
+function usd(value, digits = 2) {
+    return `$${new Intl.NumberFormat("en-US", {minimumFractionDigits: digits, maximumFractionDigits: digits}).format(value)}`;
+}
+
+function signed(value, format) {
+    return `${value > 0 ? "+" : value < 0 ? "-" : ""}${format(Math.abs(value))}`;
+}
+
+function svg(tag, attributes) {
+    const element = document.createElementNS(SVG_NS, tag);
+    for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, String(value));
+    return element;
+}
+
+// Draw a line chart with DOM-created SVG nodes only (CSP: no inline styles, no HTML strings).
+function drawChart(id, points, {levels = [], markers = [], empty = "표시할 데이터가 없습니다."} = {}) {
+    const target = $(id);
+    target.replaceChildren();
+    const valid = (Array.isArray(points) ? points : [])
+        .filter(point => Array.isArray(point) && finite(point[0]) && finite(point[1]));
+    if (valid.length < 2) {
+        target.append(node("p", empty, "muted chart-empty"));
+        return false;
+    }
+    const lines = levels.filter(level => finite(level.value));
+    const values = [...valid.map(point => point[1]), ...lines.map(level => level.value)];
+    let low = Math.min(...values), high = Math.max(...values);
+    const margin = (high - low) * 0.08 || Math.abs(high) * 0.01 || 1;
+    low -= margin;
+    high += margin;
+    const first = valid[0][0], span = valid.at(-1)[0] - first || 1;
+    const {width, height, pad} = CHART;
+    const x = value => (pad + (value - first) / span * (width - 2 * pad)).toFixed(1);
+    const y = value => (pad + (high - value) / (high - low) * (height - 2 * pad)).toFixed(1);
+    const root = svg("svg", {viewBox: `0 0 ${width} ${height}`, class: "chart-svg", "aria-hidden": "true", focusable: "false"});
+    for (const level of lines) {
+        root.append(svg("line", {x1: 0, x2: width, y1: y(level.value), y2: y(level.value),
+            class: `chart-level ${level.kind}`, "vector-effect": "non-scaling-stroke"}));
+    }
+    root.append(svg("polyline", {points: valid.map(point => `${x(point[0])},${y(point[1])}`).join(" "),
+        class: "chart-line", fill: "none", "vector-effect": "non-scaling-stroke"}));
+    for (const time of markers.filter(finite)) {
+        if (time < first || time > valid.at(-1)[0]) continue;
+        // Mark the close of the candle the entry happened in.
+        const near = valid.reduce((best, point) => point[0] <= time ? point : best, valid[0]);
+        root.append(svg("circle", {cx: x(near[0]), cy: y(near[1]), r: 9, class: "chart-marker"}));
+    }
+    target.append(root);
+    return true;
+}
+
+function renderAsset(asset) {
+    const mode = asset?.mode;
+    text("asset-mode", mode === "dry" ? "모의" : mode === "live" ? "실전" : "모드 불명");
+    $("asset-mode").className = `stats-mode ${["dry", "live"].includes(mode) ? mode : ""}`.trim();
+    text("asset-source", mode === "live" ? "비트겟 선물 계정 · 미실현 손익 포함" : mode === "dry" ? "모의 지갑 · 거래 봇 기준" : "");
+    const equity = finite(asset?.equity_usdt) ? asset.equity_usdt : null;
+    const inKrw = finite(asset?.equity_krw) ? asset.equity_krw : null;
+    // KRW large with USD below; USD only when the Upbit rate is unavailable.
+    text("asset-main", inKrw !== null ? krw(inKrw) : equity !== null ? usd(equity) : "조회 불가");
+    text("asset-sub", inKrw !== null && equity !== null
+        ? `${usd(equity)}${finite(asset.krw_per_usdt) ? ` · 1 USDT = ${krw(asset.krw_per_usdt)}` : ""}`
+        : equity !== null ? "원화 환율 조회 불가 · 달러만 표시" : "");
+    const history = Array.isArray(asset?.history) ? asset.history.filter(point => Array.isArray(point)) : [];
+    const points = history.map(([time, value]) => [time * 1000, value]);
+    if (equity !== null) points.push([Date.now(), equity]);
+    const change = asset?.change_usdt, pct = asset?.change_pct;
+    if (finite(change) && finite(asset?.since)) {
+        const since = new Date(asset.since * 1000).toLocaleString("ko-KR", {month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"});
+        const rate = finite(pct) ? ` (${signed(pct, value => `${new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 2}).format(value)}%`)})` : "";
+        text("asset-change", `기록 시작(${since}) 대비 ${signed(change, usd)}${rate}`);
+    } else text("asset-change", "자산 기록은 10분마다 한 점씩 쌓입니다.");
+    const first = points.find(point => finite(point[1]));
+    drawChart("asset-chart", points, {
+        levels: first ? [{value: first[1], kind: "base"}] : [],
+        empty: "기록을 모으는 중입니다. 패널을 열어 두면 10분마다 한 점씩 늘어납니다."
+    });
+}
+
+function renderBtc(btc) {
+    if (!btc || typeof btc !== "object") {
+        text("btc-last", "조회 불가");
+        text("btc-levels", "거래 봇에 연결되면 표시합니다.");
+        drawChart("btc-chart", [], {empty: "거래 봇에서 가격을 받지 못했습니다."});
+        return;
+    }
+    const closes = Array.isArray(btc.closes) ? btc.closes : [];
+    const last = closes.at(-1);
+    text("btc-last", Array.isArray(last) && finite(last[1]) ? usd(last[1], 0) : "조회 불가");
+    const entry = finite(btc.entry) ? btc.entry : null, stop = finite(btc.stop) ? btc.stop : null;
+    text("btc-levels", entry !== null
+        ? `열린 전략 거래 · 진입 ${usd(entry, 0)} · 손절 ${stop !== null ? usd(stop, 0) : "확인 불가"}`
+        : "열린 전략 거래 없음");
+    drawChart("btc-chart", closes, {
+        levels: [{value: entry, kind: "entry"}, {value: stop, kind: "stop"}],
+        markers: Array.isArray(btc.entries) ? btc.entries : []
+    });
+}
+
+function renderCharts(data) {
+    if (!data || typeof data !== "object") throw new Error("그래프 응답을 확인할 수 없습니다.");
+    state.charts = data;
+    renderAsset(data.asset);
+    renderBtc(data.btc);
+}
+
+async function refreshCharts() {
+    if (!state.authenticated || state.needsLogin || state.chartsPending) return;
+    state.chartsPending = true;
+    try {
+        renderCharts(await request("/api/charts"));
+    } catch (error) {
+        text("asset-change", "그래프를 불러오지 못했습니다. 1분 뒤 다시 시도합니다.");
+    } finally {
+        state.chartsPending = false;
+    }
+}
+
+function pollCharts() {
+    clearTimeout(state.chartsTimer);
+    const ready = state.authenticated && !state.needsLogin;
+    if (ready) refreshCharts();
+    state.chartsTimer = setTimeout(pollCharts, ready ? 60000 : 3000);
 }
 
 function renderSettings(status) {
@@ -253,7 +393,9 @@ function renderSettings(status) {
     $("local-settings").hidden = !local;
     if (!local) { clearSecrets(); return; }
     const keys = status.keys_configured;
-    text("keys-state", keys?.key === true && keys?.secret === true && keys?.password === true ? "설정됨" : "미설정");
+    // Saved keys are never sent back, so the inputs stay empty by design; this line says whether they are saved.
+    text("keys-state", keys?.key === true && keys?.secret === true && keys?.password === true
+        ? "저장됨 · 다시 넣지 않아도 됩니다" : "미설정 · 키를 입력하세요");
     text("pin-state", status.pin_set ? "설정됨" : "미설정");
     const ts = status.tailscale;
     text("ts-installed", ts?.installed === true ? "설치됨" : "설치 필요");
@@ -299,6 +441,11 @@ function acceptJob(job) {
 function applyStatus(status) {
     if (!status || !["local", "tailnet"].includes(status.session_kind)) throw new Error("상태 응답을 확인할 수 없습니다.");
     if ((state.status && state.status.mode !== status.mode) || status.smoke_state?.exists === true) resetPreflight();
+    // Charts follow the mode: refresh soon after a switch instead of waiting a full minute.
+    if (state.charts && state.charts.mode !== status.mode && !state.chartsPending) {
+        clearTimeout(state.chartsTimer);
+        state.chartsTimer = setTimeout(pollCharts, 0);
+    }
     state.status = status;
     state.authenticated = true;
     state.online = true;
@@ -406,9 +553,12 @@ function openConfirmation(action) {
     state.confirmation = action;
     $("live-confirm").value = "";
     $("live-field").hidden = !action.live;
-    text("confirm-title", action.kind === "mode" ? (action.value === "live" ? "실전 거래로 전환" : "모의 거래로 전환")
+    text("confirm-title", action.kind === "mode" ? (action.value === "live" ? "실전 전환 · 자동매매 시작" : "모의 거래로 전환")
         : action.kind === "autotrade" ? (action.live ? "실전 자동매매 켜기" : "모의 자동매매 켜기") : `${STEP_NAMES[action.value]} 확인`);
-    text("confirm-description", action.kind === "mode" ? "모드를 저장하고 거래 봇을 다시 시작합니다. 진행 중인 포지션은 별도로 확인하세요."
+    // A switch is one step: the bot switches automatic trading on by itself once it is ready.
+    text("confirm-description", action.kind === "mode" ? (action.value === "live"
+        ? "전환 직후 거래 봇이 다시 시작되고, 준비되는 즉시(약 1~2분) 실제 돈으로 자동매매가 시작됩니다. BTC 롱만, 2배, 거래당 손실 한도 지갑의 0.5%, 하루 최대 3회. 수익을 보장하지 않습니다. 멈추려면 '자동매매 멈추기'를 누르세요."
+        : "모의 모드로 바꾸고 거래 봇을 다시 시작합니다. 준비되면 모의 자동매매가 저절로 켜집니다. 실거래 포지션은 비트겟 웹에서 따로 확인하세요.")
         : action.kind === "autotrade" ? "전략이 스스로 진입·청산합니다. BTC 롱만, 2배, 거래당 손실 한도 지갑의 0.5%, 하루 최대 3회. 수익을 보장하지 않습니다."
         : action.value === "enter" ? "새 포지션 진입을 요청합니다. 모드와 사용 자금을 확인하세요." : "현재 거래의 청산을 요청합니다. 체결 결과를 직접 확인하세요.");
     updateConfirmation();
@@ -562,6 +712,7 @@ function boot() {
         else if (!state.needsLogin) poll();
     });
     setInterval(() => { updateLoginLock(); updateControls(); }, 1000);
+    pollCharts();
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {
         notify("홈 화면 설치 준비에 실패했습니다. 브라우저에서는 계속 사용할 수 있습니다.", true);
     });
