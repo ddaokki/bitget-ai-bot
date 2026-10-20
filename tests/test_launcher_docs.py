@@ -77,3 +77,9 @@ def test_spec_security_section_names_scrypt_not_argon2():
     section = spec.split("## 11. 보안", 1)[1].split("## 12.", 1)[0]
     assert "argon2" not in section
     assert "scrypt" in section
+
+
+def test_launcher_opens_the_panel_in_a_dedicated_edge_profile():
+    text = launcher_text()
+    assert "'--user-data-dir=' + $profileDir" in text
+    assert "Join-Path $script:repoRoot '.panel\edge-profile'" in text

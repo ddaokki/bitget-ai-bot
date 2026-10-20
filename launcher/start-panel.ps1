@@ -67,7 +67,10 @@ function Open-PanelWindow {
         $script:failureMessage = '브라우저를 열지 못했습니다. Edge 또는 기본 브라우저 설치 상태를 확인하세요. 급하면 비트겟 웹(PC)에서 직접 청산하세요.'
         $edge = Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'
         if (Test-Path -LiteralPath $edge -PathType Leaf) {
-            Start-Process -FilePath $edge -ArgumentList ('--app=' + $url) -ErrorAction Stop | Out-Null
+            # A dedicated Edge profile: a stale service worker in the everyday profile once kept the
+            # panel window loading forever. The profile lives in the git-ignored .panel folder.
+            $profileDir = Join-Path $script:repoRoot '.panel\edge-profile'
+            Start-Process -FilePath $edge -ArgumentList @(('--user-data-dir=' + $profileDir), '--no-first-run', '--no-default-browser-check', ('--app=' + $url)) -ErrorAction Stop | Out-Null
         }
         else {
             Start-Process -FilePath $url -ErrorAction Stop | Out-Null
