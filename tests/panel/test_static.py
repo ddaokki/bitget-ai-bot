@@ -858,3 +858,70 @@ const [marker] = nodes.filter(n => n.tagName === "circle");
 const points = nodes.find(n => n.tagName === "polyline").attributes.points.split(" ");
 assert.equal(`${marker.attributes.cx},${marker.attributes.cy}`, points.at(-1));
 ''')
+
+
+POSITION_ROWS = r'''
+const rows = () => Object.fromEntries(element("positions").children[0].children[1].children
+    .map(row => [row.children[0].textContent, row.children[1].textContent]));
+const live = {...status, mode: "live",
+    positions: [{symbol: "BTCUSDT", side: "long", size: 0.0003, entry: 83472.1, mark: 83529.9, liq: 42000, leverage: 2}],
+    stops: [{plan_type: "pos_loss", trigger_price: 81920.3, trigger_type: "mark_price"}],
+    exit_plans: {BTCUSDT: {exit_line: 81163, trail_distance: 2327.7, bot_stop: 81920.3}}};
+'''
+
+
+def test_position_card_shows_dollar_value_margin_and_stop_outcome(javascript):
+    javascript(POSITION_ROWS + r'''
+run("state.charts = {asset: {krw_per_usdt: 1400}}");
+run("renderPositions")(live);
+const shown = rows();
+assert.equal(shown["수량"], "0.0003");
+assert.equal(shown["포지션 금액"], "$25.06 (약 35,083원)");
+assert.equal(shown["증거금 (묶인 돈)"], "$12.52 (약 17,529원)");
+assert.match(shown["평가손익"], /^\+\$0\.02 \(약 \+24원\) · 증거금 대비 \+0\.14%$/);
+assert.equal(shown["강제청산가"], "$42,000");
+assert.equal(shown["손절 시 손익"], "-$0.47 (약 -652원)");
+assert.equal(shown["익절가"], "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다");
+assert.equal(shown["청산 신호선"], "4시간봉 종가가 $81,163 아래로 마감하면 청산");
+assert.equal(shown["본전 전환"], "고점이 약 $85,800를 넘으면 손절선이 진입가 위로 올라갑니다");
+''')
+
+
+def test_position_card_without_rate_shows_dollars_only_and_uses_lowest_exchange_stop(javascript):
+    javascript(POSITION_ROWS + r'''
+run("state.charts = null");
+run("renderPositions")({...live, stops: [{trigger_price: 82500}, {trigger_price: 81000}]});
+const shown = rows();
+assert.equal(shown["포지션 금액"], "$25.06");
+assert.equal(shown["손절 시 손익"], "-$0.74");
+''')
+
+
+def test_position_card_dry_mode_uses_bot_stop_and_reports_breakeven_reached(javascript):
+    javascript(POSITION_ROWS + r'''
+run("state.charts = null");
+run("renderPositions")({...live, mode: "dry", stops: null,
+    exit_plans: {BTCUSDT: {exit_line: null, trail_distance: 2327.7, bot_stop: 84000}}});
+const shown = rows();
+assert.equal(shown["손절 시 손익"], "+$0.16");
+assert.equal(shown["본전 전환"], "손절선이 이미 진입가 이상입니다");
+assert.equal(shown["청산 신호선"], undefined);
+''')
+
+
+def test_position_card_hides_strategy_exit_rows_for_manual_trades(javascript):
+    javascript(POSITION_ROWS + r'''
+run("state.charts = null");
+run("renderPositions")({...live, exit_plans: {}});
+const shown = rows();
+assert.equal(shown["익절가"], undefined);
+assert.equal(shown["손절 시 손익"], "-$0.47");
+''')
+
+
+def test_emergency_close_sits_at_the_page_bottom_not_pinned_over_content():
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    rule = css.split(".emergency {", 1)[1].split("}", 1)[0]
+    assert "position: fixed" not in rule and "position: sticky" not in rule
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert html.index('<aside class="emergency"') > html.index('id="phone-title"')

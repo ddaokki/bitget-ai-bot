@@ -356,7 +356,8 @@ def test_collect_dry_status_never_calls_private_reader(ops, settings):
         "mode": "dry", "freqtrade": {"reachable": True, "state": "running", "dry_run": True},
         "account": None, "positions": [{"symbol": "BTCUSDT", "side": "short", "size": 0.002,
                                         "entry": 100, "mark": 99, "liq": 150, "leverage": 2}],
-        "stops": None, "smoke_state": {"exists": False, "trade_id": None, "mode": None, "close_confirmed": False},
+        "stops": None, "exit_plans": {},
+        "smoke_state": {"exists": False, "trade_id": None, "mode": None, "close_confirmed": False},
     }
     assert reader.calls == []
     assert SECRET not in repr(result)
@@ -597,3 +598,63 @@ def test_default_runner_never_opens_a_console_window(monkeypatch):
     monkeypatch.setattr(module.subprocess, "run", fake_run)
     assert module.default_runner(["docker", "info"], 5) == (0, "ok")
     assert seen["creationflags"] == getattr(sp, "CREATE_NO_WINDOW", 0)
+
+
+class PlanFT(FT):
+    """Freqtrade with one strategy long, one smoke long and one strategy short."""
+
+    def __init__(self, candles=None):
+        super().__init__()
+        self.candle_calls = []
+        self.candles = candles if candles is not None else {
+            "columns": ["date", "close", "atr_4h", "exit_low_4h", "secret"],
+            "data": [["2026-10-21T10:00:00Z", 83346.5, 700.0, 80000.0, SECRET],
+                     ["2026-10-21T11:00:00Z", 83455.1, 775.9, 81163.0, SECRET]],
+        }
+
+    def status(self):
+        return [
+            {"pair": "BTC/USDT:USDT", "is_short": False, "enter_tag": "safe_long", "open_rate": 83472.1,
+             "stop_loss_abs": 81920.3, "secret": SECRET},
+            {"pair": "ETH/USDT:USDT", "is_short": False, "enter_tag": "smoke", "stop_loss_abs": 2000},
+            {"pair": "SOL/USDT:USDT", "is_short": True, "enter_tag": "safe_short", "stop_loss_abs": 200},
+        ]
+
+    def pair_candles(self, pair, timeframe, limit):
+        self.candle_calls.append((pair, timeframe, limit))
+        return self.candles
+
+
+def test_exit_plans_cover_strategy_longs_only_from_the_last_candle(ops, settings):
+    ft = PlanFT()
+    plans = ops.collect_status(settings, Reader(), ft)["exit_plans"]
+    assert plans == {"BTCUSDT": {"exit_line": 81163.0, "trail_distance": pytest.approx(3 * 775.9),
+                                 "bot_stop": 81920.3}}
+    assert ft.candle_calls == [("BTC/USDT:USDT", "1h", 2)]
+    assert SECRET not in repr(plans)
+
+
+@pytest.mark.parametrize("candles", [{}, {"columns": ["atr_4h"], "data": []},
+                                     {"columns": ["atr_4h", "exit_low_4h"], "data": [[float("nan"), -5]]}])
+def test_exit_plans_leave_unreadable_levels_empty(ops, settings, candles):
+    plans = ops.collect_status(settings, Reader(), PlanFT(candles))["exit_plans"]
+    assert plans == {"BTCUSDT": {"exit_line": None, "trail_distance": None, "bot_stop": 81920.3}}
+
+
+def test_exit_plans_are_none_when_candles_fail_or_freqtrade_is_down(ops, settings):
+    class Broken(PlanFT):
+        def pair_candles(self, pair, timeframe, limit):
+            raise RuntimeError(SECRET)
+
+    assert ops.collect_status(settings, Reader(), Broken())["exit_plans"] is None
+    assert ops.collect_status(settings, Reader(), FT(RuntimeError("down")))["exit_plans"] is None
+
+
+def test_exit_plan_constants_match_the_strategy_rules(ops):
+    import importlib.util
+    path = Path(__file__).resolve().parents[2] / "freqtrade" / "user_data" / "strategies" / "live_rules.py"
+    spec = importlib.util.spec_from_file_location("live_rules_for_panel", path)
+    rules = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rules)
+    assert ops.STRATEGY_TAG_PREFIX == rules.STRATEGY_TAG_PREFIX
+    assert ops.TRAIL_ATR == rules.TRAIL_ATR

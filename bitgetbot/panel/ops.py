@@ -212,6 +212,48 @@ def _live_positions(reader) -> list[dict]:
                       row.liq_price, row.leverage) for row in reader.fetch_positions()]
 
 
+# SafeTrendLive keeps no take-profit order. It trails the stop TRAIL_ATR x ATR(4h) under the highest
+# high since entry and exits when a 4h candle closes below the prior 10-candle low (exit_low_4h).
+# Mirrors live_rules.STRATEGY_TAG_PREFIX and live_rules.TRAIL_ATR (a test keeps them equal).
+STRATEGY_TAG_PREFIX = "safe_"
+TRAIL_ATR = 3.0
+STRATEGY_TIMEFRAME = "1h"
+
+
+def _last_candle(candles) -> dict:
+    columns, data = candles.get("columns"), candles.get("data")
+    if not isinstance(columns, list) or not isinstance(data, list) or not data or not isinstance(data[-1], list):
+        return {}
+    return dict(zip(columns, data[-1]))
+
+
+def _positive(value) -> float | None:
+    number = _number(value)
+    return number if number is not None and number > 0 else None
+
+
+def _exit_plans(ft) -> dict:
+    """Strategy exit levels per symbol for open strategy longs; manual and smoke trades get none."""
+    plans = {}
+    for row in ft.status():
+        tag, pair = row.get("enter_tag"), row.get("pair")
+        if not (isinstance(tag, str) and tag.startswith(STRATEGY_TAG_PREFIX)) or not isinstance(pair, str):
+            continue
+        if row.get("is_short") is not False:
+            continue
+        symbol = pair.split(":")[0].replace("/", "")
+        if not re.fullmatch(r"[A-Z0-9]{1,20}USDT", symbol) or symbol in plans:
+            continue
+        last = _last_candle(ft.pair_candles(pair, STRATEGY_TIMEFRAME, 2))
+        atr = _positive(last.get("atr_4h"))
+        plans[symbol] = {
+            "exit_line": _positive(last.get("exit_low_4h")),
+            "trail_distance": TRAIL_ATR * atr if atr is not None else None,
+            "bot_stop": _positive(row.get("stop_loss_abs")),
+        }
+    return plans
+
+
 def _stops(reader) -> list[dict]:
     return [{"plan_type": _choice(row.plan_type, ("pos_loss", "loss_plan")),
              "trigger_price": _number(row.trigger_price),
@@ -342,6 +384,7 @@ def collect_status(settings: Settings, reader, ft) -> dict:
         "positions": (observe(lambda: _dry_positions(ft)) if reachable else None)
         if settings.dry_run else observe(lambda: _live_positions(reader)),
         "stops": None if settings.dry_run else observe(lambda: _stops(reader)),
+        "exit_plans": observe(lambda: _exit_plans(ft)) if reachable else None,
         "smoke_state": _smoke_state(),
         # Dry and live use separate Freqtrade databases, so these are current-mode stats.
         "stats": observe(lambda: _stats(ft)) if reachable else None,

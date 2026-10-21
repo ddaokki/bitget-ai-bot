@@ -183,6 +183,71 @@ function stopSummary(stops) {
     return stops.length ? stops.map(stop => number(stop.trigger_price, true)).join(" · ") : "손절 주문 없음";
 }
 
+const direction = position => position.side === "long" ? 1 : position.side === "short" ? -1 : null;
+const positionValue = position => finite(position.size) && finite(position.mark) ? position.size * position.mark : null;
+const positionMargin = position => finite(position.size) && finite(position.entry) && finite(position.leverage) && position.leverage > 0
+    ? position.size * position.entry / position.leverage : null;
+
+function krwRate() {
+    const rate = state.charts?.asset?.krw_per_usdt;
+    return finite(rate) && rate > 0 ? rate : null;
+}
+
+// USD with the won value beside it when the Upbit rate is known.
+function money(value) {
+    if (!finite(value)) return "조회 불가";
+    const rate = krwRate();
+    return rate === null ? usd(value) : `${usd(value)} (약 ${krw(value * rate)})`;
+}
+
+function signedMoney(value) {
+    if (!finite(value)) return "조회 불가";
+    const rate = krwRate();
+    return rate === null ? signed(value, usd) : `${signed(value, usd)} (약 ${signed(value * rate, krw)})`;
+}
+
+function unrealized(position) {
+    const sign = direction(position);
+    if (sign === null || !finite(position.size) || !finite(position.entry) || !finite(position.mark)) return "조회 불가";
+    const pnl = (position.mark - position.entry) * position.size * sign;
+    const margin = positionMargin(position);
+    if (!finite(margin) || margin <= 0) return signedMoney(pnl);
+    const percent = new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 2, signDisplay: "exceptZero"}).format(pnl / margin * 100);
+    return `${signedMoney(pnl)} · 증거금 대비 ${percent}%`;
+}
+
+// The stop that closes the position: the exchange stop in live mode (the one furthest from the
+// price, as the widget does), the bot's own stop in dry mode.
+function protectiveStop(position, status) {
+    const sign = direction(position);
+    if (sign === null) return null;
+    if (status.mode === "dry") return status.exit_plans?.[position.symbol]?.bot_stop ?? null;
+    if (position.symbol !== "BTCUSDT" || !Array.isArray(status.stops)) return null;
+    const triggers = status.stops.map(stop => stop.trigger_price).filter(price => finite(price) && price > 0);
+    if (!triggers.length) return null;
+    return sign > 0 ? Math.min(...triggers) : Math.max(...triggers);
+}
+
+function stopOutcome(position, stop) {
+    const sign = direction(position);
+    if (sign === null || !finite(stop) || !finite(position.size) || !finite(position.entry)) return null;
+    return (stop - position.entry) * position.size * sign;
+}
+
+// The strategy sets no take-profit price: it trails the stop up and exits on a 4h close below
+// the prior 10-candle low. Show those two levels instead of an invented target.
+function exitPlanRows(position, plan) {
+    if (!plan || position.side !== "long") return [];
+    const rows = [["익절가", "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다"]];
+    if (finite(plan.exit_line)) rows.push(["청산 신호선", `4시간봉 종가가 ${number(plan.exit_line, true)} 아래로 마감하면 청산`]);
+    if (finite(plan.bot_stop) && finite(position.entry) && plan.bot_stop >= position.entry) {
+        rows.push(["본전 전환", "손절선이 이미 진입가 이상입니다"]);
+    } else if (finite(plan.trail_distance) && finite(position.entry)) {
+        rows.push(["본전 전환", `고점이 약 ${number(Math.round(position.entry + plan.trail_distance), true)}를 넘으면 손절선이 진입가 위로 올라갑니다`]);
+    }
+    return rows;
+}
+
 function renderPositions(status) {
     const target = $("positions");
     target.replaceChildren();
@@ -199,10 +264,16 @@ function renderPositions(status) {
             card.append(heading);
             const values = node("dl");
             const rows = [
-                ["수량", number(position.size)], ["레버리지", typeof position.leverage === "number" ? `${number(position.leverage)}배` : "조회 불가"],
+                ["수량", number(position.size)],
+                ["포지션 금액", money(positionValue(position))],
+                ["증거금 (묶인 돈)", money(positionMargin(position))],
+                ["레버리지", typeof position.leverage === "number" ? `${number(position.leverage)}배` : "조회 불가"],
                 ["진입가", number(position.entry, true)], ["현재가", number(position.mark, true)],
-                ["청산가", number(position.liq, true)],
-                ["손절가", position.symbol === "BTCUSDT" ? (status.mode === "dry" ? "모의 모드 · 거래소 조회 안 함" : stopSummary(status.stops)) : "조회 대상 아님 · BTCUSDT만 지원"]
+                ["평가손익", unrealized(position)],
+                ["강제청산가", number(position.liq, true)],
+                ["손절가", position.symbol === "BTCUSDT" ? (status.mode === "dry" ? "모의 모드 · 거래소 조회 안 함" : stopSummary(status.stops)) : "조회 대상 아님 · BTCUSDT만 지원"],
+                ["손절 시 손익", signedMoney(stopOutcome(position, protectiveStop(position, status)))],
+                ...exitPlanRows(position, status.exit_plans?.[position.symbol])
             ];
             for (const [label, value] of rows) {
                 const row = node("div");
