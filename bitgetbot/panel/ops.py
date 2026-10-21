@@ -304,7 +304,6 @@ def _trades(ft, saved: dict[int, dict], dry_run: bool) -> list[dict]:
             "amount": _number(row.get("amount")), "current_rate": _number(row.get("current_rate")),
             "realized_profit": _number(row.get("realized_profit")),
             "kind": _trade_kind(row.get("enter_tag")),
-            "has_open_orders": row.get("has_open_orders") is True,
             "take_profit": targets.price_for(saved, trade_id, row.get("open_timestamp"), dry_run),
         })
     return rows
@@ -447,7 +446,9 @@ def collect_status(settings: Settings, reader, ft, targets_path: Path = targets.
         if settings.dry_run else observe(lambda: _live_positions(reader)),
         "stops": None if settings.dry_run else observe(lambda: _stops(reader)),
         "exit_plans": observe(lambda: _exit_plans(ft)) if reachable else None,
-        "trades": observe(lambda: _trades(ft, targets.load(targets_path), settings.dry_run)) if reachable else None,
+        # Targets are bound to the running bot's mode (the strategy matches on its own dry_run).
+        "trades": observe(lambda: _trades(ft, targets.load(targets_path), freqtrade["dry_run"]))
+        if reachable and freqtrade["dry_run"] is not None else None,
         "smoke_state": _smoke_state(),
         # Dry and live use separate Freqtrade databases, so these are current-mode stats.
         "stats": observe(lambda: _stats(ft)) if reachable else None,

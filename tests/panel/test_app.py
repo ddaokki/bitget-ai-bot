@@ -86,17 +86,11 @@ class FT:
             raise self.error
         return {"status": SENTINELS[3]}
 
-    def force_exit(self, trade_id, ordertype, price=None):
-        self.calls.append((trade_id, ordertype) if price is None else (trade_id, ordertype, price))
+    def force_exit(self, trade_id, ordertype):
+        self.calls.append((trade_id, ordertype))
         if self.error:
             raise self.error
         return {"secret": SENTINELS[3], "result": "ignored"}
-
-    def cancel_open_order(self, trade_id):
-        self.calls.append(("cancel_open_order", trade_id))
-        if self.error:
-            raise self.error
-        return {"secret": SENTINELS[3]}
 
 
 class Reader:
@@ -1709,26 +1703,28 @@ def test_take_profit_is_bound_to_the_trade_and_shown_in_status(panel):
     local_login(panel)
     panel.ft.strategy_version = "user-tp-1"
     panel.ft.open_trades = [dict(LONG_TRADE)]
-    # Leftovers: another mode's trade 2 and a closed trade 7 are dropped on the next write.
+    # The live section's trade 2 is another trade and stays; this (dry) mode's closed trade 7 is dropped.
     panel.deps.targets_path.write_text(
-        '{"take_profit": {"2": {"price": 70000, "open_ts": 1, "dry_run": false},'
-        ' "7": {"price": 90000, "open_ts": 5, "dry_run": true}}}', encoding="utf-8")
+        '{"take_profit": {"live": {"2": {"price": 70000, "open_ts": 1}},'
+        ' "dry": {"7": {"price": 90000, "open_ts": 5}}}}', encoding="utf-8")
     response = trade_post(panel.local, "/api/trades/2/take-profit", {"price": 86000})
     assert response.status_code == 200
     assert "거래소 손절은 그대로" in response.json()["message"]
-    assert saved_targets(panel) == {"take_profit": {"2": {"price": 86000.0, "open_ts": OPEN_TS, "dry_run": True}}}
+    assert saved_targets(panel) == {"take_profit": {"live": {"2": {"price": 70000.0, "open_ts": 1}},
+                                                    "dry": {"2": {"price": 86000.0, "open_ts": OPEN_TS}}}}
     status = panel.local.get("/api/status").json()
     assert status["freqtrade"]["take_profit"] is True
     assert status["trades"][0]["take_profit"] == 86000.0
     assert trade_post(panel.local, "/api/trades/2/take-profit", {"price": None}).status_code == 200
-    assert saved_targets(panel) == {"take_profit": {}}
+    assert saved_targets(panel) == {"take_profit": {"live": {"2": {"price": 70000.0, "open_ts": 1}}, "dry": {}}}
 
 
 def test_status_ignores_a_target_saved_for_another_trade_with_the_same_id(panel):
     local_login(panel)
     panel.ft.open_trades = [dict(LONG_TRADE)]
     panel.deps.targets_path.write_text(
-        '{"take_profit": {"2": {"price": 70000, "open_ts": 1, "dry_run": true}}}', encoding="utf-8")
+        '{"take_profit": {"dry": {"2": {"price": 70000, "open_ts": 1}},'
+        ' "live": {"2": {"price": 71000, "open_ts": 1792584003000}}}}', encoding="utf-8")
     assert panel.local.get("/api/status").json()["trades"][0]["take_profit"] is None
 
 
@@ -1768,3 +1764,15 @@ def test_trade_actions_are_audited_without_prices(panel):
     actions = [(line["action"], line.get("step"), line["result"]) for line in lines]
     assert ("take_profit", "2", 200) in actions and ("trade_close", "2", 200) in actions
     assert "86000" not in json.dumps(lines)
+
+
+
+def test_trade_actions_refuse_a_bot_running_in_the_other_mode(panel):
+    local_login(panel)
+    panel.ft.strategy_version = "user-tp-1"
+    panel.ft.open_trades = [dict(LONG_TRADE)]
+    panel.ft.dry = False   # the saved mode is dry, but a live bot is still running
+    assert trade_post(panel.local, "/api/trades/2/close", {"type": "market"}).status_code == 409
+    assert trade_post(panel.local, "/api/trades/2/take-profit", {"price": 86000}).status_code == 409
+    assert panel.ft.calls == []
+    assert not panel.deps.targets_path.exists()

@@ -756,10 +756,19 @@ def create_app(deps: PanelDeps) -> FastAPI:
         raise _PanelError(404, TRADE_GONE)
 
     def _trade_client():
+        """(settings, client, bot config) once the running bot's mode matches the saved mode."""
         if deps.jobs.snapshot()["running"]:
             raise _PanelError(409, "다른 작업이 실행 중입니다")
         settings = _settings(deps)
-        return settings, deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
+        ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
+        try:
+            config = ft.show_config()
+        except Exception:
+            raise _PanelError(503, AUTOTRADE_FAILED) from None
+        # Same rule as /api/autotrade: never act on a bot whose mode differs from the saved one.
+        if not isinstance(config, dict) or config.get("dry_run") is not settings.dry_run:
+            raise _PanelError(409, AUTOTRADE_MISMATCH)
+        return settings, ft, config
 
     @app.post("/api/trades/{raw_id}/close")
     def close_trade(raw_id: str, body: dict = Depends(_body)):
@@ -767,7 +776,7 @@ def create_app(deps: PanelDeps) -> FastAPI:
         if body.get("type") != "market":
             raise _PanelError(400, "종료는 시장가만 됩니다. 원하는 가격에 나가려면 익절가를 설정하세요")
         with operation_lock:
-            settings, ft = _trade_client()
+            settings, ft, _ = _trade_client()
             _trade_row(_trade_rows(ft), trade_id)
             cancel_auto_start()  # a manual exit never turns automatic trading on afterwards
             try:
@@ -783,14 +792,9 @@ def create_app(deps: PanelDeps) -> FastAPI:
         trade_id = _trade_id(raw_id)
         price = None if body.get("price") is None else _price(body)
         with operation_lock:
-            settings, ft = _trade_client()
-            if price is not None:
-                try:
-                    config = ft.show_config()
-                except Exception:
-                    raise _PanelError(503, AUTOTRADE_FAILED) from None
-                if not ops.take_profit_supported(config):
-                    raise _PanelError(409, TP_UNSUPPORTED)
+            settings, ft, config = _trade_client()
+            if price is not None and not ops.take_profit_supported(config):
+                raise _PanelError(409, TP_UNSUPPORTED)
             rows = _trade_rows(ft)
             row = _trade_row(rows, trade_id)
             open_ts = row.get("open_timestamp")

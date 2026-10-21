@@ -19,41 +19,44 @@ def strategy_rules():
     return rules
 
 
-def test_set_binds_to_the_trade_and_prunes_other_modes_and_closed_trades(tmp_path):
+def test_set_keeps_the_other_mode_and_prunes_this_modes_closed_trades(tmp_path):
     path = tmp_path / "manual_targets.json"
     path.write_text(json.dumps({"take_profit": {
-        "1": {"price": 70000, "open_ts": 10, "dry_run": False},     # closed trade
-        "2": {"price": 86000, "open_ts": 20, "dry_run": False},     # still open, kept
-        "3": {"price": 90000, "open_ts": 30, "dry_run": True}}}), encoding="utf-8")   # other mode
-    result = targets.set_target(4, 95000, 40, False, {2: 20, 4: 40}, path)
-    assert result == {2: {"price": 86000.0, "open_ts": 20, "dry_run": False},
-                      4: {"price": 95000.0, "open_ts": 40, "dry_run": False}}
-    assert targets.set_target(2, None, 20, False, {2: 20, 4: 40}, path) == {4: result[4]}
+        "live": {"1": {"price": 70000, "open_ts": 10}, "2": {"price": 86000, "open_ts": 20}},
+        "dry": {"2": {"price": 90000, "open_ts": 30}}}}), encoding="utf-8")
+    saved = targets.set_target(4, 95000, 40, False, {2: 20, 4: 40}, path)
+    assert saved == {False: {2: {"price": 86000.0, "open_ts": 20}, 4: {"price": 95000.0, "open_ts": 40}},
+                     True: {2: {"price": 90000.0, "open_ts": 30}}}
+    saved = targets.set_target(2, None, 20, False, {2: 20, 4: 40}, path)
+    assert saved[False] == {4: {"price": 95000.0, "open_ts": 40}}
+    assert saved[True] == {2: {"price": 90000.0, "open_ts": 30}}
 
 
-def test_price_for_matches_id_open_time_and_mode(tmp_path):
-    saved = {2: {"price": 86000.0, "open_ts": 20, "dry_run": False}}
+def test_price_for_matches_mode_id_and_open_time():
+    saved = {False: {2: {"price": 86000.0, "open_ts": 20}}, True: {}}
     assert targets.price_for(saved, 2, 20, False) == 86000.0
     assert targets.price_for(saved, 2, 21, False) is None
     assert targets.price_for(saved, 2, 20, True) is None
     assert targets.price_for(saved, 3, 20, False) is None
 
 
-@pytest.mark.parametrize("text", ["", "{", "[]", '{"take_profit": 5}', '{"take_profit": {"a": {}, "2": 86000}}'])
+@pytest.mark.parametrize("text", ["", "{", "[]", '{"take_profit": 5}', '{"take_profit": {"live": {"a": {}, "2": 86000}}}'])
 def test_malformed_files_mean_no_targets(tmp_path, text):
     path = tmp_path / "manual_targets.json"
     path.write_text(text, encoding="utf-8")
-    assert targets.load(path) == {}
-    assert targets.load(tmp_path / "missing.json") == {}
+    assert targets.load(path) == {True: {}, False: {}}
+    assert targets.load(tmp_path / "missing.json") == {True: {}, False: {}}
 
 
-def test_strategy_reads_exactly_what_the_panel_writes(tmp_path):
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_strategy_reads_exactly_what_the_panel_writes(tmp_path, dry_run):
     path = tmp_path / "manual_targets.json"
-    targets.set_target(2, 86000.5, 1792584003000, False, {2: 1792584003000}, path)
+    targets.set_target(2, 86000.5, 1792584003000, dry_run, {2: 1792584003000}, path)
     rules = strategy_rules()
-    parsed = rules.parse_manual_targets(path.read_text(encoding="utf-8"))
-    assert parsed == targets.load(path)
-    assert rules.target_for(parsed, 2, 1792584003000, False) == 86000.5
+    parsed = rules.parse_manual_targets(path.read_text(encoding="utf-8"), dry_run)
+    assert parsed == targets.load(path)[dry_run]
+    assert rules.target_for(parsed, 2, 1792584003000) == 86000.5
+    assert rules.parse_manual_targets(path.read_text(encoding="utf-8"), not dry_run) == {}
     assert path.name == rules.MANUAL_TARGETS_FILE
     assert targets.PATH == Path("freqtrade/user_data") / rules.MANUAL_TARGETS_FILE
 

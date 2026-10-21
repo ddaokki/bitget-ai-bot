@@ -17,3 +17,6 @@ node_modules/
 ledger/
 .smoke_state.json
 .panel/
+# Per-trade take-profits written by the panel (runtime state)
+freqtrade/user_data/manual_targets.json
+freqtrade/user_data/.manual_targets.json.*.tmp

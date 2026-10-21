@@ -109,26 +109,24 @@ def test_daily_rows_usable_needs_400_contiguous_days():
     assert not live_rules.daily_rows_usable(rows[:200] + rows[201:] + [[400 * DAY, 1, 1, 1, 1, 1]])
 
 
-def test_manual_targets_bind_each_price_to_one_trade():
-    text = ('{"take_profit": {"2": {"price": 86000, "open_ts": 1792584003000, "dry_run": false},'
-            ' "3": {"price": 85000.5, "open_ts": 1, "dry_run": true},'
-            ' "4": {"price": -1, "open_ts": 1, "dry_run": true}, "5": {"price": 1, "open_ts": "1", "dry_run": true},'
-            ' "6": {"price": 1, "open_ts": 1, "dry_run": 0}, "7": 86000, "x": {"price": 1, "open_ts": 1, "dry_run": true},'
-            ' "8": {"price": 1e999, "open_ts": 1, "dry_run": true},'
-            ' "9": {"price": 100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000, "open_ts": 1, "dry_run": true}}}')
-    targets = live_rules.parse_manual_targets(text)
-    assert targets == {2: {"price": 86000.0, "open_ts": 1792584003000, "dry_run": False},
-                       3: {"price": 85000.5, "open_ts": 1, "dry_run": True}}
-    assert live_rules.target_for(targets, 2, 1792584003000, False) == 86000.0
-    # Same id in the other mode's database, or a later trade reusing the id: no target.
-    assert live_rules.target_for(targets, 2, 1792584003000, True) is None
-    assert live_rules.target_for(targets, 2, 1792584003001, False) is None
-    assert live_rules.target_for(targets, 99, 1, False) is None
+def test_manual_targets_read_this_modes_section_and_bind_each_price_to_one_trade():
+    text = ('{"take_profit": {"live": {"2": {"price": 86000, "open_ts": 1792584003000},'
+            ' "4": {"price": -1, "open_ts": 1}, "5": {"price": 1, "open_ts": "1"}, "7": 86000,'
+            ' "x": {"price": 1, "open_ts": 1}, "8": {"price": 1e999, "open_ts": 1},'
+            ' "9": {"price": 1' + "0" * 400 + ', "open_ts": 1}},'
+            ' "dry": {"2": {"price": 70000, "open_ts": 5}}}}')
+    live = live_rules.parse_manual_targets(text, dry_run=False)
+    assert live == {2: {"price": 86000.0, "open_ts": 1792584003000}}
+    assert live_rules.parse_manual_targets(text, dry_run=True) == {2: {"price": 70000.0, "open_ts": 5}}
+    assert live_rules.target_for(live, 2, 1792584003000) == 86000.0
+    # A later trade reusing the id (different open time) gets no target.
+    assert live_rules.target_for(live, 2, 1792584003001) is None
+    assert live_rules.target_for(live, 99, 1) is None
 
 
 @pytest.mark.parametrize("text", ["", "not json", "[]", '{"take_profit": []}', '{"other": {}}'])
 def test_manual_targets_ignore_malformed_files(text):
-    assert live_rules.parse_manual_targets(text) == {}
+    assert live_rules.parse_manual_targets(text, dry_run=False) == {}
 
 
 @pytest.mark.parametrize("is_short, rate, target, hit", [

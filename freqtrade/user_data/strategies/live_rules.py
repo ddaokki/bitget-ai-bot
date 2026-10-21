@@ -124,38 +124,39 @@ def daily_rows_usable(rows: list[list]) -> bool:
     return all(int(b[0]) - int(a[0]) == DAY_MS for a, b in zip(rows, rows[1:]))
 
 
-def parse_manual_targets(text: str) -> dict[int, dict]:
-    """{trade id: {"price", "open_ts", "dry_run"}} from the panel's file. Anything malformed is dropped.
+def parse_manual_targets(text: str, dry_run: bool) -> dict[int, dict]:
+    """This mode's {trade id: {"price", "open_ts"}} from the panel's file. Anything malformed is dropped.
 
-    A target names the exact trade it was set on (open time in ms and mode), because the dry and
-    live databases both number trades from 1 and a target must never move to another trade.
+    File: {"take_profit": {"live": {"<id>": {"price": p, "open_ts": ms}}, "dry": {...}}}. Dry and live
+    keep separate sections because their databases both number trades from 1, and each target also
+    names its trade's open time so it never moves to a later trade that reuses the id.
     """
     try:
         data = json.loads(text)
     except ValueError:
         return {}
-    targets = data.get("take_profit") if isinstance(data, dict) else None
-    if not isinstance(targets, dict):
+    sections = data.get("take_profit") if isinstance(data, dict) else None
+    section = sections.get("dry" if dry_run else "live") if isinstance(sections, dict) else None
+    if not isinstance(section, dict):
         return {}
     result = {}
-    for key, entry in targets.items():
+    for key, entry in section.items():
         try:
             trade_id = int(key)
         except (TypeError, ValueError, OverflowError):
             continue
         if not isinstance(entry, dict):
             continue
-        price, open_ts, dry_run = entry.get("price"), entry.get("open_ts"), entry.get("dry_run")
-        if type(price) in (int, float) and _finite_positive(price) and type(open_ts) is int and open_ts > 0 \
-                and type(dry_run) is bool:
-            result[trade_id] = {"price": float(price), "open_ts": open_ts, "dry_run": dry_run}
+        price, open_ts = entry.get("price"), entry.get("open_ts")
+        if type(price) in (int, float) and _finite_positive(price) and type(open_ts) is int and open_ts > 0:
+            result[trade_id] = {"price": float(price), "open_ts": open_ts}
     return result
 
 
-def target_for(targets: dict[int, dict], trade_id: int, open_ts: int, dry_run: bool) -> float | None:
-    """The take-profit price for this exact trade (same id, open time and mode), else None."""
+def target_for(targets: dict[int, dict], trade_id: int, open_ts: int) -> float | None:
+    """The take-profit price for this exact trade (same id and open time), else None."""
     entry = targets.get(trade_id)
-    if entry is None or entry["open_ts"] != open_ts or entry["dry_run"] is not dry_run:
+    if entry is None or entry["open_ts"] != open_ts:
         return None
     return entry["price"]
 

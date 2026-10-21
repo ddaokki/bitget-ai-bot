@@ -71,7 +71,6 @@ class SafeTrendLive(IStrategy):
         self._calendar_warned = None
         self._daily_cache: dict[str, tuple[float, DataFrame]] = {}
         self._daily_client = None
-        self._targets_cache: tuple[int | None, dict[int, float]] = (None, {})
         if self._fetches_own_daily():
             import ccxt  # public market data only: no keys
             self._daily_client = ccxt.bitget({"enableRateLimit": True, "timeout": 15000,
@@ -278,32 +277,24 @@ class SafeTrendLive(IStrategy):
         return "user-tp-1"
 
     def _manual_targets(self) -> dict[int, dict]:
-        """User take-profits from user_data/manual_targets.json, re-read only when the file changes.
+        """This mode's user take-profits from user_data/manual_targets.json.
 
-        Live and dry-run only: a backtest must never pick up a target. Any read or parse problem
-        means no targets (and is cached until the file changes), never an exception.
+        Read on every call (a few hundred bytes): a cache keyed on mtime can miss a rewrite on a
+        Docker Desktop bind mount. Live and dry-run only: a backtest must never pick up a target.
+        Any read or parse problem means no targets, never an exception.
         """
         if not self._fetches_own_daily():
             return {}
         path = Path(self.config.get("user_data_dir", "user_data")) / rules.MANUAL_TARGETS_FILE
-        cached_stamp, cached = getattr(self, "_targets_cache", (None, {}))
         try:
-            stamp = path.stat().st_mtime_ns
-        except OSError:
-            self._targets_cache = (None, {})
+            return rules.parse_manual_targets(path.read_text(encoding="utf-8"), bool(self.config.get("dry_run")))
+        except Exception:
             return {}
-        if cached_stamp != stamp:
-            try:
-                cached = rules.parse_manual_targets(path.read_text(encoding="utf-8"))
-            except Exception:
-                cached = {}
-            self._targets_cache = (stamp, cached)
-        return cached
 
     def _take_profit_hit(self, trade, rate: float) -> bool:
         try:
             open_ts = int(trade.open_date_utc.timestamp() * 1000)
-            target = rules.target_for(self._manual_targets(), int(trade.id), open_ts, bool(self.config.get("dry_run")))
+            target = rules.target_for(self._manual_targets(), int(trade.id), open_ts)
             return rules.take_profit_hit(bool(trade.is_short), rate, target)
         except Exception:
             return False

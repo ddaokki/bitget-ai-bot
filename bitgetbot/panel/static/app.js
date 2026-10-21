@@ -244,8 +244,8 @@ function stopOutcome(position, stop) {
     return (stop - position.entry) * position.size * sign;
 }
 
-// The strategy sets no take-profit price: it trails the stop up and exits on a 4h close below
-// the prior 10-candle low. Show those two levels instead of an invented target.
+// The strategy sets no take-profit price of its own: it trails the stop up and exits on a 4h close
+// below the prior 10-candle low. Show those levels, plus the user's take-profit when one is set.
 // `stop` is the stop that actually protects the position (exchange stop live, bot stop dry).
 function exitPlanRows(position, plan, stop, takeProfit) {
     const rows = [];
@@ -277,6 +277,9 @@ function controlledTrade() {
 function tradeActionAllowed(action) {
     const trade = controlledTrade();
     if (!action || !trade || trade.trade_id !== action.tradeId) return false;
+    // Same rule as the steps and autotrade: the running bot's mode must match the saved one.
+    const ft = state.status?.freqtrade;
+    if (ft?.reachable !== true || ft.dry_run !== (state.status?.mode === "dry")) return false;
     return canAct() && !state.pending && state.job?.running !== true;
 }
 
