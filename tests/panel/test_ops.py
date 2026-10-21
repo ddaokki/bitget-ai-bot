@@ -353,8 +353,7 @@ def test_collect_dry_status_never_calls_private_reader(ops, settings):
     result = ops.collect_status(settings, reader, FT())
     assert result.pop("stats") == STATS
     assert result == {
-        "mode": "dry", "freqtrade": {"reachable": True, "state": "running", "dry_run": True,
-                                      "take_profit": False},
+        "mode": "dry", "freqtrade": {"reachable": True, "state": "running", "dry_run": True},
         "account": None, "positions": [{"symbol": "BTCUSDT", "side": "short", "size": 0.002,
                                         "entry": 100, "mark": 99, "liq": 150, "leverage": 2,
                                         "margin": None}],
@@ -384,7 +383,7 @@ def test_collect_hides_all_exceptions_and_secrets(ops, settings, dry, capsys):
 
     failure = FreqtradeError(500, SECRET + ERROR)
     result = ops.collect_status(replace(settings, dry_run=dry), Reader(failure), FT(failure))
-    assert result["freqtrade"] == {"reachable": False, "state": None, "dry_run": None, "take_profit": False}
+    assert result["freqtrade"] == {"reachable": False, "state": None, "dry_run": None}
     assert result["account"] is None and result["positions"] is None and result["stops"] is None
     assert result["stats"] is None
     assert SECRET not in repr(result) and ERROR not in repr(result)
@@ -396,7 +395,7 @@ def test_collect_isolates_failed_fields(ops, settings):
     ft = FT()
     ft.show_config = lambda: (_ for _ in ()).throw(ValueError(SECRET + ERROR))
     result = ops.collect_status(settings, Reader(), ft)
-    assert result["freqtrade"] == {"reachable": True, "state": None, "dry_run": None, "take_profit": False}
+    assert result["freqtrade"] == {"reachable": True, "state": None, "dry_run": None}
     assert len(result["positions"]) == 1
 
 
@@ -416,7 +415,7 @@ def test_collect_sanitizes_malformed_values(ops, settings):
                          "open_rate": SECRET, "current_rate": float("nan"),
                          "liquidation_price": float("inf"), "leverage": {"secret": SECRET}}]
     result = ops.collect_status(settings, Reader(), ft)
-    assert result["freqtrade"] == {"reachable": True, "state": None, "dry_run": None, "take_profit": False}
+    assert result["freqtrade"] == {"reachable": True, "state": None, "dry_run": None}
     assert result["positions"] == [{name: None for name in
                                     ("symbol", "side", "size", "entry", "mark", "liq", "leverage", "margin")}]
     assert SECRET not in repr(result)

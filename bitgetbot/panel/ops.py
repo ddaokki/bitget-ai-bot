@@ -10,7 +10,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 from bitgetbot.bitget_read import classify_account
-from bitgetbot.panel import targets
 from bitgetbot.privcfg import Settings
 from bitgetbot.smoke import STATE_PATH, SYMBOL
 
@@ -278,7 +277,6 @@ def _exit_plans(ft) -> dict:
 
 
 SMOKE_TAG = "smoke"  # bitgetbot.smoke enters with this tag; its own steps close it
-TAKE_PROFIT_VERSION = "user-tp-"  # SafeTrendLive.version() prefix once it honours manual_targets.json
 
 
 def _trade_kind(tag) -> str:
@@ -287,8 +285,20 @@ def _trade_kind(tag) -> str:
     return "smoke" if tag == SMOKE_TAG else "manual"
 
 
-def _trades(ft, targets: dict[int, float]) -> list[dict]:
-    """Open Freqtrade trades the panel can close or give a take-profit (current mode only)."""
+def _open_exit_price(row: dict) -> float | None:
+    """Price of the trade's open exit order (a resting limit close), if any."""
+    exit_side = "buy" if row.get("is_short") is True else "sell"
+    for order in row.get("orders") or []:
+        if isinstance(order, dict) and order.get("is_open") is True and order.get("ft_order_side") == exit_side:
+            price = _number(order.get("safe_price"))
+            if price is None:
+                price = _number(order.get("price"))
+            return price if price is not None and price > 0 else None
+    return None
+
+
+def _trades(ft) -> list[dict]:
+    """Open Freqtrade trades the panel can close (current mode only)."""
     rows = []
     for row in ft.status():
         trade_id = row.get("trade_id")
@@ -305,7 +315,7 @@ def _trades(ft, targets: dict[int, float]) -> list[dict]:
             "realized_profit": _number(row.get("realized_profit")),
             "kind": _trade_kind(row.get("enter_tag")),
             "has_open_orders": row.get("has_open_orders") is True,
-            "take_profit": targets.get(trade_id),
+            "open_exit_price": _open_exit_price(row),
         })
     return rows
 
@@ -423,23 +433,16 @@ def _stats(ft) -> dict | None:
     return result
 
 
-def take_profit_supported(config) -> bool:
-    """True once the running strategy reads user take-profits (it reports a "user-tp-" version)."""
-    version = config.get("strategy_version") if isinstance(config, dict) else None
-    return isinstance(version, str) and version.startswith(TAKE_PROFIT_VERSION)
-
-
-def collect_status(settings: Settings, reader, ft, targets_path: Path = targets.PATH) -> dict:
+def collect_status(settings: Settings, reader, ft) -> dict:
     """Collect independent snapshots; dry mode never touches private exchange APIs."""
     reachable = observe(ft.ping) is True
-    freqtrade = {"reachable": reachable, "state": None, "dry_run": None, "take_profit": False}
+    freqtrade = {"reachable": reachable, "state": None, "dry_run": None}
     if reachable:
         config = observe(ft.show_config)
         if isinstance(config, dict):
             freqtrade["state"] = _choice(config.get("state"), ("running", "paused", "stopped", "reload_config"))
             dry_run = config.get("dry_run")
             freqtrade["dry_run"] = dry_run if type(dry_run) is bool else None
-            freqtrade["take_profit"] = take_profit_supported(config)
     return {
         "mode": "dry" if settings.dry_run else "live", "freqtrade": freqtrade,
         "account": None if settings.dry_run else observe(lambda: _account(reader)),
@@ -447,7 +450,7 @@ def collect_status(settings: Settings, reader, ft, targets_path: Path = targets.
         if settings.dry_run else observe(lambda: _live_positions(reader)),
         "stops": None if settings.dry_run else observe(lambda: _stops(reader)),
         "exit_plans": observe(lambda: _exit_plans(ft)) if reachable else None,
-        "trades": observe(lambda: _trades(ft, targets.load(targets_path))) if reachable else None,
+        "trades": observe(lambda: _trades(ft)) if reachable else None,
         "smoke_state": _smoke_state(),
         # Dry and live use separate Freqtrade databases, so these are current-mode stats.
         "stats": observe(lambda: _stats(ft)) if reachable else None,

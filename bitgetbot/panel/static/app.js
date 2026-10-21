@@ -247,11 +247,12 @@ function stopOutcome(position, stop) {
 // The strategy sets no take-profit price: it trails the stop up and exits on a 4h close below
 // the prior 10-candle low. Show those two levels instead of an invented target.
 // `stop` is the stop that actually protects the position (exchange stop live, bot stop dry).
-function exitPlanRows(position, plan, stop, takeProfit) {
+function exitPlanRows(position, plan, stop, openExitPrice) {
     const rows = [];
-    if (finite(takeProfit)) rows.push(["익절가", `${number(takeProfit, true)} · 닿으면 거래 봇이 시장가로 청산`]);
+    // A resting limit close above the price is the user's take-profit order on Bitget.
+    if (finite(openExitPrice)) rows.push(["익절가 (지정가 주문)", `${number(openExitPrice, true)} · 비트겟에 걸린 지정가 종료 주문`]);
     if (!plan || position.side !== "long") return rows;
-    if (!finite(takeProfit)) rows.push(["익절가", "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다"]);
+    if (!finite(openExitPrice)) rows.push(["익절가", "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다"]);
     if (finite(plan.exit_line)) rows.push(["청산 신호선", `다음 4시간봉 종가가 ${number(plan.exit_line, true)} 아래면 청산`]);
     if (finite(stop) && finite(position.entry) && stop >= position.entry) {
         rows.push(["본전 전환", "손절선이 이미 진입가 이상입니다"]);
@@ -276,7 +277,7 @@ function controlledTrade() {
 
 function tradeActionAllowed(action) {
     const trade = controlledTrade();
-    if (!action || !trade || trade.trade_id !== action.tradeId || trade.has_open_orders) return false;
+    if (!action || !trade || trade.trade_id !== action.tradeId) return false;
     return canAct() && !state.pending && state.job?.running !== true;
 }
 
@@ -285,17 +286,18 @@ function renderTradeControls() {
     $("trade-controls").hidden = trade === null;
     if (trade === null) return;
     const current = finite(trade.current_rate) ? ` · 현재 ${number(trade.current_rate, true)}` : "";
-    text("trade-summary", `거래 #${trade.trade_id} · ${trade.symbol || "코인 불명"} ${sideName(trade.side)} ${number(trade.amount)}${current}`
-        + (finite(trade.take_profit) ? ` · 익절가 ${number(trade.take_profit, true)}` : " · 익절가 없음"));
+    text("trade-summary", `거래 #${trade.trade_id} · ${trade.symbol || "코인 불명"} ${sideName(trade.side)} ${number(trade.amount)}${current}`);
     const busy = !tradeActionAllowed({tradeId: trade.trade_id});
     $("close-market").disabled = busy;
     $("close-limit").disabled = busy;
-    const tpReady = state.status?.freqtrade?.take_profit === true;
-    $("tp-set").disabled = busy || !tpReady;
-    $("tp-clear").hidden = !finite(trade.take_profit);
-    $("tp-clear").disabled = busy;
-    text("trade-help", trade.has_open_orders ? "이 거래에 처리 중인 주문이 있습니다. 끝날 때까지 기다리세요."
-        : !tpReady ? "익절가는 거래 봇을 다시 시작한 뒤 쓸 수 있습니다." : "");
+    $("open-order").hidden = !trade.has_open_orders;
+    text("open-order", finite(trade.open_exit_price)
+        ? `걸려 있는 지정가 종료 주문: ${number(trade.open_exit_price, true)}`
+        : "처리 중인 주문이 있습니다.");
+    $("cancel-order").hidden = !trade.has_open_orders;
+    $("cancel-order").disabled = busy;
+    text("trade-help", trade.has_open_orders
+        ? "새 지정가 주문이나 시장가 종료를 내면 걸려 있던 주문은 거래 봇이 취소하고 바꿉니다." : "");
 }
 
 function readPrice(id) {
@@ -310,21 +312,12 @@ function requestLimitClose(event) {
     if (!trade || !tradeActionAllowed({tradeId: trade.trade_id})) return;
     if (price === null) { notify("지정가 종료 가격을 숫자로 입력하세요.", true); return; }
     const current = trade.current_rate;
-    if (finite(current)) {
-        const long = trade.side !== "short";
-        if (long ? price > current : price < current) { notify("지정가 종료는 현재가 이하만 됩니다. 더 높은 가격은 익절가로 설정하세요.", true); return; }
-        if (long ? price < current * 0.95 : price > current * 1.05) { notify("현재가보다 5% 넘게 불리한 가격은 받지 않습니다. 시장가 종료를 쓰세요.", true); return; }
+    // Typo guard (the server checks the same band): a resting limit close keeps the stop.
+    if (finite(current) && (price < current * 0.5 || price > current * 1.5)) {
+        notify("지정가는 현재가에서 50% 안쪽으로 입력하세요.", true);
+        return;
     }
     openConfirmation({kind: "trade", value: "limit", tradeId: trade.trade_id, price, live: false});
-}
-
-function requestTakeProfit(event) {
-    event.preventDefault();
-    const trade = controlledTrade();
-    const price = readPrice("tp-price");
-    if (!trade || !tradeActionAllowed({tradeId: trade.trade_id}) || state.status?.freqtrade?.take_profit !== true) return;
-    if (price === null) { notify("익절가를 숫자로 입력하세요.", true); return; }
-    command(`/api/trades/${trade.trade_id}/take-profit`, {price});
 }
 
 function renderPositions(status) {
@@ -355,7 +348,7 @@ function renderPositions(status) {
                 ...(finite(tradeFor(status, position.symbol)?.realized_profit) && tradeFor(status, position.symbol).realized_profit !== 0
                     ? [["실현손익", signedMoney(tradeFor(status, position.symbol).realized_profit)]] : []),
                 ...exitPlanRows(position, status.exit_plans?.[position.symbol], protectiveStop(position, status),
-                    tradeFor(status, position.symbol)?.take_profit)
+                    tradeFor(status, position.symbol)?.open_exit_price)
             ];
             for (const [label, value] of rows) {
                 const row = node("div");
@@ -720,7 +713,7 @@ function openConfirmation(action) {
         text("confirm-title", action.value === "market" ? "시장가 종료" : "지정가 종료");
         text("confirm-description", action.value === "market"
             ? `${what}을(를) 지금 시장가로 닫습니다. 되돌릴 수 없습니다. 체결 결과는 비트겟 앱에서 확인하세요.`
-            : `${what}을(를) ${number(action.price, true)} 지정가로 닫는 주문을 냅니다. 체결 전까지 거래소 손절 주문이 빠지고, 1분 안에 체결되지 않으면 자동 취소한 뒤 손절을 다시 겁니다.`);
+            : `${what}을(를) ${number(action.price, true)} 지정가로 닫는 주문을 겁니다. 체결되거나 취소할 때까지 비트겟에 남고, 거래소 손절과 손절선 끌어올리기는 그대로 계속됩니다.${finite(trade?.current_rate) && (trade.side === "short" ? action.price >= trade.current_rate : action.price <= trade.current_rate) ? " 현재가와 같거나 불리한 가격이라 바로 체결될 수 있습니다." : ""}`);
         updateConfirmation();
         $("confirmation").showModal();
         $("cancel-action").focus();
@@ -877,10 +870,11 @@ function boot() {
         if (trade) openConfirmation({kind: "trade", value: "market", tradeId: trade.trade_id, live: false});
     });
     $("limit-form").addEventListener("submit", requestLimitClose);
-    $("tp-form").addEventListener("submit", requestTakeProfit);
-    $("tp-clear").addEventListener("click", () => {
+    $("cancel-order").addEventListener("click", () => {
         const trade = controlledTrade();
-        if (trade && tradeActionAllowed({tradeId: trade.trade_id})) command(`/api/trades/${trade.trade_id}/take-profit`, {price: null});
+        if (trade && trade.has_open_orders && tradeActionAllowed({tradeId: trade.trade_id})) {
+            command(`/api/trades/${trade.trade_id}/cancel-order`, {});
+        }
     });
     $("cancel-action").addEventListener("click", closeConfirmation);
     $("confirmation").addEventListener("cancel", closeConfirmation);

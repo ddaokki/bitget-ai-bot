@@ -38,7 +38,6 @@ class FT:
         self.open_trades = []
         self.ping_error = None
         self.config_error = None
-        self.strategy_version = None
         self.equity = 105.5
         self.candles = None
         self.history = {"trades": [], "total_trades": 0}
@@ -51,8 +50,7 @@ class FT:
     def show_config(self):
         if self.config_error:
             raise self.config_error
-        return {"state": self.state, "dry_run": self.dry, "strategy_version": self.strategy_version,
-                "api_server": {"password": SENTINELS[5]}}
+        return {"state": self.state, "dry_run": self.dry, "api_server": {"password": SENTINELS[5]}}
 
     def balance(self):
         if self.equity is None:
@@ -202,7 +200,6 @@ def panel(tmp_path, monkeypatch):
         mode_setter=mode_setter, keys_setter=lambda *values: keys.append(values),
         keys_configured=lambda: {"key": True, "secret": True, "password": True},
         background=background.append, sleep=sleep, krw_rate=krw_rate, record_on_startup=False,
-        targets_path=tmp_path / "manual_targets.json",
     )
     application = module.create_app(deps)
     with TestClient(application, base_url="http://127.0.0.1:8090", client=("127.0.0.1", 12345)) as local:
@@ -1605,99 +1602,93 @@ def test_status_survives_equity_read_failure(panel):
     assert not panel.deps.pin_store_path.with_name("equity.jsonl").exists()
 
 
+
 LONG_TRADE = {"trade_id": 2, "pair": "BTC/USDT:USDT", "is_short": False, "amount": 0.0003,
               "current_rate": 83500.0, "enter_tag": "safe_long", "has_open_orders": False,
               "realized_profit": 0.0, "secret": SENTINELS[3]}
 
 
-def trade_post(panel, client, path, body):
-    return client.post(path, json=body, headers=PANEL_HEADER)
+def trade_post(client, path, body=None):
+    return client.post(path, json={} if body is None else body, headers=PANEL_HEADER)
 
 
-def test_market_close_exits_one_trade_once_and_clears_its_take_profit(panel):
+def test_market_close_exits_one_trade_once(panel):
     local_login(panel)
     panel.ft.open_trades = [dict(LONG_TRADE)]
-    panel.deps.targets_path.write_text('{"take_profit": {"2": 86000}}', encoding="utf-8")
-    response = trade_post(panel, panel.local, "/api/trades/2/close", {"type": "market"})
+    response = trade_post(panel.local, "/api/trades/2/close", {"type": "market"})
     assert response.status_code == 200
     assert "시장가 종료를 요청했습니다" in response.json()["message"]
     assert panel.ft.calls == [(2, "market")]
-    assert '"2"' not in panel.deps.targets_path.read_text(encoding="utf-8")
-    assert panel.background == []
     assert SENTINELS[3] not in response.text
 
 
 def test_phone_session_can_close_a_trade(panel):
     tailnet_login(panel)
     panel.ft.open_trades = [dict(LONG_TRADE)]
-    response = trade_post(panel, panel.tailnet, "/api/trades/2/close", {"type": "market"})
-    assert response.status_code == 200
+    assert trade_post(panel.tailnet, "/api/trades/2/close", {"type": "market"}).status_code == 200
     assert panel.ft.calls == [(2, "market")]
 
 
 def test_close_requires_session_and_panel_header(panel):
     panel.ft.open_trades = [dict(LONG_TRADE)]
-    assert panel.local.post("/api/trades/2/close", json={"type": "market"}, headers=PANEL_HEADER).status_code == 401
+    assert trade_post(panel.local, "/api/trades/2/close", {"type": "market"}).status_code == 401
     local_login(panel)
     assert panel.local.post("/api/trades/2/close", json={"type": "market"}).status_code in (400, 403)
     assert panel.ft.calls == []
 
 
-def test_limit_close_must_be_marketable_and_cancels_itself_if_unfilled(panel):
+@pytest.mark.parametrize("price", [83400, 83500, 86000, 120000])
+def test_limit_close_rests_at_any_price_in_the_band(panel, price):
+    # On Bitget, Freqtrade keeps (and keeps trailing) the exchange stop while a limit exit rests,
+    # so a price above the market works as a take-profit order.
     local_login(panel)
     panel.ft.open_trades = [dict(LONG_TRADE)]
-    response = trade_post(panel, panel.local, "/api/trades/2/close", {"type": "limit", "price": 83400})
+    response = trade_post(panel.local, "/api/trades/2/close", {"type": "limit", "price": price})
     assert response.status_code == 200
-    assert "자동 취소" in response.json()["message"]
-    assert panel.ft.calls == [(2, "limit", 83400.0)]
-    assert len(panel.background) == 1
-    # The order is still open a minute later: cancel it so Freqtrade re-places the stop.
+    assert "손절과 손절선 끌어올리기는 그대로" in response.json()["message"]
+    assert panel.ft.calls == [(2, "limit", float(price))]
+    assert panel.background == []
+
+
+def test_limit_close_replaces_an_open_exit_order(panel):
+    local_login(panel)
     panel.ft.open_trades = [dict(LONG_TRADE, has_open_orders=True)]
-    panel.background.pop()()
-    assert panel.sleeps[-1] == 60.0
-    assert panel.ft.calls[-1] == ("cancel_open_order", 2)
+    assert trade_post(panel.local, "/api/trades/2/close", {"type": "limit", "price": 86500}).status_code == 200
+    assert trade_post(panel.local, "/api/trades/2/close", {"type": "market"}).status_code == 200
+    assert panel.ft.calls == [(2, "limit", 86500.0), (2, "market")]
 
 
-def test_filled_limit_close_is_not_cancelled(panel):
+@pytest.mark.parametrize("price", [41000, 125500])
+def test_limit_close_rejects_typos_outside_the_band(panel, price):
     local_login(panel)
     panel.ft.open_trades = [dict(LONG_TRADE)]
-    assert trade_post(panel, panel.local, "/api/trades/2/close", {"type": "limit", "price": 83500}).status_code == 200
-    panel.ft.open_trades = []
-    panel.background.pop()()
-    assert ("cancel_open_order", 2) not in panel.ft.calls
-
-
-@pytest.mark.parametrize("price, message", [
-    (83600, "더 유리한 가격은 익절가로"), (79000, "시장가 종료를 쓰세요"),
-])
-def test_limit_close_rejects_prices_that_would_leave_the_trade_without_its_stop(panel, price, message):
-    local_login(panel)
-    panel.ft.open_trades = [dict(LONG_TRADE)]
-    response = trade_post(panel, panel.local, "/api/trades/2/close", {"type": "limit", "price": price})
+    response = trade_post(panel.local, "/api/trades/2/close", {"type": "limit", "price": price})
     assert response.status_code == 400
-    assert message in response.json()["detail"]
+    assert "50% 안쪽" in response.json()["detail"]
     assert panel.ft.calls == []
 
 
 @pytest.mark.parametrize("body", [{"type": "stop"}, {}, {"type": "limit"}, {"type": "limit", "price": "83400"},
-                                  {"type": "limit", "price": -1}, {"type": "limit", "price": True}])
+                                  {"type": "limit", "price": -1}, {"type": "limit", "price": True},
+                                  {"type": "limit", "price": None}])
 def test_close_validates_type_and_price(panel, body):
     local_login(panel)
     panel.ft.open_trades = [dict(LONG_TRADE)]
-    assert trade_post(panel, panel.local, "/api/trades/2/close", body).status_code == 400
+    assert trade_post(panel.local, "/api/trades/2/close", body).status_code == 400
     assert panel.ft.calls == []
 
 
 @pytest.mark.parametrize("trade, path, status", [
     (dict(LONG_TRADE), "/api/trades/9/close", 404),
     (dict(LONG_TRADE), "/api/trades/x2/close", 404),
+    (dict(LONG_TRADE), "/api/trades/%D9%A2/close", 404),          # Arabic-Indic digit two
+    (dict(LONG_TRADE), "/api/trades/1234567890123/close", 404),
     (dict(LONG_TRADE, enter_tag="smoke"), "/api/trades/2/close", 409),
-    (dict(LONG_TRADE, has_open_orders=True), "/api/trades/2/close", 409),
 ])
-def test_close_refuses_unknown_smoke_or_busy_trades(panel, trade, path, status):
+def test_close_refuses_unknown_or_smoke_trades(panel, trade, path, status):
     local_login(panel)
     panel.ft.open_trades = [trade]
-    assert trade_post(panel, panel.local, path, {"type": "market"}).status_code == status
+    assert trade_post(panel.local, path, {"type": "market"}).status_code == status
     assert panel.ft.calls == []
 
 
@@ -1705,9 +1696,10 @@ def test_close_failure_is_503_without_retry_or_secrets(panel):
     local_login(panel)
     panel.ft.open_trades = [dict(LONG_TRADE)]
     panel.ft.error = FreqtradeError(500, SENTINELS[3])
-    response = trade_post(panel, panel.local, "/api/trades/2/close", {"type": "market"})
+    response = trade_post(panel.local, "/api/trades/2/close", {"type": "market"})
     assert response.status_code == 503
     assert response.json()["link"] == MANUAL_LINK
+    assert "다시 누르지 말고" in response.json()["detail"]
     assert panel.ft.calls == [(2, "market")]
     assert SENTINELS[3] not in response.text
 
@@ -1718,55 +1710,52 @@ def test_close_is_refused_while_a_job_runs(panel):
     panel.options["block"] = True
     assert panel.local.post("/api/steps/preflight", json={}, headers=PANEL_HEADER).status_code == 200
     assert panel.entered.wait(5)
-    assert trade_post(panel, panel.local, "/api/trades/2/close", {"type": "market"}).status_code == 409
+    assert trade_post(panel.local, "/api/trades/2/close", {"type": "market"}).status_code == 409
+    assert trade_post(panel.local, "/api/trades/2/cancel-order").status_code == 409
     assert (2, "market") not in panel.ft.calls
 
 
-def test_take_profit_needs_the_restarted_strategy(panel):
+def test_cancel_order_cancels_only_an_open_order(panel):
     local_login(panel)
     panel.ft.open_trades = [dict(LONG_TRADE)]
-    response = trade_post(panel, panel.local, "/api/trades/2/take-profit", {"price": 86000})
+    response = trade_post(panel.local, "/api/trades/2/cancel-order")
     assert response.status_code == 409
-    assert "다시 시작해야" in response.json()["detail"]
-    assert not panel.deps.targets_path.exists()
-
-
-def test_take_profit_is_saved_for_open_trades_and_shown_in_status(panel):
-    local_login(panel)
-    panel.ft.strategy_version = "user-tp-1"
-    panel.ft.open_trades = [dict(LONG_TRADE)]
-    panel.deps.targets_path.write_text('{"take_profit": {"7": 90000}}', encoding="utf-8")
-    response = trade_post(panel, panel.local, "/api/trades/2/take-profit", {"price": 86000})
+    panel.ft.open_trades = [dict(LONG_TRADE, has_open_orders=True)]
+    response = trade_post(panel.local, "/api/trades/2/cancel-order")
     assert response.status_code == 200
-    assert "거래소 손절은 그대로" in response.json()["message"]
-    # The closed trade 7 is pruned; the strategy reads this exact format.
-    assert json.loads(panel.deps.targets_path.read_text(encoding="utf-8")) == {"take_profit": {"2": 86000.0}}
-    status = panel.local.get("/api/status").json()
-    assert status["freqtrade"]["take_profit"] is True
-    assert status["trades"][0]["take_profit"] == 86000.0
-    cleared = trade_post(panel, panel.local, "/api/trades/2/take-profit", {"price": None})
-    assert cleared.status_code == 200
-    assert json.loads(panel.deps.targets_path.read_text(encoding="utf-8")) == {"take_profit": {}}
+    assert "손절은 그대로" in response.json()["message"]
+    assert panel.ft.calls == [("cancel_open_order", 2)]
 
 
-@pytest.mark.parametrize("price, message", [(83500, "유리한 쪽"), (83000, "유리한 쪽"), (130000, "50% 안쪽")])
-def test_take_profit_must_be_on_the_profit_side_and_near(panel, price, message):
+def test_cancel_order_failure_is_503_without_secrets(panel):
     local_login(panel)
-    panel.ft.strategy_version = "user-tp-1"
-    panel.ft.open_trades = [dict(LONG_TRADE)]
-    response = trade_post(panel, panel.local, "/api/trades/2/take-profit", {"price": price})
-    assert response.status_code == 400
-    assert message in response.json()["detail"]
-    assert not panel.deps.targets_path.exists()
+    panel.ft.open_trades = [dict(LONG_TRADE, has_open_orders=True)]
+    panel.ft.error = FreqtradeError(400, SENTINELS[3])
+    response = trade_post(panel.local, "/api/trades/2/cancel-order")
+    assert response.status_code == 503
+    assert SENTINELS[3] not in response.text
+
+
+def test_status_lists_open_trades_with_their_resting_exit_price(panel):
+    local_login(panel)
+    panel.ft.open_trades = [dict(LONG_TRADE, has_open_orders=True, orders=[
+        {"ft_order_side": "buy", "is_open": False, "safe_price": 83472.1},
+        {"ft_order_side": "stoploss", "is_open": True, "safe_price": 81920.3},
+        {"ft_order_side": "sell", "is_open": True, "safe_price": 86000.0, "secret": SENTINELS[3]}])]
+    status = panel.local.get("/api/status").json()
+    assert status["trades"] == [{"trade_id": 2, "symbol": "BTCUSDT", "side": "long", "amount": 0.0003,
+                                 "current_rate": 83500.0, "realized_profit": 0.0, "kind": "strategy",
+                                 "has_open_orders": True, "open_exit_price": 86000.0}]
+    assert SENTINELS[3] not in json.dumps(status)
 
 
 def test_trade_actions_are_audited_without_prices(panel):
     local_login(panel)
-    panel.ft.strategy_version = "user-tp-1"
-    panel.ft.open_trades = [dict(LONG_TRADE)]
-    trade_post(panel, panel.local, "/api/trades/2/take-profit", {"price": 86000})
-    trade_post(panel, panel.local, "/api/trades/2/close", {"type": "market"})
+    panel.ft.open_trades = [dict(LONG_TRADE, has_open_orders=True)]
+    trade_post(panel.local, "/api/trades/2/close", {"type": "limit", "price": 86000})
+    trade_post(panel.local, "/api/trades/2/cancel-order")
+    trade_post(panel.local, "/api/trades/2/close", {"type": "market"})
     lines = [json.loads(line) for line in panel.deps.pin_store_path.with_name("audit.log").read_text(encoding="utf-8").splitlines()]
     actions = [(line["action"], line.get("step"), line["result"]) for line in lines]
-    assert ("take_profit", "2", 200) in actions and ("trade_close", "2", 200) in actions
+    assert ("trade_close", "2", 200) in actions and ("trade_cancel_order", "2", 200) in actions
     assert "86000" not in json.dumps(lines)

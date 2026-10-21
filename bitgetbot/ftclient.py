@@ -126,5 +126,5 @@ class FreqtradeClient:
         return self._request("POST", "forceexit", json=payload).json()
 
     def cancel_open_order(self, trade_id: int) -> dict:
-        """Cancel the trade's open order; Freqtrade re-places the exchange stop afterwards."""
+        """Cancel the trade's open order (e.g. a resting limit exit). The exchange stop is untouched."""
         return self._request("DELETE", f"trades/{int(trade_id)}/open-order").json()
