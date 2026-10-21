@@ -46,8 +46,8 @@ def _run(run: Runner, argv: list[str], timeout_s: int) -> tuple[int, str]:
         return 127, ""
 
 
-def docker_running(run: Runner = default_runner) -> bool:
-    return _run(run, ["docker", "info"], 10)[0] == 0
+def docker_running(run: Runner = default_runner, timeout_s: int = 10) -> bool:
+    return _run(run, ["docker", "info"], timeout_s)[0] == 0
 
 
 def compose_up(run: Runner = default_runner) -> bool:

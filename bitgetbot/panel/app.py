@@ -17,14 +17,14 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from bitgetbot.bitget_read import BitgetReader, make_exchange
 from bitgetbot.ftclient import FreqtradeClient
 from bitgetbot.ledger import fetch_krw_per_usdt
-from bitgetbot.panel import charts, ops
+from bitgetbot.panel import charts, ops, widget, widget_token
 from bitgetbot.panel.auth import (
     Lockout, Sessions, allowed_host, classify, csrf_ok, effective_scheme, hash_pin, identity, valid_pin,
     verify_pin,
@@ -52,6 +52,9 @@ AUTOTRADE_FAILED = "거래 봇에 요청하지 못했습니다. 실행 상태를
 MODE_SWITCHED = "{mode} 모드로 전환했습니다. 거래 봇이 준비되면(약 1~2분) 자동매매가 저절로 켜집니다."
 AUTO_START_TIMEOUT_S = 180
 AUTO_START_INTERVAL_S = 3
+WIDGET_PATH = "/api/widget/summary"
+WIDGET_DENIED = "위젯 토큰이 올바르지 않습니다"
+WIDGET_LOCKED = "위젯 토큰 확인이 잠겼습니다. 잠시 후 다시 시도하세요"
 # Audit actions by exact POST path. Request bodies, keys, PINs and tokens are never recorded.
 AUDIT_ACTIONS = {
     "/api/pin": "pin_set", "/api/keys": "keys_saved", "/api/mode": "mode",
@@ -107,6 +110,10 @@ class PanelDeps:
     krw_rate: Callable[[], tuple[float, str]] = fetch_krw_per_usdt
     equity_log: charts.EquityLog | None = None
     fx: charts.FxCache | None = None
+    # Persistent read-only widget token (.panel/widget_token), re-read when the file changes.
+    widget_token: Callable[[], str | None] | None = None
+    # Separate from the PIN lockout: widget failures never lock the panel or the phone login.
+    widget_lockout: Lockout | None = None
 
     def __post_init__(self):
         if self.audit_path is None:
@@ -121,6 +128,10 @@ class PanelDeps:
             self.sessions = Sessions(clock=self.clock)
         if self.lockout is None:
             self.lockout = Lockout(clock=self.clock)
+        if self.widget_token is None:
+            self.widget_token = widget_token.FileToken(self.pin_store_path.with_name("widget_token"))
+        if self.widget_lockout is None:
+            self.widget_lockout = Lockout(clock=self.clock)
 
     def _execute(self, name: str, io: SmokeIO) -> int:
         settings = _settings(self)
@@ -263,6 +274,24 @@ def _open_trade_blocks_mode(deps: PanelDeps) -> bool:
         return True
 
 
+def _bearer(value: str | None) -> str | None:
+    if not value:
+        return None
+    scheme, _, credentials = value.partition(" ")
+    credentials = credentials.strip()
+    return credentials if scheme.lower() == "bearer" and credentials else None
+
+
+def _etag_matches(header: str | None, etag: str) -> bool:
+    if not header:
+        return False
+    for candidate in header.split(","):
+        candidate = candidate.strip()
+        if candidate == "*" or candidate.removeprefix("W/") == etag:
+            return True
+    return False
+
+
 def _equity_reader(settings: Settings, reader, ft) -> Callable[[], float | None]:
     return lambda: charts.current_equity(settings.dry_run, reader, ft)
 
@@ -361,6 +390,23 @@ def create_app(deps: PanelDeps) -> FastAPI:
         finally:
             _close(ft)
 
+    def build_widget_summary() -> dict:
+        ft = None
+        try:
+            settings = _settings(deps)
+            credentials = ("", "", "") if settings.dry_run else (settings.key, settings.secret, settings.password)
+            ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass,
+                                 timeout=widget.FT_TIMEOUT_S)
+            return widget.build(widget.Sources(
+                settings=settings, reader=deps.reader_factory(*credentials), ft=ft, fx=deps.fx,
+                equity_log=deps.equity_log, docker_running=lambda: ops.docker_running(deps.runner, widget.DOCKER_TIMEOUT_S),
+                clock=deps.clock,
+            ))
+        finally:
+            _close(ft)
+
+    widget_cache = widget.SummaryCache(build_widget_summary, deps.clock)
+
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, error):
         return JSONResponse({"detail": "입력을 확인하세요"}, status_code=400)
@@ -393,7 +439,8 @@ def create_app(deps: PanelDeps) -> FastAPI:
                 scheme = effective_scheme(request.url.scheme, host, request.headers)
                 if not csrf_ok(method, request.headers, scheme, host):
                     response = JSONResponse({"detail": "요청 출처를 확인할 수 없습니다"}, status_code=403)
-                elif request.url.path not in {"/api/ping", "/api/login"}:
+                elif request.url.path not in {"/api/ping", "/api/login", WIDGET_PATH}:
+                    # The widget route authenticates only with its own Bearer token (in the route).
                     sid = request.cookies.get("panel_session", "")
                     session_kind = deps.sessions.get(sid)
                     # A stolen local cookie is never a local capability over a proxy/tailnet request.
@@ -466,6 +513,34 @@ def create_app(deps: PanelDeps) -> FastAPI:
         deps.lockout.success(ident)
         deps.lockout.success("*")
         return session_response("tailnet")
+
+    @app.get(WIDGET_PATH)
+    def widget_summary(request: Request):
+        # Read-only and Bearer-only: the panel cookie and launch token are ignored here, and the
+        # widget token is accepted nowhere else.
+        expected = deps.widget_token()
+        supplied = _bearer(request.headers.get("authorization"))
+        if (expected is None or supplied is None
+                or not secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))):
+            # The lock throttles wrong tokens only. A valid 256-bit token always passes, so a
+            # stale board or another local process cannot lock the real widget out, and valid
+            # polls never reset the failure count (no guess budget refilled between polls).
+            remaining = deps.widget_lockout.attempt("*")
+            if remaining > 0:
+                seconds = math.ceil(remaining)
+                return JSONResponse({"detail": WIDGET_LOCKED, "retry_after": seconds}, status_code=429,
+                                    headers={"Retry-After": str(seconds)})
+            return JSONResponse({"detail": WIDGET_DENIED}, status_code=401,
+                                headers={"WWW-Authenticate": "Bearer"})
+        try:
+            summary = widget_cache.get()
+        except Exception:
+            raise _PanelError(503, FAILURE) from None
+        seq = summary["seq"]
+        etag = f'"{seq}"'
+        if _etag_matches(request.headers.get("if-none-match"), etag):
+            return Response(status_code=304, headers={"ETag": etag})
+        return JSONResponse(summary, headers={"ETag": etag})
 
     @app.post("/api/pin")
     def save_pin(request: Request, body: dict = Depends(_body)):

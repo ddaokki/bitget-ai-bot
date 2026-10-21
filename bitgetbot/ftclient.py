@@ -78,6 +78,10 @@ class FreqtradeClient:
             "GET", "trades", params={"limit": limit, "order_by_id": "false"},
         ).json()
 
+    def daily(self, timescale: int = 1) -> dict:
+        # Read-only: closed profit per UTC day, newest day first.
+        return self._request("GET", "daily", params={"timescale": timescale}).json()
+
     def balance(self) -> dict:
         return self._request("GET", "balance").json()
 

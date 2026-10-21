@@ -1,0 +1,30 @@
+{
+  "v": 1,
+  "seq": 123,
+  "updatedAt": "2026-10-19T09:30:05Z",
+  "mode": "dry_run",
+  "bot": {
+    "state": "running",
+    "reason": null,
+    "aggressive": { "armed": false, "budgetKrw": 300000, "lossThisWeekKrw": 42000 }
+  },
+  "equity": { "krw": 2483000, "usdt": 1815.4, "krwPerUsdt": 1367.7, "fxAt": "2026-10-19T09:00:00Z" },
+  "pnl": { "todayKrw": 18400, "todayUsdt": 13.45, "todayPct": 0.75, "totalKrw": 83000, "totalUsdt": 60.68, "totalPct": 3.46 },
+  "spark": [
+    { "t": "2026-10-13T00:00:00Z", "krw": 2400000 },
+    { "t": "2026-10-14T00:00:00Z", "krw": 2412000 },
+    { "t": "2026-10-15T00:00:00Z", "krw": 2398000 },
+    { "t": "2026-10-16T00:00:00Z", "krw": 2431000 },
+    { "t": "2026-10-17T00:00:00Z", "krw": 2455000 },
+    { "t": "2026-10-18T00:00:00Z", "krw": 2464600 },
+    { "t": "2026-10-19T09:30:00Z", "krw": 2483000 }
+  ],
+  "positions": [
+    { "symbol": "BTCUSDT", "side": "long", "mode": "safe", "leverage": 3, "entry": 67210.5, "mark": 67845.2, "stopLoss": 66100, "liqPrice": 45210, "marginUsdt": 420, "uPnlUsdt": 11.89, "uPnlPct": 2.83 },
+    { "symbol": "ETHUSDT", "side": "short", "mode": "aggressive", "leverage": 5, "entry": 2650.1, "mark": 2661.4, "stopLoss": 2705, "liqPrice": 3150, "marginUsdt": 150, "uPnlUsdt": -3.2, "uPnlPct": -2.13 },
+    { "symbol": "SOLUSDT", "side": "long", "mode": "manual", "leverage": 2, "entry": 152.3, "mark": 152.9, "stopLoss": 147, "liqPrice": 80, "marginUsdt": 80, "uPnlUsdt": 0.31, "uPnlPct": 0.39 }
+  ],
+  "pending": [ { "symbol": "XRPUSDT", "text": "지정가 매수 대기 0.512" } ],
+  "ai": { "verdict": "ALLOW", "reason": "변동성 정상, 추세 상방", "at": "2026-10-19T09:25:00Z", "expiresAt": "2026-10-19T10:25:00Z" },
+  "alerts": [ { "level": "warn", "text": "ETH 손절가 근접" } ]
+}

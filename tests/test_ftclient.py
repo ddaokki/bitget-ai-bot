@@ -220,3 +220,20 @@ def test_pair_candles_is_an_authenticated_read_only_get():
         "http://127.0.0.1:8080", "u", "p", transport=httpx.MockTransport(handler),
     )
     assert client.pair_candles("BTC/USDT:USDT", "1h", 72) == payload
+
+
+@pytest.mark.parametrize("timescale", [None, 7])
+def test_daily_is_an_authenticated_read_only_get(timescale):
+    payload = {"data": [{"date": "2026-10-21", "abs_profit": 1.5}], "stake_currency": "USDT"}
+
+    def handler(req):
+        assert req.method == "GET"
+        assert req.url.path == "/api/v1/daily"
+        assert dict(req.url.params) == {"timescale": str(1 if timescale is None else timescale)}
+        assert req.headers["authorization"] == "Basic dTpw"
+        return httpx.Response(200, json=payload)
+
+    client = FreqtradeClient(
+        "http://127.0.0.1:8080", "u", "p", transport=httpx.MockTransport(handler),
+    )
+    assert (client.daily() if timescale is None else client.daily(timescale)) == payload

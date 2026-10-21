@@ -352,3 +352,23 @@ def test_usdt_equity_reads_account_equity_including_unrealized():
 def test_usdt_equity_missing_or_invalid_raises(row):
     with pytest.raises(ValueError):
         BitgetReader(FakeEx(accounts={"code": "00000", "data": [row]})).fetch_usdt_equity()
+
+
+def test_position_reports_exchange_margin_and_unrealized_pnl():
+    ex = FakeEx(positions={"code": "00000", "data": [{
+        "symbol": "BTCUSDT", "holdSide": "long", "total": "0.001",
+        "openPriceAvg": "100000", "markPrice": "101000", "liquidationPrice": "60000",
+        "leverage": "2", "marginMode": "isolated", "marginSize": "50", "unrealizedPL": "1",
+    }]})
+    position = BitgetReader(ex).fetch_positions()[0]
+    assert (position.margin, position.unrealized_pnl) == (50.0, 1.0)
+
+
+def test_position_without_margin_fields_reports_none():
+    ex = FakeEx(positions={"code": "00000", "data": [{
+        "symbol": "BTCUSDT", "holdSide": "long", "total": "0.001",
+        "openPriceAvg": "100000", "markPrice": "101000", "leverage": "2", "marginMode": "isolated",
+        "marginSize": "", "unrealizedPL": "bad",
+    }]})
+    position = BitgetReader(ex).fetch_positions()[0]
+    assert (position.margin, position.unrealized_pnl) == (None, None)

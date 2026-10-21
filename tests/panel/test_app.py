@@ -129,6 +129,7 @@ def panel(tmp_path, monkeypatch):
     settings = [Settings(True, "http://127.0.0.1:8080", SENTINELS[6], SENTINELS[5], *SENTINELS[2:5])]
     ft = FT()
     runner_calls, reader_calls, ft_calls, executions, modes, keys = [], [], [], [], [], []
+    ft_options = []
     release, entered = Event(), Event()
     options = {"block": False, "restart_error": False, "container": True, "compose_code": 0, "execute_error": False}
     background, sleeps, fx_calls = [], [], []
@@ -176,8 +177,9 @@ def panel(tmp_path, monkeypatch):
         reader_calls.append(credentials)
         return Reader()
 
-    def ft_factory(*credentials):
+    def ft_factory(*credentials, **options):
         ft_calls.append(credentials)
+        ft_options.append(options)
         return ft
 
     def mode_setter(mode):
@@ -199,7 +201,7 @@ def panel(tmp_path, monkeypatch):
             data = SimpleNamespace(
                 module=module, app=application, deps=deps, local=local, tailnet=tailnet,
                 settings=settings, ft=ft, runner_calls=runner_calls, reader_calls=reader_calls,
-                ft_calls=ft_calls, executions=executions, modes=modes, keys=keys,
+                ft_calls=ft_calls, ft_options=ft_options, executions=executions, modes=modes, keys=keys,
                 options=options, now=now, release=release, entered=entered, state_path=ops.STATE_PATH,
                 background=background, sleeps=sleeps, fx_calls=fx_calls,
             )
@@ -767,10 +769,14 @@ def test_entrypoint_rotates_private_token_and_binds_only_loopback(tmp_path, monk
         return tokens[len(seen_sizes) - 1]
 
     monkeypatch.setattr(entry.secrets, "token_urlsafe", token)
+    widget_tokens = []
     for index in range(2):
         assert entry.main([]) == 0
         assert (tmp_path / ".panel" / "token").read_text(encoding="utf-8").strip() == tokens[index]
         assert received[index].token == tokens[index]
+        widget_tokens.append((tmp_path / ".panel" / "widget_token").read_text(encoding="utf-8").strip())
+    # The launch token rotates; the read-only widget token persists across launches.
+    assert widget_tokens[0] == widget_tokens[1] and widget_tokens[0] not in tokens
     assert probes == [(("127.0.0.1", 8090), 0.2)] * 2
     assert seen_sizes == [32, 32]
     assert calls == [("fake-app", {
@@ -778,8 +784,9 @@ def test_entrypoint_rotates_private_token_and_binds_only_loopback(tmp_path, monk
         "proxy_headers": False,
     })] * 2
     captured = capsys.readouterr()
-    assert all(token not in captured.out + captured.err for token in tokens)
-    assert list((tmp_path / ".panel").iterdir()) == [tmp_path / ".panel" / "token"]
+    assert all(token not in captured.out + captured.err for token in tokens + widget_tokens)
+    assert sorted((tmp_path / ".panel").iterdir()) == [tmp_path / ".panel" / "token",
+                                                       tmp_path / ".panel" / "widget_token"]
 
 
 def test_entrypoint_private_token_has_protected_owner_only_permissions(tmp_path):

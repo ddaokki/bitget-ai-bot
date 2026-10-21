@@ -9,7 +9,7 @@ from pathlib import Path
 
 import uvicorn
 
-from bitgetbot.panel import ops
+from bitgetbot.panel import ops, widget_token
 from bitgetbot.panel.app import PanelDeps, create_app
 
 
@@ -87,6 +87,8 @@ def main(argv: list[str] | None = None) -> int:
             pass
         token = secrets.token_urlsafe(32)
         _write_token(Path(".panel/token"), token)
+        # The read-only widget token persists across launches; only `widget_token rotate` replaces it.
+        widget_token.ensure(widget_token.PATH, _write_token)
         app = create_app(PanelDeps(token=token))
         _ensure_stdio(Path(".panel"))
         uvicorn.run(

@@ -54,6 +54,8 @@ class BitgetReader:
                 liq_price=liq_price,
                 leverage=num(row.get("leverage")),
                 margin_mode=margin_mode.lower() if margin_mode is not None else None,
+                margin=num(row.get("marginSize")),
+                unrealized_pnl=num(row.get("unrealizedPL")),
             ))
         return positions
 

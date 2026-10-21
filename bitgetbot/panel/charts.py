@@ -164,22 +164,25 @@ class FxCache:
         self._until = float("-inf")
 
     def rate(self) -> float | None:
+        return self.rate_at()[0]
+
+    def rate_at(self) -> tuple[float | None, float | None]:
+        """(rate, clock time that rate was fetched); (None, None) when unavailable."""
         with self._lock:
             now = self.clock()
-            if now < self._until:
-                return self._value
-            try:
-                value = _positive(self.fetch()[0])
-            except Exception:
-                value = None
-            if value is None:
-                # Keep a recent good rate rather than hiding KRW on a brief Upbit hiccup.
-                self._until = now + FX_RETRY_S
-                if now - self._fetched_at > FX_TTL_S * 3:
-                    self._value = None
-            else:
-                self._value, self._fetched_at, self._until = value, now, now + FX_TTL_S
-            return self._value
+            if now >= self._until:
+                try:
+                    value = _positive(self.fetch()[0])
+                except Exception:
+                    value = None
+                if value is None:
+                    # Keep a recent good rate rather than hiding KRW on a brief Upbit hiccup.
+                    self._until = now + FX_RETRY_S
+                    if now - self._fetched_at > FX_TTL_S * 3:
+                        self._value = None
+                else:
+                    self._value, self._fetched_at, self._until = value, now, now + FX_TTL_S
+            return (self._value, self._fetched_at) if self._value is not None else (None, None)
 
 
 def asset_payload(mode: str, equity: float | None, history: list[list[float]], krw: float | None) -> dict:

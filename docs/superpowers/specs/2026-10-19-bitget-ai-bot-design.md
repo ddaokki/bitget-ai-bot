@@ -334,6 +334,7 @@
 }
 ```
 - `spark`는 최근 7일 최대 48점. 트레이딩 창 URL은 `{trading.url}/`(데스크톱 레이아웃), 로그인은 웹앱 PIN.
+- 1차 구현(2026-10-21, 컨트롤 패널 `127.0.0.1:8090`): 위젯 토큰은 `.panel/widget_token`(재시작해도 유지, `python -m bitgetbot.panel.widget_token rotate`로 재발급), 요약은 3초 캐시. 아직 없는 기능이라 `aggressive`는 꺼짐·0, `pending`은 `[]`, `ai`는 `null`, `takeProfit`은 `null`. 값 정의는 `docs/runbooks/panel.md` §6.
 - 사용자 승인 후 이 계약을 robo-briefing 세션에 전달.
 
 ### 10.6 1차 앱: 원클릭 컨트롤 패널 (2026-10-20 승인 **[사용자]**)
