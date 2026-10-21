@@ -14,6 +14,9 @@ class PositionSnapshot:
     liq_price: float | None
     leverage: float | None
     margin_mode: str | None
+    # Exchange-reported position margin and unrealized PnL (USDT); None when not reported.
+    margin: float | None = None
+    unrealized_pnl: float | None = None
 
 
 @dataclass(frozen=True)

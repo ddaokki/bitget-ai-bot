@@ -767,10 +767,14 @@ def test_entrypoint_rotates_private_token_and_binds_only_loopback(tmp_path, monk
         return tokens[len(seen_sizes) - 1]
 
     monkeypatch.setattr(entry.secrets, "token_urlsafe", token)
+    widget_tokens = []
     for index in range(2):
         assert entry.main([]) == 0
         assert (tmp_path / ".panel" / "token").read_text(encoding="utf-8").strip() == tokens[index]
         assert received[index].token == tokens[index]
+        widget_tokens.append((tmp_path / ".panel" / "widget_token").read_text(encoding="utf-8").strip())
+    # The launch token rotates; the read-only widget token persists across launches.
+    assert widget_tokens[0] == widget_tokens[1] and widget_tokens[0] not in tokens
     assert probes == [(("127.0.0.1", 8090), 0.2)] * 2
     assert seen_sizes == [32, 32]
     assert calls == [("fake-app", {
@@ -778,8 +782,9 @@ def test_entrypoint_rotates_private_token_and_binds_only_loopback(tmp_path, monk
         "proxy_headers": False,
     })] * 2
     captured = capsys.readouterr()
-    assert all(token not in captured.out + captured.err for token in tokens)
-    assert list((tmp_path / ".panel").iterdir()) == [tmp_path / ".panel" / "token"]
+    assert all(token not in captured.out + captured.err for token in tokens + widget_tokens)
+    assert sorted((tmp_path / ".panel").iterdir()) == [tmp_path / ".panel" / "token",
+                                                       tmp_path / ".panel" / "widget_token"]
 
 
 def test_entrypoint_private_token_has_protected_owner_only_permissions(tmp_path):
