@@ -185,8 +185,10 @@ function stopSummary(stops) {
 
 const direction = position => position.side === "long" ? 1 : position.side === "short" ? -1 : null;
 const positionValue = position => finite(position.size) && finite(position.mark) ? position.size * position.mark : null;
-const positionMargin = position => finite(position.size) && finite(position.entry) && finite(position.leverage) && position.leverage > 0
-    ? position.size * position.entry / position.leverage : null;
+// Prefer the margin actually held (Bitget isolated margin / bot stake); fall back to size x entry / leverage.
+const positionMargin = position => finite(position.margin) && position.margin > 0 ? position.margin
+    : finite(position.size) && finite(position.entry) && finite(position.leverage) && position.leverage > 0
+        ? position.size * position.entry / position.leverage : null;
 
 function krwRate() {
     const rate = state.charts?.asset?.krw_per_usdt;
@@ -216,8 +218,8 @@ function unrealized(position) {
     return `${signedMoney(pnl)} · 증거금 대비 ${percent}%`;
 }
 
-// The stop that closes the position: the exchange stop in live mode (the one furthest from the
-// price, as the widget does), the bot's own stop in dry mode.
+// The stop used for "if the stop fills": the exchange stop in live mode (with several, the one furthest
+// from the price, i.e. the worst case, as the widget does), the bot's own stop in dry mode.
 function protectiveStop(position, status) {
     const sign = direction(position);
     if (sign === null) return null;
@@ -228,6 +230,12 @@ function protectiveStop(position, status) {
     return sign > 0 ? Math.min(...triggers) : Math.max(...triggers);
 }
 
+function stopOutcomeText(position, status) {
+    const outcome = signedMoney(stopOutcome(position, protectiveStop(position, status)));
+    const count = status.mode !== "dry" && Array.isArray(status.stops) ? status.stops.length : 0;
+    return count > 1 && outcome !== "조회 불가" ? `${outcome} · 손절 주문 ${count}개 중 가장 불리한 값` : outcome;
+}
+
 function stopOutcome(position, stop) {
     const sign = direction(position);
     if (sign === null || !finite(stop) || !finite(position.size) || !finite(position.entry)) return null;
@@ -236,11 +244,12 @@ function stopOutcome(position, stop) {
 
 // The strategy sets no take-profit price: it trails the stop up and exits on a 4h close below
 // the prior 10-candle low. Show those two levels instead of an invented target.
-function exitPlanRows(position, plan) {
+// `stop` is the stop that actually protects the position (exchange stop live, bot stop dry).
+function exitPlanRows(position, plan, stop) {
     if (!plan || position.side !== "long") return [];
     const rows = [["익절가", "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다"]];
-    if (finite(plan.exit_line)) rows.push(["청산 신호선", `4시간봉 종가가 ${number(plan.exit_line, true)} 아래로 마감하면 청산`]);
-    if (finite(plan.bot_stop) && finite(position.entry) && plan.bot_stop >= position.entry) {
+    if (finite(plan.exit_line)) rows.push(["청산 신호선", `다음 4시간봉 종가가 ${number(plan.exit_line, true)} 아래면 청산`]);
+    if (finite(stop) && finite(position.entry) && stop >= position.entry) {
         rows.push(["본전 전환", "손절선이 이미 진입가 이상입니다"]);
     } else if (finite(plan.trail_distance) && finite(position.entry)) {
         rows.push(["본전 전환", `고점이 약 ${number(Math.round(position.entry + plan.trail_distance), true)}를 넘으면 손절선이 진입가 위로 올라갑니다`]);
@@ -269,11 +278,11 @@ function renderPositions(status) {
                 ["증거금 (묶인 돈)", money(positionMargin(position))],
                 ["레버리지", typeof position.leverage === "number" ? `${number(position.leverage)}배` : "조회 불가"],
                 ["진입가", number(position.entry, true)], ["현재가", number(position.mark, true)],
-                ["평가손익", unrealized(position)],
+                ["평가손익 (수수료 제외)", unrealized(position)],
                 ["강제청산가", number(position.liq, true)],
                 ["손절가", position.symbol === "BTCUSDT" ? (status.mode === "dry" ? "모의 모드 · 거래소 조회 안 함" : stopSummary(status.stops)) : "조회 대상 아님 · BTCUSDT만 지원"],
-                ["손절 시 손익", signedMoney(stopOutcome(position, protectiveStop(position, status)))],
-                ...exitPlanRows(position, status.exit_plans?.[position.symbol])
+                ["손절 시 손익 (수수료 제외)", stopOutcomeText(position, status)],
+                ...exitPlanRows(position, status.exit_plans?.[position.symbol], protectiveStop(position, status))
             ];
             for (const [label, value] of rows) {
                 const row = node("div");

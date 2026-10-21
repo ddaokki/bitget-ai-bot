@@ -878,11 +878,11 @@ const shown = rows();
 assert.equal(shown["수량"], "0.0003");
 assert.equal(shown["포지션 금액"], "$25.06 (약 35,083원)");
 assert.equal(shown["증거금 (묶인 돈)"], "$12.52 (약 17,529원)");
-assert.match(shown["평가손익"], /^\+\$0\.02 \(약 \+24원\) · 증거금 대비 \+0\.14%$/);
+assert.match(shown["평가손익 (수수료 제외)"], /^\+\$0\.02 \(약 \+24원\) · 증거금 대비 \+0\.14%$/);
 assert.equal(shown["강제청산가"], "$42,000");
-assert.equal(shown["손절 시 손익"], "-$0.47 (약 -652원)");
+assert.equal(shown["손절 시 손익 (수수료 제외)"], "-$0.47 (약 -652원)");
 assert.equal(shown["익절가"], "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다");
-assert.equal(shown["청산 신호선"], "4시간봉 종가가 $81,163 아래로 마감하면 청산");
+assert.equal(shown["청산 신호선"], "다음 4시간봉 종가가 $81,163 아래면 청산");
 assert.equal(shown["본전 전환"], "고점이 약 $85,800를 넘으면 손절선이 진입가 위로 올라갑니다");
 ''')
 
@@ -893,7 +893,7 @@ run("state.charts = null");
 run("renderPositions")({...live, stops: [{trigger_price: 82500}, {trigger_price: 81000}]});
 const shown = rows();
 assert.equal(shown["포지션 금액"], "$25.06");
-assert.equal(shown["손절 시 손익"], "-$0.74");
+assert.equal(shown["손절 시 손익 (수수료 제외)"], "-$0.74 · 손절 주문 2개 중 가장 불리한 값");
 ''')
 
 
@@ -903,7 +903,7 @@ run("state.charts = null");
 run("renderPositions")({...live, mode: "dry", stops: null,
     exit_plans: {BTCUSDT: {exit_line: null, trail_distance: 2327.7, bot_stop: 84000}}});
 const shown = rows();
-assert.equal(shown["손절 시 손익"], "+$0.16");
+assert.equal(shown["손절 시 손익 (수수료 제외)"], "+$0.16");
 assert.equal(shown["본전 전환"], "손절선이 이미 진입가 이상입니다");
 assert.equal(shown["청산 신호선"], undefined);
 ''')
@@ -915,7 +915,7 @@ run("state.charts = null");
 run("renderPositions")({...live, exit_plans: {}});
 const shown = rows();
 assert.equal(shown["익절가"], undefined);
-assert.equal(shown["손절 시 손익"], "-$0.47");
+assert.equal(shown["손절 시 손익 (수수료 제외)"], "-$0.47");
 ''')
 
 
@@ -925,3 +925,23 @@ def test_emergency_close_sits_at_the_page_bottom_not_pinned_over_content():
     assert "position: fixed" not in rule and "position: sticky" not in rule
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     assert html.index('<aside class="emergency"') > html.index('id="phone-title"')
+
+
+def test_position_card_prefers_exchange_margin_and_judges_breakeven_on_the_exchange_stop(javascript):
+    javascript(POSITION_ROWS + r"""
+run("state.charts = null");
+// Live: the bot already raised its stop above entry but the exchange stop is still below it.
+run("renderPositions")({...live, positions: [{...live.positions[0], margin: 22.52}],
+    exit_plans: {BTCUSDT: {exit_line: 81163, trail_distance: 2327.7, bot_stop: 83500}}});
+const shown = rows();
+assert.equal(shown["증거금 (묶인 돈)"], "$22.52");
+assert.match(shown["평가손익 (수수료 제외)"], /증거금 대비 \+0\.08%$/);
+assert.equal(shown["본전 전환"], "고점이 약 $85,800를 넘으면 손절선이 진입가 위로 올라갑니다");
+""")
+
+
+def test_topbar_links_to_the_emergency_block():
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    topbar = html.split('<header class="topbar">', 1)[1].split("</header>", 1)[0]
+    assert '<a class="emergency-jump" href="#emergency-title">긴급 청산 ↓</a>' in topbar
+    assert 'id="emergency-title"' in html

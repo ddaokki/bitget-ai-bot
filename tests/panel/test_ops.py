@@ -355,7 +355,8 @@ def test_collect_dry_status_never_calls_private_reader(ops, settings):
     assert result == {
         "mode": "dry", "freqtrade": {"reachable": True, "state": "running", "dry_run": True},
         "account": None, "positions": [{"symbol": "BTCUSDT", "side": "short", "size": 0.002,
-                                        "entry": 100, "mark": 99, "liq": 150, "leverage": 2}],
+                                        "entry": 100, "mark": 99, "liq": 150, "leverage": 2,
+                                        "margin": None}],
         "stops": None, "exit_plans": {},
         "smoke_state": {"exists": False, "trade_id": None, "mode": None, "close_confirmed": False},
     }
@@ -369,7 +370,8 @@ def test_collect_live_status_uses_reader_and_only_public_fields(ops, settings):
     assert result["mode"] == "live"
     assert result["account"] == {"kind": "classic", "usdt_available": 25.5}
     assert result["positions"] == [{"symbol": "BTCUSDT", "side": "long", "size": 0.001,
-                                   "entry": 100, "mark": 101, "liq": 60, "leverage": 2}]
+                                   "entry": 100, "mark": 101, "liq": 60, "leverage": 2,
+                                   "margin": None}]
     assert result["stops"] == [{"plan_type": "pos_loss", "trigger_price": 90, "trigger_type": "mark_price"}]
     assert reader.calls == ["account", "balance", "positions", "stops"]
     assert SECRET not in repr(result)
@@ -414,7 +416,8 @@ def test_collect_sanitizes_malformed_values(ops, settings):
                          "liquidation_price": float("inf"), "leverage": {"secret": SECRET}}]
     result = ops.collect_status(settings, Reader(), ft)
     assert result["freqtrade"] == {"reachable": True, "state": None, "dry_run": None}
-    assert result["positions"] == [{name: None for name in ("symbol", "side", "size", "entry", "mark", "liq", "leverage")}]
+    assert result["positions"] == [{name: None for name in
+                                    ("symbol", "side", "size", "entry", "mark", "liq", "leverage", "margin")}]
     assert SECRET not in repr(result)
 
 
@@ -607,9 +610,10 @@ class PlanFT(FT):
         super().__init__()
         self.candle_calls = []
         self.candles = candles if candles is not None else {
-            "columns": ["date", "close", "atr_4h", "exit_low_4h", "secret"],
-            "data": [["2026-10-21T10:00:00Z", 83346.5, 700.0, 80000.0, SECRET],
-                     ["2026-10-21T11:00:00Z", 83455.1, 775.9, 81163.0, SECRET]],
+            "columns": ["date", "date_4h", "low_4h", "atr_4h", "exit_low_4h", "secret"],
+            "data": [[f"h{i}", f"2026-10-{19 + i // 6:02d}T{(i % 6) * 4:02d}:00:00Z", low, 775.9, 81163.0, SECRET]
+                     for i, low in enumerate([80000.0, 81900, 82000, 82100, 82200, 82300, 82400,
+                                              82500, 82600, 82700, 81500.0])],
         }
 
     def status(self):
@@ -625,17 +629,26 @@ class PlanFT(FT):
         return self.candles
 
 
-def test_exit_plans_cover_strategy_longs_only_from_the_last_candle(ops, settings):
+def test_exit_plans_cover_strategy_longs_only_with_the_next_exit_window(ops, settings):
     ft = PlanFT()
     plans = ops.collect_status(settings, Reader(), ft)["exit_plans"]
-    assert plans == {"BTCUSDT": {"exit_line": 81163.0, "trail_distance": pytest.approx(3 * 775.9),
+    # The next 4h close is checked against the last 10 completed 4h lows: the oldest bar (80000)
+    # has rolled off and the newest (81500) is in, unlike the strategy's shifted exit_low_4h (81163).
+    assert plans == {"BTCUSDT": {"exit_line": 81500.0, "trail_distance": pytest.approx(3 * 775.9),
                                  "bot_stop": 81920.3}}
-    assert ft.candle_calls == [("BTC/USDT:USDT", "1h", 2)]
+    assert ft.candle_calls == [("BTC/USDT:USDT", "1h", ops.PLAN_CANDLES)]
+    assert ops.PLAN_CANDLES >= 4 * ops.EXIT_BARS + 4
     assert SECRET not in repr(plans)
 
 
+def test_exit_line_needs_ten_completed_4h_candles(ops, settings):
+    candles = PlanFT().candles
+    short = {"columns": candles["columns"], "data": candles["data"][-9:]}
+    assert ops.collect_status(settings, Reader(), PlanFT(short))["exit_plans"]["BTCUSDT"]["exit_line"] is None
+
+
 @pytest.mark.parametrize("candles", [{}, {"columns": ["atr_4h"], "data": []},
-                                     {"columns": ["atr_4h", "exit_low_4h"], "data": [[float("nan"), -5]]}])
+                                     {"columns": ["atr_4h", "date_4h", "low_4h"], "data": [[float("nan"), "x", -5]]}])
 def test_exit_plans_leave_unreadable_levels_empty(ops, settings, candles):
     plans = ops.collect_status(settings, Reader(), PlanFT(candles))["exit_plans"]
     assert plans == {"BTCUSDT": {"exit_line": None, "trail_distance": None, "bot_stop": 81920.3}}
@@ -658,3 +671,6 @@ def test_exit_plan_constants_match_the_strategy_rules(ops):
     spec.loader.exec_module(rules)
     assert ops.STRATEGY_TAG_PREFIX == rules.STRATEGY_TAG_PREFIX
     assert ops.TRAIL_ATR == rules.TRAIL_ATR
+    strategy = (path.parent / "SafeTrendLive.py").read_text(encoding="utf-8")
+    assert f'dataframe["exit_low"] = dataframe.low.rolling({ops.EXIT_BARS}).min().shift(1)' in strategy
+    assert 'timeframe = "1h"' in strategy and ops.STRATEGY_TIMEFRAME == "1h"

@@ -186,12 +186,14 @@ def _choice(value, choices: tuple[str, ...]) -> str | None:
     return value if isinstance(value, str) and value in choices else None
 
 
-def _position(symbol, side, size, entry, mark, liq, leverage) -> dict:
+def _position(symbol, side, size, entry, mark, liq, leverage, margin=None) -> dict:
     return {
         "symbol": symbol if isinstance(symbol, str) and re.fullmatch(r"[A-Z0-9]{1,20}USDT", symbol) else None,
         "side": _choice(side, ("long", "short")), "size": _number(size),
         "entry": _number(entry), "mark": _number(mark), "liq": _number(liq),
         "leverage": _number(leverage),
+        # Margin actually held (exchange isolated margin live, bot stake dry); None when unknown.
+        "margin": _number(margin),
     }
 
 
@@ -201,7 +203,7 @@ def _dry_positions(ft) -> list[dict]:
             row.get("pair", "").split(":")[0].replace("/", ""),
             ("short" if row["is_short"] else "long") if type(row.get("is_short")) is bool else None,
             row.get("amount"), row.get("open_rate"), row.get("current_rate"),
-            row.get("liquidation_price"), row.get("leverage"),
+            row.get("liquidation_price"), row.get("leverage"), row.get("stake_amount"),
         )
         for row in ft.status()
     ]
@@ -209,27 +211,46 @@ def _dry_positions(ft) -> list[dict]:
 
 def _live_positions(reader) -> list[dict]:
     return [_position(row.symbol, row.side, row.size, row.entry_price, row.mark_price,
-                      row.liq_price, row.leverage) for row in reader.fetch_positions()]
+                      row.liq_price, row.leverage, row.margin) for row in reader.fetch_positions()]
 
 
 # SafeTrendLive keeps no take-profit order. It trails the stop TRAIL_ATR x ATR(4h) under the highest
-# high since entry and exits when a 4h candle closes below the prior 10-candle low (exit_low_4h).
-# Mirrors live_rules.STRATEGY_TAG_PREFIX and live_rules.TRAIL_ATR (a test keeps them equal).
+# high since entry and exits when a 4h candle closes below the low of the EXIT_BARS 4h candles before
+# it. Mirrors live_rules.STRATEGY_TAG_PREFIX / TRAIL_ATR and the strategy's rolling(10) (tests check).
 STRATEGY_TAG_PREFIX = "safe_"
 TRAIL_ATR = 3.0
+EXIT_BARS = 10
 STRATEGY_TIMEFRAME = "1h"
+# 1h rows to read: enough to hold EXIT_BARS completed 4h candles plus the one still forming.
+PLAN_CANDLES = 4 * EXIT_BARS + 8
 
 
-def _last_candle(candles) -> dict:
+def _candle_rows(candles) -> list[dict]:
     columns, data = candles.get("columns"), candles.get("data")
-    if not isinstance(columns, list) or not isinstance(data, list) or not data or not isinstance(data[-1], list):
-        return {}
-    return dict(zip(columns, data[-1]))
+    if not isinstance(columns, list) or not isinstance(data, list):
+        return []
+    return [dict(zip(columns, row)) for row in data if isinstance(row, list)]
 
 
 def _positive(value) -> float | None:
     number = _number(value)
     return number if number is not None and number > 0 else None
+
+
+def _next_exit_line(rows: list[dict]) -> float | None:
+    """The level the NEXT 4h close is checked against: the low of the last EXIT_BARS completed 4h candles.
+
+    The strategy's exit_low_4h on the newest row is the window before the newest completed candle,
+    which the bot already checked at that candle's close, so it is one candle out of date here.
+    """
+    lows = {}
+    for row in rows:
+        start, low = row.get("date_4h"), _positive(row.get("low_4h"))
+        if isinstance(start, str) and low is not None:
+            lows[start] = low
+    if len(lows) < EXIT_BARS:
+        return None
+    return min(low for _, low in sorted(lows.items())[-EXIT_BARS:])
 
 
 def _exit_plans(ft) -> dict:
@@ -244,10 +265,11 @@ def _exit_plans(ft) -> dict:
         symbol = pair.split(":")[0].replace("/", "")
         if not re.fullmatch(r"[A-Z0-9]{1,20}USDT", symbol) or symbol in plans:
             continue
-        last = _last_candle(ft.pair_candles(pair, STRATEGY_TIMEFRAME, 2))
-        atr = _positive(last.get("atr_4h"))
+        candles = ft.pair_candles(pair, STRATEGY_TIMEFRAME, PLAN_CANDLES)
+        rows = _candle_rows(candles) if isinstance(candles, dict) else []
+        atr = _positive(rows[-1].get("atr_4h")) if rows else None
         plans[symbol] = {
-            "exit_line": _positive(last.get("exit_low_4h")),
+            "exit_line": _next_exit_line(rows),
             "trail_distance": TRAIL_ATR * atr if atr is not None else None,
             "bot_stop": _positive(row.get("stop_loss_abs")),
         }
