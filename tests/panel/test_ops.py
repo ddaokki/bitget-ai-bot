@@ -95,6 +95,7 @@ def test_default_runner_uses_repo_root_utf8_and_timeout(ops, monkeypatch):
         assert kwargs == {
             "cwd": Path(__file__).resolve().parents[2], "capture_output": True,
             "text": True, "encoding": "utf-8", "errors": "replace", "timeout": 7,
+            "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0),
         }
         return SimpleNamespace(returncode=2, stdout="output", stderr=SECRET)
 
@@ -582,3 +583,17 @@ def test_unreachable_freqtrade_skips_stats_requests(ops, settings):
     ft.ping = lambda: False
     ft.profit = lambda: pytest.fail("unreachable Freqtrade must not be asked for stats")
     assert ops.collect_status(settings, Reader(), ft)["stats"] is None
+
+
+def test_default_runner_never_opens_a_console_window(monkeypatch):
+    import subprocess as sp
+    from bitgetbot.panel import ops as module
+    seen = {}
+
+    def fake_run(argv, **kwargs):
+        seen.update(kwargs)
+        return sp.CompletedProcess(argv, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    assert module.default_runner(["docker", "info"], 5) == (0, "ok")
+    assert seen["creationflags"] == getattr(sp, "CREATE_NO_WINDOW", 0)

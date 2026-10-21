@@ -19,12 +19,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE = ["docker", "compose", "-f", "freqtrade/docker-compose.yml"]
 
 
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)  # 0 on non-Windows
+
+
 def default_runner(argv: list[str], timeout_s: int) -> tuple[int, str]:
     """Run argv without a shell, keeping process diagnostics out of panel results."""
     try:
         result = subprocess.run(
             argv, cwd=REPO_ROOT, capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=timeout_s,
+            # The panel runs under pythonw (no console); without this flag every docker/
+            # tailscale status poll pops up and closes a console window on Windows.
+            creationflags=NO_WINDOW,
         )
         return result.returncode, result.stdout
     except subprocess.TimeoutExpired:
