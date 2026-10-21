@@ -187,7 +187,7 @@ def _choice(value, choices: tuple[str, ...]) -> str | None:
     return value if isinstance(value, str) and value in choices else None
 
 
-def _position(symbol, side, size, entry, mark, liq, leverage, margin=None) -> dict:
+def _position(symbol, side, size, entry, mark, liq, leverage, margin=None, margin_mode=None) -> dict:
     return {
         "symbol": symbol if isinstance(symbol, str) and re.fullmatch(r"[A-Z0-9]{1,20}USDT", symbol) else None,
         "side": _choice(side, ("long", "short")), "size": _number(size),
@@ -195,6 +195,7 @@ def _position(symbol, side, size, entry, mark, liq, leverage, margin=None) -> di
         "leverage": _number(leverage),
         # Margin actually held (exchange isolated margin live, bot stake dry); None when unknown.
         "margin": _number(margin),
+        "margin_mode": _choice(margin_mode, ("isolated", "crossed")),
     }
 
 
@@ -212,7 +213,7 @@ def _dry_positions(ft) -> list[dict]:
 
 def _live_positions(reader) -> list[dict]:
     return [_position(row.symbol, row.side, row.size, row.entry_price, row.mark_price,
-                      row.liq_price, row.leverage, row.margin) for row in reader.fetch_positions()]
+                      row.liq_price, row.leverage, row.margin, row.margin_mode) for row in reader.fetch_positions()]
 
 
 # SafeTrendLive keeps no take-profit order. It trails the stop TRAIL_ATR x ATR(4h) under the highest

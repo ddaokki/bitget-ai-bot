@@ -357,7 +357,7 @@ def test_collect_dry_status_never_calls_private_reader(ops, settings):
                                       "take_profit": False},
         "account": None, "positions": [{"symbol": "BTCUSDT", "side": "short", "size": 0.002,
                                         "entry": 100, "mark": 99, "liq": 150, "leverage": 2,
-                                        "margin": None}],
+                                        "margin": None, "margin_mode": None}],
         "stops": None, "exit_plans": {}, "trades": [],
         "smoke_state": {"exists": False, "trade_id": None, "mode": None, "close_confirmed": False},
     }
@@ -372,7 +372,7 @@ def test_collect_live_status_uses_reader_and_only_public_fields(ops, settings):
     assert result["account"] == {"kind": "classic", "usdt_available": 25.5}
     assert result["positions"] == [{"symbol": "BTCUSDT", "side": "long", "size": 0.001,
                                    "entry": 100, "mark": 101, "liq": 60, "leverage": 2,
-                                   "margin": None}]
+                                   "margin": None, "margin_mode": "isolated"}]
     assert result["stops"] == [{"plan_type": "pos_loss", "trigger_price": 90, "trigger_type": "mark_price"}]
     assert reader.calls == ["account", "balance", "positions", "stops"]
     assert SECRET not in repr(result)
@@ -418,7 +418,7 @@ def test_collect_sanitizes_malformed_values(ops, settings):
     result = ops.collect_status(settings, Reader(), ft)
     assert result["freqtrade"] == {"reachable": True, "state": None, "dry_run": None, "take_profit": False}
     assert result["positions"] == [{name: None for name in
-                                    ("symbol", "side", "size", "entry", "mark", "liq", "leverage", "margin")}]
+                                    ("symbol", "side", "size", "entry", "mark", "liq", "leverage", "margin", "margin_mode")}]
     assert SECRET not in repr(result)
 
 

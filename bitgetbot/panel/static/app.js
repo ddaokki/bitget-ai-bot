@@ -8,7 +8,7 @@ const state = {
     status: null, job: null, authenticated: false, online: false, needsLogin: false,
     pending: false, emergencyPending: false, lastStatusAt: 0, epoch: 0,
     preflightMode: null, preflightJobStart: null, pendingPreflight: null,
-    confirmation: null, emergencyDeadline: 0, loginDeadline: 0,
+    confirmation: null, emergencyDeadline: 0, loginDeadline: 0, tpEditing: null,
     pollTimer: null, polling: false,
     charts: null, chartsPending: false, chartsTimer: null
 };
@@ -197,31 +197,31 @@ function krwRate() {
     return finite(rate) && rate > 0 ? rate : null;
 }
 
-// USD with the won value beside it when the Upbit rate is known.
-function money(value) {
-    if (!finite(value)) return "조회 불가";
+// Bitget-style figures: prices with one decimal, amounts in USDT (four decimals under 1 USDT),
+// and the won value underneath when the Upbit rate is known.
+const fixed = (value, digits) => new Intl.NumberFormat("en-US", {minimumFractionDigits: digits, maximumFractionDigits: digits}).format(value);
+const priceText = value => finite(value) ? fixed(value, 1) : "--";
+const truncatedPrice = value => finite(value) ? fixed(Math.trunc(value * 10) / 10, 1) : "--";
+const usdt = value => `${fixed(value, Math.abs(value) < 1 ? 4 : 2)} USDT`;
+const signedUsdt = value => `${value > 0 ? "+" : value < 0 ? "-" : ""}${usdt(Math.abs(value))}`;
+const percentText = value => `${value > 0 ? "+" : ""}${fixed(value, 2)}%`;
+const tone = value => !finite(value) || value === 0 ? "" : value > 0 ? "up" : "down";
+
+function wonHint(value, withSign = false) {
     const rate = krwRate();
-    return rate === null ? usd(value) : `${usd(value)} (약 ${krw(value * rate)})`;
+    if (rate === null || !finite(value)) return "";
+    return `≈ ${withSign ? signed(value * rate, krw) : krw(value * rate)}`;
 }
 
-function signedMoney(value) {
-    if (!finite(value)) return "조회 불가";
-    const rate = krwRate();
-    return rate === null ? signed(value, usd) : `${signed(value, usd)} (약 ${signed(value * rate, krw)})`;
-}
-
-function unrealized(position) {
+function unrealizedPnl(position) {
     const sign = direction(position);
-    if (sign === null || !finite(position.size) || !finite(position.entry) || !finite(position.mark)) return "조회 불가";
-    const pnl = (position.mark - position.entry) * position.size * sign;
-    const margin = positionMargin(position);
-    if (!finite(margin) || margin <= 0) return signedMoney(pnl);
-    const percent = new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 2, signDisplay: "exceptZero"}).format(pnl / margin * 100);
-    return `${signedMoney(pnl)} · 증거금 대비 ${percent}%`;
+    if (sign === null || !finite(position.size) || !finite(position.entry) || !finite(position.mark)) return null;
+    return (position.mark - position.entry) * position.size * sign;
 }
 
-// The stop used for "if the stop fills": the exchange stop in live mode (with several, the one furthest
-// from the price, i.e. the worst case, as the widget does), the bot's own stop in dry mode.
+// The stop that is shown and used for "if the stop fills": the exchange stop in live mode (with
+// several, the one furthest from the price, i.e. the worst case, as the widget does), the bot's own
+// stop in dry mode.
 function protectiveStop(position, status) {
     const sign = direction(position);
     if (sign === null) return null;
@@ -232,33 +232,19 @@ function protectiveStop(position, status) {
     return sign > 0 ? Math.min(...triggers) : Math.max(...triggers);
 }
 
-function stopOutcomeText(position, status) {
-    const outcome = signedMoney(stopOutcome(position, protectiveStop(position, status)));
-    const count = status.mode !== "dry" && Array.isArray(status.stops) ? status.stops.length : 0;
-    return count > 1 && outcome !== "조회 불가" ? `${outcome} · 손절 주문 ${count}개 중 가장 불리한 값` : outcome;
+function outcomeText(position, price) {
+    const outcome = stopOutcome(position, price);
+    if (!finite(outcome)) return "";
+    const margin = positionMargin(position);
+    const roe = finite(margin) && margin > 0 ? ` (${percentText(outcome / margin * 100)})` : "";
+    const won = wonHint(outcome, true);
+    return `${signedUsdt(outcome)}${roe}${won ? ` ${won}` : ""}`;
 }
 
 function stopOutcome(position, stop) {
     const sign = direction(position);
     if (sign === null || !finite(stop) || !finite(position.size) || !finite(position.entry)) return null;
     return (stop - position.entry) * position.size * sign;
-}
-
-// The strategy sets no take-profit price of its own: it trails the stop up and exits on a 4h close
-// below the prior 10-candle low. Show those levels, plus the user's take-profit when one is set.
-// `stop` is the stop that actually protects the position (exchange stop live, bot stop dry).
-function exitPlanRows(position, plan, stop, takeProfit) {
-    const rows = [];
-    if (finite(takeProfit)) rows.push(["익절가", `${number(takeProfit, true)} · 닿으면 거래 봇이 시장가로 전량 청산`]);
-    if (!plan || position.side !== "long") return rows;
-    if (!finite(takeProfit)) rows.push(["익절가", "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다"]);
-    if (finite(plan.exit_line)) rows.push(["청산 신호선", `다음 4시간봉 종가가 ${number(plan.exit_line, true)} 아래면 청산`]);
-    if (finite(stop) && finite(position.entry) && stop >= position.entry) {
-        rows.push(["본전 전환", "손절선이 이미 진입가 이상입니다"]);
-    } else if (finite(plan.trail_distance) && finite(position.entry)) {
-        rows.push(["본전 전환", `고점이 약 ${number(Math.round(position.entry + plan.trail_distance), true)}를 넘으면 손절선이 진입가 위로 올라갑니다`]);
-    }
-    return rows;
 }
 
 // The bot trade behind a position (or, without a symbol, the first one the panel may close).
@@ -283,20 +269,35 @@ function tradeActionAllowed(action) {
     return canAct() && !state.pending && state.job?.running !== true;
 }
 
+// The take-profit editor is a static form under the table, so a value being typed survives the
+// table being redrawn on every status poll.
 function renderTradeControls() {
     const trade = controlledTrade();
-    $("trade-controls").hidden = trade === null;
-    if (trade === null) return;
-    const current = finite(trade.current_rate) ? ` · 현재 ${number(trade.current_rate, true)}` : "";
-    text("trade-summary", `거래 #${trade.trade_id} · ${trade.symbol || "코인 불명"} ${sideName(trade.side)} ${number(trade.amount)}${current}`
-        + (finite(trade.take_profit) ? ` · 익절가 ${number(trade.take_profit, true)}` : " · 익절가 없음"));
+    const editing = trade !== null && state.tpEditing === trade.trade_id;
+    if (!editing) state.tpEditing = null;
+    $("trade-controls").hidden = !editing;
+    if (!editing) return;
     const busy = !tradeActionAllowed({tradeId: trade.trade_id});
-    $("close-market").disabled = busy;
     const tpReady = state.status?.freqtrade?.take_profit === true;
+    text("tp-title", `${trade.symbol || "코인 불명"} ${sideName(trade.side)} · 익절가(TP)`);
     $("tp-set").disabled = busy || !tpReady;
     $("tp-clear").hidden = !finite(trade.take_profit);
     $("tp-clear").disabled = busy;
-    text("trade-help", !tpReady ? "익절가는 거래 봇을 이 기능이 들어간 버전으로 다시 시작한 뒤 쓸 수 있습니다." : "");
+    text("trade-help", !tpReady ? "익절가는 거래 봇을 이 기능이 들어간 버전으로 다시 시작한 뒤 쓸 수 있습니다."
+        : "가격이 닿으면 거래 봇이 시장가로 전량 청산합니다. 그때까지 거래소 손절은 그대로입니다.");
+}
+
+function openTakeProfit(trade) {
+    if (!trade || !tradeActionAllowed({tradeId: trade.trade_id})) return;
+    state.tpEditing = trade.trade_id;
+    $("tp-price").value = finite(trade.take_profit) ? String(trade.take_profit) : "";
+    renderTradeControls();
+    $("tp-price").focus();
+}
+
+function closeTakeProfit() {
+    state.tpEditing = null;
+    renderTradeControls();
 }
 
 function readPrice(id) {
@@ -316,7 +317,68 @@ function requestTakeProfit(event) {
         if (long ? price <= current : price >= current) { notify("익절가는 현재가보다 유리한 쪽이어야 합니다. 지금 닫으려면 시장가 종료를 쓰세요.", true); return; }
         if (price < current * 0.5 || price > current * 1.5) { notify("익절가는 현재가에서 50% 안쪽으로 입력하세요.", true); return; }
     }
+    state.tpEditing = null;
     command(`/api/trades/${trade.trade_id}/take-profit`, {price});
+}
+
+// One labelled column of the Bitget-style position row: label, main value, optional second line.
+function cell(label, value, second = "", valueClass = "", secondClass = "") {
+    const box = node("div", undefined, "pcell");
+    box.append(node("span", label, "plabel"));
+    const main = typeof value === "string" ? node("span", value, `pvalue ${valueClass}`.trim()) : value;
+    box.append(main);
+    if (second) box.append(node("span", second, `psub ${secondClass}`.trim()));
+    return box;
+}
+
+function takeProfitCell(position, trade) {
+    const tp = trade?.take_profit;
+    const box = cell("익절가 (TP)", finite(tp) ? priceText(tp) : "--", finite(tp) ? outcomeText(position, tp) : "",
+        finite(tp) ? "up" : "", "up");
+    if (trade && Number.isInteger(trade.trade_id) && ["long", "short"].includes(position.side)) {
+        const edit = node("button", finite(tp) ? "변경" : "익절 설정", "secondary mini");
+        edit.type = "button";
+        edit.disabled = !tradeActionAllowed({tradeId: trade.trade_id});
+        edit.addEventListener("click", () => openTakeProfit(controlledTrade()));
+        box.append(edit);
+    }
+    return box;
+}
+
+function stopLossCell(position, stop) {
+    return cell("손절가 (SL)", priceText(stop), finite(stop) ? outcomeText(position, stop) : "",
+        finite(stop) ? "down" : "", "down");
+}
+
+function closeCell(trade) {
+    const box = node("div", undefined, "pcell actions");
+    box.append(node("span", "청산", "plabel"));
+    if (!trade || !Number.isInteger(trade.trade_id)) {
+        box.append(node("span", "비트겟 앱에서", "psub"));
+        return box;
+    }
+    const market = node("button", "시장가", "danger mini");
+    market.type = "button";
+    market.disabled = !tradeActionAllowed({tradeId: trade.trade_id});
+    market.addEventListener("click", () => openConfirmation({kind: "trade", value: "market", tradeId: trade.trade_id, live: false}));
+    box.append(market);
+    return box;
+}
+
+// Secondary facts in one muted line under the row: how the strategy exits and what the stop costs.
+function strategyLine(position, plan, stop, status) {
+    const parts = [];
+    if (plan && position.side === "long") {
+        if (finite(plan.exit_line)) parts.push(`전략 청산: 다음 4시간봉 종가 < ${priceText(plan.exit_line)}`);
+        if (finite(stop) && finite(position.entry) && stop >= position.entry) parts.push("손절선 본전 이상");
+        else if (finite(plan.trail_distance) && finite(position.entry)) {
+            parts.push(`고점 ${priceText(Math.round(position.entry + plan.trail_distance))} 넘으면 손절선 본전 이상`);
+        }
+    }
+    if (finite(stop) || finite(tradeFor(status, position.symbol)?.take_profit)) parts.push("익절·손절 손익은 수수료 제외, % 는 증거금 대비");
+    const count = status.mode !== "dry" && Array.isArray(status.stops) ? status.stops.length : 0;
+    if (count > 1) parts.push(`손절 주문 ${count}개 · 가장 불리한 값 기준`);
+    return parts.join(" · ");
 }
 
 function renderPositions(status) {
@@ -328,34 +390,34 @@ function renderPositions(status) {
         target.append(node("p", "열린 포지션이 없습니다.", "muted"));
     } else {
         for (const position of status.positions) {
-            const card = node("article", undefined, "position");
-            const heading = node("h3", position.symbol || "코인 확인 불가");
-            const side = position.side === "long" ? "매수 · 롱" : position.side === "short" ? "매도 · 숏" : "방향 확인 불가";
-            heading.append(node("span", side, `side ${position.side === "long" ? "long" : position.side === "short" ? "short" : ""}`));
-            card.append(heading);
-            const values = node("dl");
-            const rows = [
-                ["수량", number(position.size)],
-                ["포지션 금액", money(positionValue(position))],
-                ["증거금 (묶인 돈)", money(positionMargin(position))],
-                ["레버리지", typeof position.leverage === "number" ? `${number(position.leverage)}배` : "조회 불가"],
-                ["진입가", number(position.entry, true)], ["현재가", number(position.mark, true)],
-                ["평가손익 (수수료 제외)", unrealized(position)],
-                ["강제청산가", number(position.liq, true)],
-                ["손절가", position.symbol === "BTCUSDT" ? (status.mode === "dry" ? "모의 모드 · 거래소 조회 안 함" : stopSummary(status.stops)) : "조회 대상 아님 · BTCUSDT만 지원"],
-                ["손절 시 손익 (수수료 제외)", stopOutcomeText(position, status)],
-                ...(finite(tradeFor(status, position.symbol)?.realized_profit) && tradeFor(status, position.symbol).realized_profit !== 0
-                    ? [["실현손익", signedMoney(tradeFor(status, position.symbol).realized_profit)]] : []),
-                ...exitPlanRows(position, status.exit_plans?.[position.symbol], protectiveStop(position, status),
-                    tradeFor(status, position.symbol)?.take_profit)
-            ];
-            for (const [label, value] of rows) {
-                const row = node("div");
-                row.append(node("dt", label), node("dd", value));
-                values.append(row);
-            }
-            card.append(values);
-            target.append(card);
+            const trade = tradeFor(status, position.symbol);
+            const stop = protectiveStop(position, status);
+            const value = positionValue(position);
+            const margin = positionMargin(position);
+            const pnl = unrealizedPnl(position);
+            const roe = finite(pnl) && finite(margin) && margin > 0 ? pnl / margin * 100 : null;
+            const sideClass = position.side === "long" ? "up" : position.side === "short" ? "down" : "";
+            const mode = {isolated: "격리", crossed: "교차"}[position.margin_mode];
+            const leverage = finite(position.leverage) ? `${number(position.leverage)}x` : "";
+            const row = node("div", undefined, "position-row");
+            row.append(
+                cell("선물", position.symbol || "확인 불가", [sideName(position.side), leverage, mode].filter(Boolean).join(" · "), "strong", sideClass),
+                cell("포지션 가치", finite(value) ? usdt(value) : "--", wonHint(value)),
+                cell("진입가 / 시장가", priceText(position.entry), priceText(position.mark)),
+                cell("예상 강제청산가", truncatedPrice(position.liq), "", "warn"),
+                cell("증거금", finite(margin) ? usdt(margin) : "--", wonHint(margin)),
+                cell("미실현 손익 (ROE)", finite(pnl) ? `${signedUsdt(pnl)}${finite(roe) ? ` (${percentText(roe)})` : ""}` : "--",
+                    wonHint(pnl, true), tone(pnl)),
+                cell("실현 손익", finite(trade?.realized_profit) ? signedUsdt(trade.realized_profit) : "--", "", tone(trade?.realized_profit)),
+                takeProfitCell(position, trade),
+                stopLossCell(position, stop),
+                closeCell(trade),
+            );
+            const article = node("article", undefined, "position");
+            article.append(row);
+            const info = strategyLine(position, status.exit_plans?.[position.symbol], stop, status);
+            if (info) article.append(node("p", info, "position-info"));
+            target.append(article);
         }
     }
     const stops = $("stops");
@@ -863,15 +925,15 @@ function boot() {
     $("phone-enable").addEventListener("click", () => {
         if (!$("phone-enable").disabled) command("/api/phone/enable", {});
     });
-    $("close-market").addEventListener("click", () => {
-        const trade = controlledTrade();
-        if (trade) openConfirmation({kind: "trade", value: "market", tradeId: trade.trade_id, live: false});
-    });
     $("tp-form").addEventListener("submit", requestTakeProfit);
     $("tp-clear").addEventListener("click", () => {
         const trade = controlledTrade();
-        if (trade && tradeActionAllowed({tradeId: trade.trade_id})) command(`/api/trades/${trade.trade_id}/take-profit`, {price: null});
+        if (trade && tradeActionAllowed({tradeId: trade.trade_id})) {
+            state.tpEditing = null;
+            command(`/api/trades/${trade.trade_id}/take-profit`, {price: null});
+        }
     });
+    $("tp-close").addEventListener("click", closeTakeProfit);
     $("cancel-action").addEventListener("click", closeConfirmation);
     $("confirmation").addEventListener("cancel", closeConfirmation);
     $("live-confirm").addEventListener("input", updateConfirmation);

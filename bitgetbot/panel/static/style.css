@@ -8,6 +8,7 @@
   --muted: #a4afbd;
   --up: #2ebd85;
   --down: #f6465d;
+  --warn: #f0a33a;
   --dry: #f0b90b;
   --focus: #89bbff;
 }
@@ -81,10 +82,25 @@ form button { width: 100%; margin-top: 16px; }
 .card { min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .section-heading span { color: var(--muted); font-size: 12px; }
-.position { padding: 16px 0; border-bottom: 1px solid var(--border); }
-.trade-controls { display: grid; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); }
-.trade-form { display: grid; gap: 6px; }
-.trade-form label { font-size: 12px; color: var(--muted); }
+.positions-card { grid-column: 1 / -1; }
+.position { padding: 12px 0; border-bottom: 1px solid var(--border); }
+/* Bitget-style position row: one labelled column per figure, one line on wide screens. */
+.position-row { display: grid; grid-template-columns: repeat(10, minmax(max-content, auto)); gap: 4px 18px; align-items: start; overflow-x: auto; padding-bottom: 4px; }
+.pcell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.plabel { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.pvalue { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pvalue.strong { font-weight: 800; }
+.psub { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.up { color: var(--up); }
+.down { color: var(--down); }
+.warn { color: var(--warn); }
+.pcell.actions { justify-content: flex-start; }
+button.mini { min-height: 30px; padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+.position-info { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.trade-controls { display: grid; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.tp-form { display: grid; gap: 6px; }
+.tp-form label { font-size: 12px; color: var(--muted); }
+.stop-section summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 10px 0 4px; }
 .trade-inline { display: flex; flex-wrap: wrap; gap: 8px; }
 .trade-inline input { flex: 1 1 140px; width: auto; }
 .position:first-child { padding-top: 4px; }
@@ -141,6 +157,8 @@ dialog::backdrop { background: rgb(0 0 0 / 78%); }
   .toolbar p { flex-basis: 100%; }
   .toolbar button { flex: 1; white-space: nowrap; }
   .emergency { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+  .position-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; overflow-x: visible; }
+  .pvalue, .psub { white-space: normal; overflow-wrap: anywhere; }
   .emergency-actions { gap: 10px; }
   .emergency-actions a { padding: 8px 0; }
   #emergency-confirm { flex-basis: 100%; }

@@ -860,84 +860,12 @@ assert.equal(`${marker.attributes.cx},${marker.attributes.cy}`, points.at(-1));
 ''')
 
 
-POSITION_ROWS = r'''
-const rows = () => Object.fromEntries(element("positions").children[0].children[1].children
-    .map(row => [row.children[0].textContent, row.children[1].textContent]));
-const live = {...status, mode: "live",
-    positions: [{symbol: "BTCUSDT", side: "long", size: 0.0003, entry: 83472.1, mark: 83529.9, liq: 42000, leverage: 2}],
-    stops: [{plan_type: "pos_loss", trigger_price: 81920.3, trigger_type: "mark_price"}],
-    exit_plans: {BTCUSDT: {exit_line: 81163, trail_distance: 2327.7, bot_stop: 81920.3}}};
-'''
-
-
-def test_position_card_shows_dollar_value_margin_and_stop_outcome(javascript):
-    javascript(POSITION_ROWS + r'''
-run("state.charts = {asset: {krw_per_usdt: 1400}}");
-run("renderPositions")(live);
-const shown = rows();
-assert.equal(shown["수량"], "0.0003");
-assert.equal(shown["포지션 금액"], "$25.06 (약 35,083원)");
-assert.equal(shown["증거금 (묶인 돈)"], "$12.52 (약 17,529원)");
-assert.match(shown["평가손익 (수수료 제외)"], /^\+\$0\.02 \(약 \+24원\) · 증거금 대비 \+0\.14%$/);
-assert.equal(shown["강제청산가"], "$42,000");
-assert.equal(shown["손절 시 손익 (수수료 제외)"], "-$0.47 (약 -652원)");
-assert.equal(shown["익절가"], "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다");
-assert.equal(shown["청산 신호선"], "다음 4시간봉 종가가 $81,163 아래면 청산");
-assert.equal(shown["본전 전환"], "고점이 약 $85,800를 넘으면 손절선이 진입가 위로 올라갑니다");
-''')
-
-
-def test_position_card_without_rate_shows_dollars_only_and_uses_lowest_exchange_stop(javascript):
-    javascript(POSITION_ROWS + r'''
-run("state.charts = null");
-run("renderPositions")({...live, stops: [{trigger_price: 82500}, {trigger_price: 81000}]});
-const shown = rows();
-assert.equal(shown["포지션 금액"], "$25.06");
-assert.equal(shown["손절 시 손익 (수수료 제외)"], "-$0.74 · 손절 주문 2개 중 가장 불리한 값");
-''')
-
-
-def test_position_card_dry_mode_uses_bot_stop_and_reports_breakeven_reached(javascript):
-    javascript(POSITION_ROWS + r'''
-run("state.charts = null");
-run("renderPositions")({...live, mode: "dry", stops: null,
-    exit_plans: {BTCUSDT: {exit_line: null, trail_distance: 2327.7, bot_stop: 84000}}});
-const shown = rows();
-assert.equal(shown["손절 시 손익 (수수료 제외)"], "+$0.16");
-assert.equal(shown["본전 전환"], "손절선이 이미 진입가 이상입니다");
-assert.equal(shown["청산 신호선"], undefined);
-''')
-
-
-def test_position_card_hides_strategy_exit_rows_for_manual_trades(javascript):
-    javascript(POSITION_ROWS + r'''
-run("state.charts = null");
-run("renderPositions")({...live, exit_plans: {}});
-const shown = rows();
-assert.equal(shown["익절가"], undefined);
-assert.equal(shown["손절 시 손익 (수수료 제외)"], "-$0.47");
-''')
-
-
 def test_emergency_close_sits_at_the_page_bottom_not_pinned_over_content():
     css = (STATIC / "style.css").read_text(encoding="utf-8")
     rule = css.split(".emergency {", 1)[1].split("}", 1)[0]
     assert "position: fixed" not in rule and "position: sticky" not in rule
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     assert html.index('<aside class="emergency"') > html.index('id="phone-title"')
-
-
-def test_position_card_prefers_exchange_margin_and_judges_breakeven_on_the_exchange_stop(javascript):
-    javascript(POSITION_ROWS + r"""
-run("state.charts = null");
-// Live: the bot already raised its stop above entry but the exchange stop is still below it.
-run("renderPositions")({...live, positions: [{...live.positions[0], margin: 22.52}],
-    exit_plans: {BTCUSDT: {exit_line: 81163, trail_distance: 2327.7, bot_stop: 83500}}});
-const shown = rows();
-assert.equal(shown["증거금 (묶인 돈)"], "$22.52");
-assert.match(shown["평가손익 (수수료 제외)"], /증거금 대비 \+0\.08%$/);
-assert.equal(shown["본전 전환"], "고점이 약 $85,800를 넘으면 손절선이 진입가 위로 올라갑니다");
-""")
 
 
 def test_topbar_links_to_the_emergency_block():
@@ -949,72 +877,121 @@ def test_topbar_links_to_the_emergency_block():
 
 
 
-TRADE_FIXTURE = r'''
-const trade = {trade_id: 2, symbol: "BTCUSDT", side: "long", amount: 0.0003, current_rate: 83500,
-               realized_profit: 0, kind: "strategy", has_open_orders: false, take_profit: null};
-const withTrade = (extra = {}, ft = {}) => ({...status, mode: "live",
-    freqtrade: {...status.freqtrade, dry_run: false, take_profit: false, ...ft},
-    trades: [{...trade, ...extra}]});
+
+POSITION_ROWS = r'''
+// {column label: "value | second line | button text"} of the first position row.
+const flat = child => child.textContent || (child.children || []).map(flat).join("");
+const cells = () => Object.fromEntries(element("positions").children[0].children[0].children
+    .map(c => [c.children[0].textContent, c.children.slice(1).map(flat).join(" | ")]));
+const info = () => element("positions").children[0].children[1]?.textContent;
+const live = {...status, mode: "live",
+    freqtrade: {...status.freqtrade, dry_run: false, take_profit: true},
+    positions: [{symbol: "BTCUSDT", side: "long", size: 0.0003, entry: 83472.1, mark: 83529.9, liq: 41920.59,
+                 leverage: 2, margin_mode: "isolated"}],
+    stops: [{plan_type: "pos_loss", trigger_price: 81920.3, trigger_type: "mark_price"}],
+    exit_plans: {BTCUSDT: {exit_line: 81163, trail_distance: 2327.7, bot_stop: 81920.3}}};
+const trade = {trade_id: 2, symbol: "BTCUSDT", side: "long", amount: 0.0003, current_rate: 83529.9,
+               realized_profit: -0.01, kind: "strategy", take_profit: null};
 const posts = () => requests.filter(r => r.options?.method === "POST").map(r => [r.url, JSON.parse(r.options.body)]);
 '''
 
 
-def test_trade_controls_show_for_a_bot_trade_and_gate_take_profit_on_restart(javascript):
-    javascript(TRADE_FIXTURE + r'''
-run("applyStatus")(withTrade());
-assert.equal(element("trade-controls").hidden, false);
-assert.equal(element("trade-summary").textContent, "거래 #2 · BTCUSDT 롱 0.0003 · 현재 $83,500 · 익절가 없음");
-assert.equal(element("close-market").disabled, false);
-assert.equal(element("tp-set").disabled, true);
-assert.match(element("trade-help").textContent, /다시 시작한 뒤/);
-run("applyStatus")(withTrade({}, {take_profit: true}));
-assert.equal(element("tp-set").disabled, false);
-assert.equal(element("trade-help").textContent, "");
-run("applyStatus")(withTrade({kind: "smoke"}));
-assert.equal(element("trade-controls").hidden, true);
+def test_position_row_reads_like_bitget(javascript):
+    javascript(POSITION_ROWS + r'''
+run("state.charts = {asset: {krw_per_usdt: 1400}}");
+run("renderPositions")(live);
+assert.deepEqual(Object.keys(cells()), ["선물", "포지션 가치", "진입가 / 시장가", "예상 강제청산가", "증거금",
+    "미실현 손익 (ROE)", "실현 손익", "익절가 (TP)", "손절가 (SL)", "청산"]);
+const shown = cells();
+assert.equal(shown["선물"], "BTCUSDT | 롱 · 2x · 격리");
+assert.equal(shown["포지션 가치"], "25.06 USDT | ≈ 35,083원");
+assert.equal(shown["진입가 / 시장가"], "83,472.1 | 83,529.9");
+// One decimal kept, the rest dropped (not rounded up).
+assert.equal(shown["예상 강제청산가"], "41,920.5");
+assert.equal(shown["증거금"], "12.52 USDT | ≈ 17,529원");
+assert.equal(shown["미실현 손익 (ROE)"], "+0.0173 USDT (+0.14%) | ≈ +24원");
+assert.equal(shown["손절가 (SL)"], "81,920.3 | -0.4655 USDT (-3.72%) ≈ -652원");
+assert.equal(shown["익절가 (TP)"], "--");
+assert.equal(shown["청산"], "비트겟 앱에서");
+assert.match(info(), /전략 청산: 다음 4시간봉 종가 < 81,163\.0 · 고점 85,800\.0 넘으면 손절선 본전 이상/);
 ''')
 
 
-def test_market_close_goes_through_confirmation_then_one_post(javascript):
-    javascript(TRADE_FIXTURE + r'''
-run("applyStatus")(withTrade());
+def test_position_row_without_rate_shows_usdt_only_and_worst_exchange_stop(javascript):
+    javascript(POSITION_ROWS + r'''
+run("state.charts = null");
+run("renderPositions")({...live, stops: [{trigger_price: 82500}, {trigger_price: 81000}]});
+const shown = cells();
+assert.equal(shown["포지션 가치"], "25.06 USDT");
+assert.equal(shown["손절가 (SL)"], "81,000.0 | -0.7416 USDT (-5.92%)");
+assert.match(info(), /손절 주문 2개 · 가장 불리한 값 기준/);
+''')
+
+
+def test_position_row_dry_mode_uses_bot_stop_and_reports_breakeven(javascript):
+    javascript(POSITION_ROWS + r'''
+run("state.charts = null");
+run("renderPositions")({...live, mode: "dry", stops: null,
+    exit_plans: {BTCUSDT: {exit_line: null, trail_distance: 2327.7, bot_stop: 84000}}});
+assert.equal(cells()["손절가 (SL)"], "84,000.0 | +0.1584 USDT (+1.26%)");
+assert.match(info(), /손절선 본전 이상/);
+assert.doesNotMatch(info(), /전략 청산/);
+''')
+
+
+def test_position_row_prefers_exchange_margin_and_shows_the_bot_trade(javascript):
+    javascript(POSITION_ROWS + r'''
+run("state.charts = null");
+run("applyStatus")({...live, positions: [{...live.positions[0], margin: 22.52}], trades: [{...trade, take_profit: 86000}]});
+const shown = cells();
+assert.equal(shown["증거금"], "22.52 USDT");
+assert.equal(shown["미실현 손익 (ROE)"], "+0.0173 USDT (+0.08%)");
+assert.equal(shown["실현 손익"], "-0.0100 USDT");
+assert.equal(shown["익절가 (TP)"], "86,000.0 | +0.7584 USDT (+3.37%) | 변경");
+assert.equal(shown["청산"], "시장가");
+''')
+
+
+def test_market_button_opens_confirmation_then_one_post(javascript):
+    javascript(POSITION_ROWS + r'''
+run("applyStatus")({...live, trades: [trade]});
+const button = element("positions").children[0].children[0].children.at(-1).children[1];
+assert.equal(button.textContent, "시장가");
+assert.equal(button.disabled, false);
 run('openConfirmation({kind: "trade", value: "market", tradeId: 2, live: false})');
-assert.equal(element("confirmation").open, true);
 assert.equal(element("confirm-title").textContent, "시장가 종료");
 assert.match(element("confirm-description").textContent, /되돌릴 수 없습니다/);
-assert.equal(element("live-field").hidden, true);
-assert.equal(element("confirm-action").disabled, false);
 await run("confirmAction()");
 assert.deepEqual(posts(), [["/api/trades/2/close", {type: "market"}]]);
 ''')
 
 
-def test_take_profit_checks_the_side_then_posts(javascript):
-    javascript(TRADE_FIXTURE + r'''
-run("applyStatus")(withTrade({}, {take_profit: true}));
-const submit = () => run("requestTakeProfit")({preventDefault() {}});
+def test_take_profit_editor_opens_from_the_row_and_survives_redraws(javascript):
+    javascript(POSITION_ROWS + r'''
+run("applyStatus")({...live, trades: [trade]});
+assert.equal(element("trade-controls").hidden, true);
+run("openTakeProfit(controlledTrade())");
+assert.equal(element("trade-controls").hidden, false);
+assert.equal(element("tp-set").disabled, false);
 element("tp-price").value = "83000";
-submit();
+run("applyStatus")({...live, trades: [trade]});   // a status poll redraws the row
+assert.equal(element("trade-controls").hidden, false);
+assert.equal(element("tp-price").value, "83000");
+run("requestTakeProfit")({preventDefault() {}});
 assert.match(element("notice").textContent, /유리한 쪽/);
-element("tp-price").value = "200000";
-submit();
-assert.match(element("notice").textContent, /50% 안쪽/);
-assert.deepEqual(posts(), []);
 element("tp-price").value = "86000";
-await submit();
+await run("requestTakeProfit")({preventDefault() {}});
 assert.deepEqual(posts(), [["/api/trades/2/take-profit", {price: 86000}]]);
-run("applyStatus")(withTrade({take_profit: 86000}, {take_profit: true}));
-assert.equal(element("tp-clear").hidden, false);
-assert.match(element("trade-summary").textContent, /익절가 \$86,000/);
+assert.equal(run("state.tpEditing"), null);
 ''')
 
 
-def test_position_card_shows_the_user_take_profit_and_realized_pnl(javascript):
+def test_take_profit_editor_waits_for_the_restarted_bot(javascript):
     javascript(POSITION_ROWS + r'''
-run("state.charts = null");
-run("renderPositions")({...live, trades: [{trade_id: 2, symbol: "BTCUSDT", kind: "strategy", take_profit: 86000, realized_profit: -0.01}]});
-const shown = rows();
-assert.equal(shown["익절가"], "$86,000 · 닿으면 거래 봇이 시장가로 전량 청산");
-assert.equal(shown["실현손익"], "-$0.01");
-assert.equal(shown["청산 신호선"], "다음 4시간봉 종가가 $81,163 아래면 청산");
+run("applyStatus")({...live, freqtrade: {...live.freqtrade, take_profit: false}, trades: [trade]});
+run("openTakeProfit(controlledTrade())");
+assert.equal(element("tp-set").disabled, true);
+assert.match(element("trade-help").textContent, /다시 시작한 뒤/);
+run("applyStatus")({...live, trades: [{...trade, kind: "smoke"}]});
+assert.equal(element("trade-controls").hidden, true);
 ''')
