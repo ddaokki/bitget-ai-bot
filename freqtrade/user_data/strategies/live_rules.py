@@ -4,6 +4,7 @@ No Freqtrade import, so tests run in the repo venv. All money values are in USDT
 """
 from __future__ import annotations
 
+import json
 import math
 from datetime import datetime, timedelta
 
@@ -17,12 +18,14 @@ DAILY_LOSS_CAP = 0.03        # §7.4: no new entry after -3% realized today (UTC
 WEEKLY_LOSS_CAP = 0.06       # §7.4: no new entry after -6% realized this ISO week
 MANUAL_STOP_PRICE_PCT = 0.03  # manual/smoke trades: stop 3% below the open price
 STRATEGY_TAG_PREFIX = "safe_"
+MANUAL_TARGETS_FILE = "manual_targets.json"  # user_data/<file>, written by the control panel
+USER_TP_EXIT = "user_take_profit"            # exit reason when a user take-profit is touched
 
 
 def _finite_positive(value) -> bool:
     try:
         return math.isfinite(float(value)) and float(value) > 0
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return False
 
 
@@ -119,3 +122,46 @@ def daily_rows_usable(rows: list[list]) -> bool:
     if len(rows) < DAILY_MIN_ROWS:
         return False
     return all(int(b[0]) - int(a[0]) == DAY_MS for a, b in zip(rows, rows[1:]))
+
+
+def parse_manual_targets(text: str) -> dict[int, dict]:
+    """{trade id: {"price", "open_ts", "dry_run"}} from the panel's file. Anything malformed is dropped.
+
+    A target names the exact trade it was set on (open time in ms and mode), because the dry and
+    live databases both number trades from 1 and a target must never move to another trade.
+    """
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return {}
+    targets = data.get("take_profit") if isinstance(data, dict) else None
+    if not isinstance(targets, dict):
+        return {}
+    result = {}
+    for key, entry in targets.items():
+        try:
+            trade_id = int(key)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not isinstance(entry, dict):
+            continue
+        price, open_ts, dry_run = entry.get("price"), entry.get("open_ts"), entry.get("dry_run")
+        if type(price) in (int, float) and _finite_positive(price) and type(open_ts) is int and open_ts > 0 \
+                and type(dry_run) is bool:
+            result[trade_id] = {"price": float(price), "open_ts": open_ts, "dry_run": dry_run}
+    return result
+
+
+def target_for(targets: dict[int, dict], trade_id: int, open_ts: int, dry_run: bool) -> float | None:
+    """The take-profit price for this exact trade (same id, open time and mode), else None."""
+    entry = targets.get(trade_id)
+    if entry is None or entry["open_ts"] != open_ts or entry["dry_run"] is not dry_run:
+        return None
+    return entry["price"]
+
+
+def take_profit_hit(is_short: bool, rate: float, target: float | None) -> bool:
+    """True once the price touches the user's take-profit in the trade's favour."""
+    if target is None or not _finite_positive(rate):
+        return False
+    return rate <= target if is_short else rate >= target

@@ -1,5 +1,5 @@
 """Loopback control-panel API. Orders stay inside smoke, emergency close-all, the per-trade close
-and limit-order controls, or the strategy the user switches on with /api/autotrade or a confirmed
+and take-profit controls, or the strategy the user switches on with /api/autotrade or a confirmed
 mode switch (Freqtrade /start, /pause). Every order goes through Freqtrade, never straight to Bitget."""
 
 import json
@@ -26,7 +26,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from bitgetbot.bitget_read import BitgetReader, make_exchange
 from bitgetbot.ftclient import FreqtradeClient
 from bitgetbot.ledger import fetch_krw_per_usdt
-from bitgetbot.panel import charts, ops, widget, widget_token
+from bitgetbot.panel import charts, ops, targets, widget, widget_token
 from bitgetbot.panel.auth import (
     Lockout, Sessions, allowed_host, classify, csrf_ok, effective_scheme, hash_pin, identity, valid_pin,
     verify_pin,
@@ -55,10 +55,14 @@ TRADE_GONE = "열린 거래가 아닙니다. 화면을 새로 고쳐 확인하�
 TRADE_SMOKE = "점검(스모크) 거래는 단계 버튼의 청산으로 닫으세요"
 TRADE_CLOSE_FAILED = "종료 요청을 확인할 수 없습니다. 다시 누르지 말고 비트겟 앱에서 포지션과 주문을 직접 확인하세요"
 TRADE_PRICE = "가격은 0보다 큰 숫자로 입력하세요"
-LIMIT_FAR = "지정가는 현재가에서 50% 안쪽으로 입력하세요"
-# A typo guard only: on Bitget, Freqtrade keeps (and keeps trailing) the exchange stop while a
-# limit exit rests (stoploss_blocks_assets is False), so any price within the band is safe to rest.
-LIMIT_BAND = 0.5
+TP_WRONG_SIDE = "익절가는 현재가보다 유리한 쪽(롱은 위, 숏은 아래)이어야 합니다. 지금 닫으려면 시장가 종료를 쓰세요"
+TP_FAR = "익절가는 현재가에서 50% 안쪽으로 입력하세요"
+TP_UNSUPPORTED = "거래 봇을 다시 시작해야 익절가를 쓸 수 있습니다"
+TP_SAVE_FAILED = "익절가를 저장하지 못했습니다"
+# A resting limit exit can fill partly; at this account's size Freqtrade then cannot cancel the rest,
+# which blocks the bot's own exits and close-all. So "exit at my price" is a take-profit the strategy
+# executes at market on touch, and the panel never rests limit exits.
+TP_BAND = 0.5
 MODE_SWITCHED = "{mode} 모드로 전환했습니다. 거래 봇이 준비되면(약 1~2분) 자동매매가 저절로 켜집니다."
 AUTO_START_TIMEOUT_S = 180
 AUTO_START_INTERVAL_S = 3
@@ -71,7 +75,7 @@ AUDIT_ACTIONS = {
     "/api/docker/up": "docker_up", "/api/emergency/close-all": "emergency",
     "/api/phone/enable": "phone_enable", "/api/autotrade": "autotrade",
 }
-TRADE_ACTIONS = {"close": "trade_close", "cancel-order": "trade_cancel_order"}
+TRADE_ACTIONS = {"close": "trade_close", "take-profit": "take_profit"}
 TRADE_ID = re.compile(r"[0-9]{1,12}")
 
 
@@ -114,6 +118,7 @@ class PanelDeps:
     static_dir: Path = STATIC_DIR
     smoke_command: Callable[[str, SmokeIO], int] = run_command
     audit_path: Path | None = None
+    targets_path: Path = targets.PATH
     # Runs the post-switch "start autotrade when ready" task and the startup equity snapshot;
     # tests replace it to run them inline.
     background: Callable[[Callable[[], None]], None] = _daemon
@@ -580,7 +585,7 @@ def create_app(deps: PanelDeps) -> FastAPI:
         credentials = ("", "", "") if settings.dry_run else (settings.key, settings.secret, settings.password)
         reader = deps.reader_factory(*credentials)
         ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
-        snapshot = ops.collect_status(settings, reader, ft)
+        snapshot = ops.collect_status(settings, reader, ft, deps.targets_path)
         # Asset history: at most one snapshot per mode every 10 minutes while the panel is polled.
         record_equity(settings, reader, ft)
         snapshot.update(
@@ -727,70 +732,89 @@ def create_app(deps: PanelDeps) -> FastAPI:
 
     def _price(body: dict) -> float:
         price = body.get("price")
-        if type(price) not in (int, float) or not math.isfinite(price) or price <= 0:
+        try:
+            valid = type(price) in (int, float) and math.isfinite(float(price)) and float(price) > 0
+        except OverflowError:
+            valid = False
+        if not valid:
             raise _PanelError(400, TRADE_PRICE)
         return float(price)
 
-    def _trade_row(ft, trade_id: int) -> dict:
+    def _trade_rows(ft) -> list[dict]:
         try:
             rows = ft.status()
         except Exception:
             raise _PanelError(503, AUTOTRADE_FAILED) from None
-        for row in rows if isinstance(rows, list) else []:
-            if isinstance(row, dict) and row.get("trade_id") == trade_id:
+        return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+
+    def _trade_row(rows: list[dict], trade_id: int) -> dict:
+        for row in rows:
+            if row.get("trade_id") == trade_id:
                 if row.get("enter_tag") == ops.SMOKE_TAG:
                     raise _PanelError(409, TRADE_SMOKE)
                 return row
         raise _PanelError(404, TRADE_GONE)
 
-    def _trade_client(trade_id: int):
-        """(settings, client, row) for one open, non-smoke trade, checked under the operation lock."""
+    def _trade_client():
         if deps.jobs.snapshot()["running"]:
             raise _PanelError(409, "다른 작업이 실행 중입니다")
         settings = _settings(deps)
-        ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
-        return settings, ft, _trade_row(ft, trade_id)
+        return settings, deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
 
     @app.post("/api/trades/{raw_id}/close")
     def close_trade(raw_id: str, body: dict = Depends(_body)):
         trade_id = _trade_id(raw_id)
-        kind = body.get("type")
-        if not isinstance(kind, str) or kind not in {"market", "limit"}:
-            raise _PanelError(400, "종료 방식은 market 또는 limit으로 입력하세요")
-        price = _price(body) if kind == "limit" else None
+        if body.get("type") != "market":
+            raise _PanelError(400, "종료는 시장가만 됩니다. 원하는 가격에 나가려면 익절가를 설정하세요")
         with operation_lock:
-            _, ft, row = _trade_client(trade_id)
+            settings, ft = _trade_client()
+            _trade_row(_trade_rows(ft), trade_id)
+            cancel_auto_start()  # a manual exit never turns automatic trading on afterwards
+            try:
+                # One request, never retried: an ambiguous timeout must not double an exit.
+                ft.force_exit(trade_id, "market")
+            except Exception:
+                return JSONResponse({"detail": TRADE_CLOSE_FAILED, "link": MANUAL_LINK}, status_code=503)
+        where = "모의 거래입니다." if settings.dry_run else "비트겟 앱에서 체결을 확인하세요."
+        return {"ok": True, "message": f"거래 #{trade_id} 시장가 종료를 요청했습니다. {where}"}
+
+    @app.post("/api/trades/{raw_id}/take-profit")
+    def take_profit(raw_id: str, body: dict = Depends(_body)):
+        trade_id = _trade_id(raw_id)
+        price = None if body.get("price") is None else _price(body)
+        with operation_lock:
+            settings, ft = _trade_client()
+            if price is not None:
+                try:
+                    config = ft.show_config()
+                except Exception:
+                    raise _PanelError(503, AUTOTRADE_FAILED) from None
+                if not ops.take_profit_supported(config):
+                    raise _PanelError(409, TP_UNSUPPORTED)
+            rows = _trade_rows(ft)
+            row = _trade_row(rows, trade_id)
+            open_ts = row.get("open_timestamp")
+            if type(open_ts) is not int or open_ts <= 0:
+                raise _PanelError(503, AUTOTRADE_FAILED)
             if price is not None:
                 rate = row.get("current_rate")
                 if type(rate) not in (int, float) or not math.isfinite(rate) or rate <= 0:
                     raise _PanelError(503, AUTOTRADE_FAILED)
-                if not rate * (1 - LIMIT_BAND) <= price <= rate * (1 + LIMIT_BAND):
-                    raise _PanelError(400, LIMIT_FAR)
-            cancel_auto_start()  # a manual exit never turns automatic trading on afterwards
+                short = row.get("is_short") is True
+                if (price >= rate) if short else (price <= rate):
+                    raise _PanelError(400, TP_WRONG_SIDE)
+                if not rate * (1 - TP_BAND) <= price <= rate * (1 + TP_BAND):
+                    raise _PanelError(400, TP_FAR)
+            open_trades = {r["trade_id"]: r.get("open_timestamp") for r in rows if type(r.get("trade_id")) is int}
             try:
-                # One request, never retried: an ambiguous timeout must not double an exit. Freqtrade
-                # replaces an exit order that is already open with this one.
-                ft.force_exit(trade_id, kind, price=price)
+                targets.set_target(trade_id, price, open_ts, settings.dry_run, open_trades, deps.targets_path)
             except Exception:
-                return JSONResponse({"detail": TRADE_CLOSE_FAILED, "link": MANUAL_LINK}, status_code=503)
+                raise _PanelError(500, TP_SAVE_FAILED) from None
         if price is None:
-            return {"ok": True, "message": f"거래 #{trade_id} 시장가 종료를 요청했습니다. 비트겟 앱에서 체결을 확인하세요."}
+            return {"ok": True, "message": f"거래 #{trade_id} 익절가를 해제했습니다."}
         return {"ok": True, "message": (
-            f"거래 #{trade_id} 지정가 {price:,.1f} 종료 주문을 걸었습니다. 체결되거나 취소할 때까지 비트겟에 남고, "
-            "거래소 손절과 손절선 끌어올리기는 그대로 계속됩니다.")}
-
-    @app.post("/api/trades/{raw_id}/cancel-order")
-    def cancel_trade_order(raw_id: str):
-        trade_id = _trade_id(raw_id)
-        with operation_lock:
-            _, ft, row = _trade_client(trade_id)
-            if row.get("has_open_orders") is not True:
-                raise _PanelError(409, "취소할 주문이 없습니다")
-            try:
-                ft.cancel_open_order(trade_id)
-            except Exception:
-                raise _PanelError(503, "주문 취소를 확인할 수 없습니다. 비트겟 앱에서 주문을 확인하세요") from None
-        return {"ok": True, "message": f"거래 #{trade_id}의 지정가 종료 주문을 취소했습니다. 손절은 그대로입니다."}
+            f"거래 #{trade_id} 익절가 {price:,.1f} 설정. 가격이 닿으면 거래 봇이 시장가로 전량 청산합니다. "
+            "그때까지 거래소 손절은 그대로입니다.")}
 
     @app.post("/api/keys")
     def save_keys(request: Request, body: dict = Depends(_body)):

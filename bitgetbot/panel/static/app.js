@@ -135,7 +135,7 @@ function actionAllowed(action) {
     if (action.fromMode !== state.status.mode) return false;
     if (action.kind === "step") return stepAllowed(action.value);
     if (action.kind === "autotrade") return autotradeAllowed(action.value);
-    if (action.kind === "trade") return ["market", "limit"].includes(action.value) && tradeActionAllowed(action);
+    if (action.kind === "trade") return action.value === "market" && tradeActionAllowed(action);
     // A mode switch would hide an open smoke trade from status and emergency close.
     return action.kind === "mode" && ["dry", "live"].includes(state.status.mode)
         && state.status.smoke_state?.exists === false
@@ -247,12 +247,11 @@ function stopOutcome(position, stop) {
 // The strategy sets no take-profit price: it trails the stop up and exits on a 4h close below
 // the prior 10-candle low. Show those two levels instead of an invented target.
 // `stop` is the stop that actually protects the position (exchange stop live, bot stop dry).
-function exitPlanRows(position, plan, stop, openExitPrice) {
+function exitPlanRows(position, plan, stop, takeProfit) {
     const rows = [];
-    // A resting limit close above the price is the user's take-profit order on Bitget.
-    if (finite(openExitPrice)) rows.push(["익절가 (지정가 주문)", `${number(openExitPrice, true)} · 비트겟에 걸린 지정가 종료 주문`]);
+    if (finite(takeProfit)) rows.push(["익절가", `${number(takeProfit, true)} · 닿으면 거래 봇이 시장가로 전량 청산`]);
     if (!plan || position.side !== "long") return rows;
-    if (!finite(openExitPrice)) rows.push(["익절가", "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다"]);
+    if (!finite(takeProfit)) rows.push(["익절가", "고정 익절 없음 · 가격이 오르면 손절선을 따라 올립니다"]);
     if (finite(plan.exit_line)) rows.push(["청산 신호선", `다음 4시간봉 종가가 ${number(plan.exit_line, true)} 아래면 청산`]);
     if (finite(stop) && finite(position.entry) && stop >= position.entry) {
         rows.push(["본전 전환", "손절선이 이미 진입가 이상입니다"]);
@@ -286,18 +285,15 @@ function renderTradeControls() {
     $("trade-controls").hidden = trade === null;
     if (trade === null) return;
     const current = finite(trade.current_rate) ? ` · 현재 ${number(trade.current_rate, true)}` : "";
-    text("trade-summary", `거래 #${trade.trade_id} · ${trade.symbol || "코인 불명"} ${sideName(trade.side)} ${number(trade.amount)}${current}`);
+    text("trade-summary", `거래 #${trade.trade_id} · ${trade.symbol || "코인 불명"} ${sideName(trade.side)} ${number(trade.amount)}${current}`
+        + (finite(trade.take_profit) ? ` · 익절가 ${number(trade.take_profit, true)}` : " · 익절가 없음"));
     const busy = !tradeActionAllowed({tradeId: trade.trade_id});
     $("close-market").disabled = busy;
-    $("close-limit").disabled = busy;
-    $("open-order").hidden = !trade.has_open_orders;
-    text("open-order", finite(trade.open_exit_price)
-        ? `걸려 있는 지정가 종료 주문: ${number(trade.open_exit_price, true)}`
-        : "처리 중인 주문이 있습니다.");
-    $("cancel-order").hidden = !trade.has_open_orders;
-    $("cancel-order").disabled = busy;
-    text("trade-help", trade.has_open_orders
-        ? "새 지정가 주문이나 시장가 종료를 내면 걸려 있던 주문은 거래 봇이 취소하고 바꿉니다." : "");
+    const tpReady = state.status?.freqtrade?.take_profit === true;
+    $("tp-set").disabled = busy || !tpReady;
+    $("tp-clear").hidden = !finite(trade.take_profit);
+    $("tp-clear").disabled = busy;
+    text("trade-help", !tpReady ? "익절가는 거래 봇을 이 기능이 들어간 버전으로 다시 시작한 뒤 쓸 수 있습니다." : "");
 }
 
 function readPrice(id) {
@@ -305,19 +301,19 @@ function readPrice(id) {
     return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-function requestLimitClose(event) {
+function requestTakeProfit(event) {
     event.preventDefault();
     const trade = controlledTrade();
-    const price = readPrice("limit-price");
-    if (!trade || !tradeActionAllowed({tradeId: trade.trade_id})) return;
-    if (price === null) { notify("지정가 종료 가격을 숫자로 입력하세요.", true); return; }
+    const price = readPrice("tp-price");
+    if (!trade || !tradeActionAllowed({tradeId: trade.trade_id}) || state.status?.freqtrade?.take_profit !== true) return;
+    if (price === null) { notify("익절가를 숫자로 입력하세요.", true); return; }
     const current = trade.current_rate;
-    // Typo guard (the server checks the same band): a resting limit close keeps the stop.
-    if (finite(current) && (price < current * 0.5 || price > current * 1.5)) {
-        notify("지정가는 현재가에서 50% 안쪽으로 입력하세요.", true);
-        return;
+    if (finite(current)) {
+        const long = trade.side !== "short";
+        if (long ? price <= current : price >= current) { notify("익절가는 현재가보다 유리한 쪽이어야 합니다. 지금 닫으려면 시장가 종료를 쓰세요.", true); return; }
+        if (price < current * 0.5 || price > current * 1.5) { notify("익절가는 현재가에서 50% 안쪽으로 입력하세요.", true); return; }
     }
-    openConfirmation({kind: "trade", value: "limit", tradeId: trade.trade_id, price, live: false});
+    command(`/api/trades/${trade.trade_id}/take-profit`, {price});
 }
 
 function renderPositions(status) {
@@ -348,7 +344,7 @@ function renderPositions(status) {
                 ...(finite(tradeFor(status, position.symbol)?.realized_profit) && tradeFor(status, position.symbol).realized_profit !== 0
                     ? [["실현손익", signedMoney(tradeFor(status, position.symbol).realized_profit)]] : []),
                 ...exitPlanRows(position, status.exit_plans?.[position.symbol], protectiveStop(position, status),
-                    tradeFor(status, position.symbol)?.open_exit_price)
+                    tradeFor(status, position.symbol)?.take_profit)
             ];
             for (const [label, value] of rows) {
                 const row = node("div");
@@ -710,10 +706,9 @@ function openConfirmation(action) {
     if (action.kind === "trade") {
         const trade = controlledTrade();
         const what = `거래 #${action.tradeId} ${trade?.symbol || ""} ${sideName(trade?.side)} ${number(trade?.amount)}`;
-        text("confirm-title", action.value === "market" ? "시장가 종료" : "지정가 종료");
-        text("confirm-description", action.value === "market"
-            ? `${what}을(를) 지금 시장가로 닫습니다. 되돌릴 수 없습니다. 체결 결과는 비트겟 앱에서 확인하세요.`
-            : `${what}을(를) ${number(action.price, true)} 지정가로 닫는 주문을 겁니다. 체결되거나 취소할 때까지 비트겟에 남고, 거래소 손절과 손절선 끌어올리기는 그대로 계속됩니다.${finite(trade?.current_rate) && (trade.side === "short" ? action.price >= trade.current_rate : action.price <= trade.current_rate) ? " 현재가와 같거나 불리한 가격이라 바로 체결될 수 있습니다." : ""}`);
+        text("confirm-title", "시장가 종료");
+        text("confirm-description", `${what}을(를) 지금 시장가로 닫습니다. 되돌릴 수 없습니다. `
+            + (state.status?.mode === "dry" ? "모의 거래입니다." : "체결 결과는 비트겟 앱에서 확인하세요."));
         updateConfirmation();
         $("confirmation").showModal();
         $("cancel-action").focus();
@@ -741,7 +736,7 @@ async function confirmAction() {
     const action = state.confirmation;
     if (!actionAllowed(action) || (action.live && $("live-confirm").value !== "LIVE")) return;
     if (action.kind === "trade") {
-        await command(`/api/trades/${action.tradeId}/close`, action.value === "limit" ? {type: "limit", price: action.price} : {type: "market"});
+        await command(`/api/trades/${action.tradeId}/close`, {type: "market"});
         return;
     }
     const body = action.kind === "mode" ? {mode: action.value} : action.kind === "autotrade" ? {action: action.value} : {};
@@ -869,12 +864,10 @@ function boot() {
         const trade = controlledTrade();
         if (trade) openConfirmation({kind: "trade", value: "market", tradeId: trade.trade_id, live: false});
     });
-    $("limit-form").addEventListener("submit", requestLimitClose);
-    $("cancel-order").addEventListener("click", () => {
+    $("tp-form").addEventListener("submit", requestTakeProfit);
+    $("tp-clear").addEventListener("click", () => {
         const trade = controlledTrade();
-        if (trade && trade.has_open_orders && tradeActionAllowed({tradeId: trade.trade_id})) {
-            command(`/api/trades/${trade.trade_id}/cancel-order`, {});
-        }
+        if (trade && tradeActionAllowed({tradeId: trade.trade_id})) command(`/api/trades/${trade.trade_id}/take-profit`, {price: null});
     });
     $("cancel-action").addEventListener("click", closeConfirmation);
     $("confirmation").addEventListener("cancel", closeConfirmation);

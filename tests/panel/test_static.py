@@ -948,29 +948,30 @@ def test_topbar_links_to_the_emergency_block():
 
 
 
+
 TRADE_FIXTURE = r'''
 const trade = {trade_id: 2, symbol: "BTCUSDT", side: "long", amount: 0.0003, current_rate: 83500,
-               realized_profit: 0, kind: "strategy", has_open_orders: false, open_exit_price: null};
-const withTrade = (extra = {}) => ({...status, mode: "live",
-    freqtrade: {...status.freqtrade, dry_run: false}, trades: [{...trade, ...extra}]});
+               realized_profit: 0, kind: "strategy", has_open_orders: false, take_profit: null};
+const withTrade = (extra = {}, ft = {}) => ({...status, mode: "live",
+    freqtrade: {...status.freqtrade, dry_run: false, take_profit: false, ...ft},
+    trades: [{...trade, ...extra}]});
 const posts = () => requests.filter(r => r.options?.method === "POST").map(r => [r.url, JSON.parse(r.options.body)]);
 '''
 
 
-def test_trade_controls_show_for_a_bot_trade_only(javascript):
+def test_trade_controls_show_for_a_bot_trade_and_gate_take_profit_on_restart(javascript):
     javascript(TRADE_FIXTURE + r'''
 run("applyStatus")(withTrade());
 assert.equal(element("trade-controls").hidden, false);
-assert.equal(element("trade-summary").textContent, "거래 #2 · BTCUSDT 롱 0.0003 · 현재 $83,500");
+assert.equal(element("trade-summary").textContent, "거래 #2 · BTCUSDT 롱 0.0003 · 현재 $83,500 · 익절가 없음");
 assert.equal(element("close-market").disabled, false);
-assert.equal(element("close-limit").disabled, false);
-assert.equal(element("cancel-order").hidden, true);
+assert.equal(element("tp-set").disabled, true);
+assert.match(element("trade-help").textContent, /다시 시작한 뒤/);
+run("applyStatus")(withTrade({}, {take_profit: true}));
+assert.equal(element("tp-set").disabled, false);
+assert.equal(element("trade-help").textContent, "");
 run("applyStatus")(withTrade({kind: "smoke"}));
 assert.equal(element("trade-controls").hidden, true);
-run("applyStatus")(withTrade({has_open_orders: true, open_exit_price: 86000}));
-assert.equal(element("close-market").disabled, false);
-assert.equal(element("cancel-order").hidden, false);
-assert.equal(element("open-order").textContent, "걸려 있는 지정가 종료 주문: $86,000");
 ''')
 
 
@@ -988,49 +989,32 @@ assert.deepEqual(posts(), [["/api/trades/2/close", {type: "market"}]]);
 ''')
 
 
-def test_limit_close_above_the_price_is_a_take_profit_order(javascript):
+def test_take_profit_checks_the_side_then_posts(javascript):
     javascript(TRADE_FIXTURE + r'''
-run("applyStatus")(withTrade());
-const submit = () => run("requestLimitClose")({preventDefault() {}});
-element("limit-price").value = "200000";
+run("applyStatus")(withTrade({}, {take_profit: true}));
+const submit = () => run("requestTakeProfit")({preventDefault() {}});
+element("tp-price").value = "83000";
 submit();
-assert.equal(element("confirmation").open, false);
+assert.match(element("notice").textContent, /유리한 쪽/);
+element("tp-price").value = "200000";
+submit();
 assert.match(element("notice").textContent, /50% 안쪽/);
-element("limit-price").value = "86000";
-submit();
-assert.equal(element("confirmation").open, true);
-assert.match(element("confirm-description").textContent, /\$86,000 지정가로 닫는 주문을 겁니다.*손절과 손절선 끌어올리기는 그대로/);
-assert.doesNotMatch(element("confirm-description").textContent, /바로 체결/);
-await run("confirmAction()");
-assert.deepEqual(posts(), [["/api/trades/2/close", {type: "limit", price: 86000}]]);
+assert.deepEqual(posts(), []);
+element("tp-price").value = "86000";
+await submit();
+assert.deepEqual(posts(), [["/api/trades/2/take-profit", {price: 86000}]]);
+run("applyStatus")(withTrade({take_profit: 86000}, {take_profit: true}));
+assert.equal(element("tp-clear").hidden, false);
+assert.match(element("trade-summary").textContent, /익절가 \$86,000/);
 ''')
 
 
-def test_limit_close_at_or_below_the_price_warns_it_fills_now(javascript):
-    javascript(TRADE_FIXTURE + r'''
-run("applyStatus")(withTrade());
-element("limit-price").value = "83400";
-run("requestLimitClose")({preventDefault() {}});
-assert.match(element("confirm-description").textContent, /바로 체결될 수 있습니다/);
-''')
-
-
-def test_cancel_order_posts_for_the_trade(javascript):
-    javascript(TRADE_FIXTURE + r'''
-run("applyStatus")(withTrade({has_open_orders: true, open_exit_price: 86000}));
-const handler = run("controlledTrade") && true;
-await run(`command("/api/trades/2/cancel-order", {})`);
-assert.deepEqual(posts(), [["/api/trades/2/cancel-order", {}]]);
-''')
-
-
-def test_position_card_shows_a_resting_limit_close_as_the_take_profit(javascript):
+def test_position_card_shows_the_user_take_profit_and_realized_pnl(javascript):
     javascript(POSITION_ROWS + r'''
 run("state.charts = null");
-run("renderPositions")({...live, trades: [{trade_id: 2, symbol: "BTCUSDT", kind: "strategy", open_exit_price: 86000, realized_profit: -0.01}]});
+run("renderPositions")({...live, trades: [{trade_id: 2, symbol: "BTCUSDT", kind: "strategy", take_profit: 86000, realized_profit: -0.01}]});
 const shown = rows();
-assert.equal(shown["익절가 (지정가 주문)"], "$86,000 · 비트겟에 걸린 지정가 종료 주문");
-assert.equal(shown["익절가"], undefined);
+assert.equal(shown["익절가"], "$86,000 · 닿으면 거래 봇이 시장가로 전량 청산");
 assert.equal(shown["실현손익"], "-$0.01");
 assert.equal(shown["청산 신호선"], "다음 4시간봉 종가가 $81,163 아래면 청산");
 ''')
