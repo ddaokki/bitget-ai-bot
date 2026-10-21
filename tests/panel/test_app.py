@@ -129,6 +129,7 @@ def panel(tmp_path, monkeypatch):
     settings = [Settings(True, "http://127.0.0.1:8080", SENTINELS[6], SENTINELS[5], *SENTINELS[2:5])]
     ft = FT()
     runner_calls, reader_calls, ft_calls, executions, modes, keys = [], [], [], [], [], []
+    ft_options = []
     release, entered = Event(), Event()
     options = {"block": False, "restart_error": False, "container": True, "compose_code": 0, "execute_error": False}
     background, sleeps, fx_calls = [], [], []
@@ -176,8 +177,9 @@ def panel(tmp_path, monkeypatch):
         reader_calls.append(credentials)
         return Reader()
 
-    def ft_factory(*credentials):
+    def ft_factory(*credentials, **options):
         ft_calls.append(credentials)
+        ft_options.append(options)
         return ft
 
     def mode_setter(mode):
@@ -199,7 +201,7 @@ def panel(tmp_path, monkeypatch):
             data = SimpleNamespace(
                 module=module, app=application, deps=deps, local=local, tailnet=tailnet,
                 settings=settings, ft=ft, runner_calls=runner_calls, reader_calls=reader_calls,
-                ft_calls=ft_calls, executions=executions, modes=modes, keys=keys,
+                ft_calls=ft_calls, ft_options=ft_options, executions=executions, modes=modes, keys=keys,
                 options=options, now=now, release=release, entered=entered, state_path=ops.STATE_PATH,
                 background=background, sleeps=sleeps, fx_calls=fx_calls,
             )

@@ -137,35 +137,46 @@ def test_foreign_host_is_rejected_even_with_the_widget_token(w):
     assert response.status_code == 421
 
 
-def test_failures_lock_only_the_widget_route_and_never_the_panel(w):
+def test_failures_lock_only_wrong_tokens_and_never_the_panel(w):
     for _ in range(5):
         assert get(w, token=OTHER).status_code == 401
-    locked = get(w)
+    locked = get(w, token=OTHER)
     assert locked.status_code == 429
     assert int(locked.headers["retry-after"]) == 900
     assert_clean(locked.text)
+    assert get(w, token=None).status_code == 429
+    # The valid token still works during the lock: a stale board cannot lock the real widget out.
+    assert get(w).status_code == 200
     # The panel itself is never locked by widget failures.
     local_login(w)
     assert w.local.get("/api/status").status_code == 200
     tailnet_login(w)
     assert w.tailnet.get("/api/status").status_code == 200
     w.now[0] += 900
-    assert get(w).status_code == 200
+    assert get(w, token=OTHER).status_code == 401
 
 
-def test_lock_escalates_and_a_valid_request_resets_the_count(w):
+def test_lock_escalates_and_valid_requests_do_not_reset_the_count(w):
     for _ in range(4):
         assert get(w, token=OTHER).status_code == 401
-    assert get(w).status_code == 200
-    for _ in range(4):
-        assert get(w, token=OTHER).status_code == 401
-    assert get(w).status_code == 200
-    for _ in range(5):
-        get(w, token=OTHER)
+        assert get(w).status_code == 200
+    # The fifth wrong token locks even though valid polls came in between.
+    assert get(w, token=OTHER).status_code == 401
+    assert get(w, token=OTHER).status_code == 429
     w.now[0] += 900
     for _ in range(5):
         get(w, token=OTHER)
-    assert int(get(w).headers["retry-after"]) == 1800
+    assert int(get(w, token=OTHER).headers["retry-after"]) == 1800
+
+
+def test_stale_board_after_rotation_does_not_block_the_new_token(w):
+    from bitgetbot.panel import __main__ as entry
+
+    entry._write_token(w.token_path, OTHER)
+    for _ in range(20):  # the old board keeps polling with the old token
+        assert get(w).status_code in (401, 429)
+    assert get(w).status_code == 429
+    assert get(w, token=OTHER).status_code == 200
 
 
 def test_pin_lockout_does_not_lock_the_widget(w):
@@ -254,6 +265,39 @@ def test_summary_is_built_at_most_once_per_3_seconds(w, monkeypatch):
     w.now[0] += 0.1
     get(w)
     assert reads == {"equity": 2, "positions": 2}
+
+
+def test_cache_window_starts_when_a_slow_build_finishes(w):
+    calls = []
+    original = w.ft.ping
+
+    def slow_ping():
+        calls.append(1)
+        w.now[0] += 5  # a build slower than the 3 s window
+        return original()
+
+    w.ft.ping = slow_ping
+    first = get(w).json()
+    w.now[0] += 2.9
+    assert get(w).json() == first
+    assert len(calls) == 1
+    assert first["updatedAt"] == widget.iso(NOW + 5)
+    w.now[0] += 0.1
+    get(w)
+    assert len(calls) == 2
+
+
+def test_widget_build_uses_short_local_timeouts(w):
+    w.ft_options.clear()
+    get(w)
+    assert w.ft_options == [{"timeout": widget.FT_TIMEOUT_S}]
+    assert widget.FT_TIMEOUT_S <= 1.5
+    w.ft.ping_error = FreqtradeUnreachable(SENTINELS[3])
+    timeouts = []
+    w.deps.runner = lambda argv, timeout: timeouts.append(timeout) or (0, "")
+    w.now[0] += 3
+    get(w)
+    assert timeouts == [widget.DOCKER_TIMEOUT_S] and widget.DOCKER_TIMEOUT_S <= 2
 
 
 def test_build_failure_is_generic_503_and_also_rate_limited(w):

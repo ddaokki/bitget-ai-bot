@@ -19,6 +19,10 @@ from bitgetbot.panel.ops import is_strategy_tag, observe
 from bitgetbot.privcfg import Settings
 
 CACHE_S = 3.0           # build at most once per 3 s however many widgets poll (each every 5 s)
+# The widget gives up after 3 s. Short local timeouts keep a hung Freqtrade API or a stuck
+# Docker Desktop from outliving that, so the board still receives the critical alerts.
+FT_TIMEOUT_S = 1.5
+DOCKER_TIMEOUT_S = 2
 SPARK_DAYS = 7
 SPARK_POINTS = 48
 SYMBOL = re.compile(r"[A-Z0-9]{1,20}USDT")
@@ -286,16 +290,19 @@ class SummaryCache:
                 if self._failed:
                     raise RuntimeError("summary unavailable")
                 return self._summary
-            self._at = now
+            # The window starts when a build finishes: a slow build is still reused for 3 s, and
+            # requests that waited on the lock meanwhile get its result instead of rebuilding.
             try:
                 content = clean(self._build())
                 key = json.dumps(content, sort_keys=True, ensure_ascii=False, allow_nan=False)
             except Exception:
                 self._failed = True
+                self._at = self._clock()
                 raise RuntimeError("summary unavailable") from None
+            self._at = self._clock()
             if key != self._key:
                 self._seq += 1
                 self._key = key
             self._failed = False
-            self._summary = {"v": 1, "seq": self._seq, "updatedAt": iso(now), **content}
+            self._summary = {"v": 1, "seq": self._seq, "updatedAt": iso(self._at), **content}
             return self._summary

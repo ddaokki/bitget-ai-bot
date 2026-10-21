@@ -395,10 +395,11 @@ def create_app(deps: PanelDeps) -> FastAPI:
         try:
             settings = _settings(deps)
             credentials = ("", "", "") if settings.dry_run else (settings.key, settings.secret, settings.password)
-            ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass)
+            ft = deps.ft_factory(settings.api_url, settings.api_user, settings.api_pass,
+                                 timeout=widget.FT_TIMEOUT_S)
             return widget.build(widget.Sources(
                 settings=settings, reader=deps.reader_factory(*credentials), ft=ft, fx=deps.fx,
-                equity_log=deps.equity_log, docker_running=lambda: ops.docker_running(deps.runner),
+                equity_log=deps.equity_log, docker_running=lambda: ops.docker_running(deps.runner, widget.DOCKER_TIMEOUT_S),
                 clock=deps.clock,
             ))
         finally:
@@ -517,19 +518,20 @@ def create_app(deps: PanelDeps) -> FastAPI:
     def widget_summary(request: Request):
         # Read-only and Bearer-only: the panel cookie and launch token are ignored here, and the
         # widget token is accepted nowhere else.
-        remaining = deps.widget_lockout.check("*")
-        if remaining > 0:
-            seconds = math.ceil(remaining)
-            return JSONResponse({"detail": WIDGET_LOCKED, "retry_after": seconds}, status_code=429,
-                                headers={"Retry-After": str(seconds)})
         expected = deps.widget_token()
         supplied = _bearer(request.headers.get("authorization"))
         if (expected is None or supplied is None
                 or not secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))):
-            deps.widget_lockout.fail("*")
+            # The lock throttles wrong tokens only. A valid 256-bit token always passes, so a
+            # stale board or another local process cannot lock the real widget out, and valid
+            # polls never reset the failure count (no guess budget refilled between polls).
+            remaining = deps.widget_lockout.attempt("*")
+            if remaining > 0:
+                seconds = math.ceil(remaining)
+                return JSONResponse({"detail": WIDGET_LOCKED, "retry_after": seconds}, status_code=429,
+                                    headers={"Retry-After": str(seconds)})
             return JSONResponse({"detail": WIDGET_DENIED}, status_code=401,
                                 headers={"WWW-Authenticate": "Bearer"})
-        deps.widget_lockout.success("*")
         try:
             summary = widget_cache.get()
         except Exception:
