@@ -77,6 +77,27 @@
         <section class="card" aria-labelledby="positions-title">
           <div class="section-heading"><h2 id="positions-title">포지션</h2><span>가격 단위: 달러 ($)</span></div>
           <div id="positions"><p class="muted">아직 조회하지 않았습니다.</p></div>
+          <div id="trade-controls" class="trade-controls" hidden>
+            <h3>이 거래 종료 · 익절가</h3>
+            <p id="trade-summary" class="muted"></p>
+            <button id="close-market" class="danger" type="button" disabled>시장가 종료</button>
+            <form id="limit-form" class="trade-form">
+              <label for="limit-price">지정가 종료 가격 ($) · 현재가 이하, 1분 안에 안 체결되면 자동 취소</label>
+              <div class="trade-inline">
+                <input id="limit-price" type="number" inputmode="decimal" step="0.1" min="0" autocomplete="off">
+                <button id="close-limit" class="secondary" type="submit" disabled>지정가 종료</button>
+              </div>
+            </form>
+            <form id="tp-form" class="trade-form">
+              <label for="tp-price">익절가 ($) · 가격이 닿으면 봇이 시장가로 청산, 그때까지 손절 유지</label>
+              <div class="trade-inline">
+                <input id="tp-price" type="number" inputmode="decimal" step="0.1" min="0" autocomplete="off">
+                <button id="tp-set" type="submit" disabled>익절가 설정</button>
+                <button id="tp-clear" class="secondary" type="button" hidden disabled>해제</button>
+              </div>
+            </form>
+            <p id="trade-help" class="muted" role="status"></p>
+          </div>
           <div class="stop-section"><h3>비트코인 손절 후보</h3><p class="muted">서버가 조회하는 BTCUSDT 손절 후보를 모두 표시합니다.</p><div id="stops"></div></div>
         </section>
 

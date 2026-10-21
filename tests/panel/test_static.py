@@ -945,3 +945,88 @@ def test_topbar_links_to_the_emergency_block():
     topbar = html.split('<header class="topbar">', 1)[1].split("</header>", 1)[0]
     assert '<a class="emergency-jump" href="#emergency-title">긴급 청산 ↓</a>' in topbar
     assert 'id="emergency-title"' in html
+
+
+TRADE_FIXTURE = r'''
+const trade = {trade_id: 2, symbol: "BTCUSDT", side: "long", amount: 0.0003, current_rate: 83500,
+               realized_profit: 0, kind: "strategy", has_open_orders: false, take_profit: null};
+const withTrade = (extra = {}, ft = {}) => ({...status, mode: "live",
+    freqtrade: {...status.freqtrade, dry_run: false, take_profit: false, ...ft},
+    trades: [{...trade, ...extra}]});
+const posts = () => requests.filter(r => r.options?.method === "POST").map(r => [r.url, JSON.parse(r.options.body)]);
+'''
+
+
+def test_trade_controls_show_for_a_bot_trade_and_gate_take_profit_on_restart(javascript):
+    javascript(TRADE_FIXTURE + r'''
+run("applyStatus")(withTrade());
+assert.equal(element("trade-controls").hidden, false);
+assert.match(element("trade-summary").textContent, /거래 #2 · BTCUSDT 롱 0\.0003 · 현재 \$83,500 · 익절가 없음/);
+assert.equal(element("close-market").disabled, false);
+assert.equal(element("close-limit").disabled, false);
+assert.equal(element("tp-set").disabled, true);
+assert.match(element("trade-help").textContent, /다시 시작한 뒤/);
+run("applyStatus")(withTrade({}, {take_profit: true}));
+assert.equal(element("tp-set").disabled, false);
+run("applyStatus")(withTrade({kind: "smoke"}));
+assert.equal(element("trade-controls").hidden, true);
+run("applyStatus")(withTrade({has_open_orders: true}));
+assert.equal(element("close-market").disabled, true);
+''')
+
+
+def test_market_close_goes_through_confirmation_then_one_post(javascript):
+    javascript(TRADE_FIXTURE + r'''
+run("applyStatus")(withTrade());
+run('openConfirmation({kind: "trade", value: "market", tradeId: 2, live: false})');
+assert.equal(element("confirmation").open, true);
+assert.equal(element("confirm-title").textContent, "시장가 종료");
+assert.match(element("confirm-description").textContent, /되돌릴 수 없습니다/);
+assert.equal(element("live-field").hidden, true);
+assert.equal(element("confirm-action").disabled, false);
+await run("confirmAction()");
+assert.deepEqual(posts(), [["/api/trades/2/close", {type: "market"}]]);
+''')
+
+
+def test_limit_close_checks_the_price_before_confirming(javascript):
+    javascript(TRADE_FIXTURE + r'''
+run("applyStatus")(withTrade());
+const submit = () => run("requestLimitClose")({preventDefault() {}});
+element("limit-price").value = "83600";
+submit();
+assert.equal(element("confirmation").open, false);
+assert.match(element("notice").textContent, /익절가로 설정하세요/);
+element("limit-price").value = "70000";
+submit();
+assert.equal(element("confirmation").open, false);
+element("limit-price").value = "83400";
+submit();
+assert.equal(element("confirmation").open, true);
+assert.match(element("confirm-description").textContent, /\$83,400 지정가.*1분 안에 체결되지 않으면 자동 취소/);
+await run("confirmAction()");
+assert.deepEqual(posts(), [["/api/trades/2/close", {type: "limit", price: 83400}]]);
+''')
+
+
+def test_take_profit_set_and_clear_post_to_the_trade(javascript):
+    javascript(TRADE_FIXTURE + r'''
+run("applyStatus")(withTrade({}, {take_profit: true}));
+element("tp-price").value = "86000";
+await run("requestTakeProfit")({preventDefault() {}});
+assert.deepEqual(posts(), [["/api/trades/2/take-profit", {price: 86000}]]);
+run("applyStatus")(withTrade({take_profit: 86000}, {take_profit: true}));
+assert.equal(element("tp-clear").hidden, false);
+assert.match(element("trade-summary").textContent, /익절가 \$86,000/);
+''')
+
+
+def test_position_card_shows_the_user_take_profit_and_realized_pnl(javascript):
+    javascript(POSITION_ROWS + r'''
+run("state.charts = null");
+run("renderPositions")({...live, trades: [{trade_id: 2, symbol: "BTCUSDT", kind: "strategy", take_profit: 86000, realized_profit: -0.01}]});
+const shown = rows();
+assert.equal(shown["익절가"], "$86,000 · 닿으면 거래 봇이 시장가로 청산");
+assert.equal(shown["실현손익"], "-$0.01");
+assert.equal(shown["청산 신호선"], "다음 4시간봉 종가가 $81,163 아래면 청산");
+''')

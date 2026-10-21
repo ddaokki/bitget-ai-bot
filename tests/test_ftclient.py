@@ -237,3 +237,17 @@ def test_daily_is_an_authenticated_read_only_get(timescale):
         "http://127.0.0.1:8080", "u", "p", transport=httpx.MockTransport(handler),
     )
     assert (client.daily() if timescale is None else client.daily(timescale)) == payload
+
+
+def test_force_exit_limit_price_and_cancel_open_order():
+    seen = []
+
+    def handler(req):
+        seen.append((req.method, req.url.path, json.loads(req.content) if req.content else None))
+        return httpx.Response(200, json={"result": "ok"})
+
+    client = FreqtradeClient("http://127.0.0.1:8080", "u", "p", transport=httpx.MockTransport(handler))
+    client.force_exit(2, "limit", price=83400.0)
+    client.cancel_open_order(2)
+    assert seen == [("POST", "/api/v1/forceexit", {"tradeid": 2, "ordertype": "limit", "price": 83400.0}),
+                    ("DELETE", "/api/v1/trades/2/open-order", None)]

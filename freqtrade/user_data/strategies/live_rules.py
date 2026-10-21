@@ -4,6 +4,7 @@ No Freqtrade import, so tests run in the repo venv. All money values are in USDT
 """
 from __future__ import annotations
 
+import json
 import math
 from datetime import datetime, timedelta
 
@@ -17,6 +18,8 @@ DAILY_LOSS_CAP = 0.03        # §7.4: no new entry after -3% realized today (UTC
 WEEKLY_LOSS_CAP = 0.06       # §7.4: no new entry after -6% realized this ISO week
 MANUAL_STOP_PRICE_PCT = 0.03  # manual/smoke trades: stop 3% below the open price
 STRATEGY_TAG_PREFIX = "safe_"
+MANUAL_TARGETS_FILE = "manual_targets.json"  # user_data/<file>, written by the control panel
+USER_TP_EXIT = "user_take_profit"            # exit reason when a user take-profit is touched
 
 
 def _finite_positive(value) -> bool:
@@ -119,3 +122,30 @@ def daily_rows_usable(rows: list[list]) -> bool:
     if len(rows) < DAILY_MIN_ROWS:
         return False
     return all(int(b[0]) - int(a[0]) == DAY_MS for a, b in zip(rows, rows[1:]))
+
+
+def parse_manual_targets(text: str) -> dict[int, float]:
+    """{trade id: take-profit price} from the panel's file. Anything malformed is ignored."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return {}
+    targets = data.get("take_profit") if isinstance(data, dict) else None
+    if not isinstance(targets, dict):
+        return {}
+    result = {}
+    for key, value in targets.items():
+        try:
+            trade_id = int(key)
+        except (TypeError, ValueError):
+            continue
+        if type(value) in (int, float) and _finite_positive(value):
+            result[trade_id] = float(value)
+    return result
+
+
+def take_profit_hit(is_short: bool, rate: float, target: float | None) -> bool:
+    """True once the price touches the user's take-profit in the trade's favour."""
+    if target is None or not _finite_positive(rate):
+        return False
+    return rate <= target if is_short else rate >= target

@@ -82,6 +82,11 @@ form button { width: 100%; margin-top: 16px; }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .section-heading span { color: var(--muted); font-size: 12px; }
 .position { padding: 16px 0; border-bottom: 1px solid var(--border); }
+.trade-controls { display: grid; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.trade-form { display: grid; gap: 6px; }
+.trade-form label { font-size: 12px; color: var(--muted); }
+.trade-inline { display: flex; flex-wrap: wrap; gap: 8px; }
+.trade-inline input { flex: 1 1 140px; width: auto; }
 .position:first-child { padding-top: 4px; }
 .position h3 { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .side { font-size: 13px; padding: 2px 9px; border: 1px solid currentColor; border-radius: 5px; }

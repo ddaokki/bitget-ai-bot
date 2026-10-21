@@ -107,3 +107,27 @@ def test_daily_rows_usable_needs_400_contiguous_days():
     assert live_rules.daily_rows_usable(rows)
     assert not live_rules.daily_rows_usable(rows[:399])
     assert not live_rules.daily_rows_usable(rows[:200] + rows[201:] + [[400 * DAY, 1, 1, 1, 1, 1]])
+
+
+def test_manual_targets_parse_trade_ids_and_positive_prices_only():
+    text = '{"take_profit": {"2": 86000, "3": 85000.5, "x": 1, "4": -1, "5": "86000", "6": true, "7": NaN}}'
+    assert live_rules.parse_manual_targets(text) == {2: 86000.0, 3: 85000.5}
+
+
+@pytest.mark.parametrize("text", ["", "not json", "[]", '{"take_profit": []}', '{"other": {}}'])
+def test_manual_targets_ignore_malformed_files(text):
+    assert live_rules.parse_manual_targets(text) == {}
+
+
+@pytest.mark.parametrize("is_short, rate, target, hit", [
+    (False, 86000.0, 86000.0, True), (False, 85999.9, 86000.0, False),
+    (True, 80000.0, 80000.0, True), (True, 80000.1, 80000.0, False),
+    (False, 90000.0, None, False), (False, float("nan"), 86000.0, False),
+])
+def test_take_profit_hit_on_touch_in_the_trade_direction(is_short, rate, target, hit):
+    assert live_rules.take_profit_hit(is_short, rate, target) is hit
+
+
+def test_user_take_profit_constants():
+    assert live_rules.MANUAL_TARGETS_FILE == "manual_targets.json"
+    assert live_rules.USER_TP_EXIT == "user_take_profit"

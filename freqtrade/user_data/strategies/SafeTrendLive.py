@@ -71,6 +71,7 @@ class SafeTrendLive(IStrategy):
         self._calendar_warned = None
         self._daily_cache: dict[str, tuple[float, DataFrame]] = {}
         self._daily_client = None
+        self._targets_cache: tuple[int | None, dict[int, float]] = (None, {})
         if self._fetches_own_daily():
             import ccxt  # public market data only: no keys
             self._daily_client = ccxt.bitget({"enableRateLimit": True, "timeout": 15000,
@@ -272,7 +273,38 @@ class SafeTrendLive(IStrategy):
         trade.set_custom_data("stop_ratchet", float(stop))
         return stoploss_from_absolute(stop, current_rate=current_rate, is_short=False, leverage=trade.leverage)
 
+    def version(self) -> str:
+        # The control panel reads this through /show_config before it offers a take-profit.
+        return "user-tp-1"
+
+    def _manual_targets(self) -> dict[int, float]:
+        """User take-profits from user_data/manual_targets.json, re-read only when the file changes.
+
+        Live and dry-run only: a backtest must never pick up a target meant for a live trade id.
+        """
+        if not self._fetches_own_daily():
+            return {}
+        path = Path(self.config.get("user_data_dir", "user_data")) / rules.MANUAL_TARGETS_FILE
+        cached_stamp, cached = getattr(self, "_targets_cache", (None, {}))
+        try:
+            stamp = path.stat().st_mtime_ns
+        except OSError:
+            self._targets_cache = (None, {})
+            return {}
+        if cached_stamp != stamp:
+            try:
+                cached = rules.parse_manual_targets(path.read_text(encoding="utf-8"))
+            except OSError:
+                return cached
+            self._targets_cache = (stamp, cached)
+        return cached
+
     def custom_exit(self, pair: str, trade, current_time: datetime, current_rate: float, current_profit: float, **kwargs):
+        # A user take-profit set in the panel applies to every trade, manual ones included. The
+        # exchange stop stays in place until this exit is placed.
+        target = self._manual_targets().get(trade.id)
+        if rules.take_profit_hit(bool(trade.is_short), current_rate, target):
+            return rules.USER_TP_EXIT
         # A chandelier level computed from closed candles can already sit above the price (spike,
         # then a close well below). Freqtrade ignores a stop above the price (stoploss_from_absolute
         # returns 0), so exit here instead of leaving the older, lower exchange stop in place.

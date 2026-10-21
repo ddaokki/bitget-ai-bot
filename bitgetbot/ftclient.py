@@ -118,8 +118,13 @@ class FreqtradeClient:
             "entry_tag": entry_tag,
         }).json()
 
-    def force_exit(self, trade_id: int | str, ordertype: str = "market") -> dict:
-        return self._request("POST", "forceexit", json={
-            "tradeid": trade_id,
-            "ordertype": ordertype,
-        }).json()
+    def force_exit(self, trade_id: int | str, ordertype: str = "market", price: float | None = None) -> dict:
+        payload = {"tradeid": trade_id, "ordertype": ordertype}
+        if price is not None:
+            # Freqtrade >= 2.45 API: a limit exit at this price instead of the current one.
+            payload["price"] = price
+        return self._request("POST", "forceexit", json=payload).json()
+
+    def cancel_open_order(self, trade_id: int) -> dict:
+        """Cancel the trade's open order; Freqtrade re-places the exchange stop afterwards."""
+        return self._request("DELETE", f"trades/{int(trade_id)}/open-order").json()
