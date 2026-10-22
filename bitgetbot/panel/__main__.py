@@ -9,8 +9,11 @@ from pathlib import Path
 
 import uvicorn
 
+from bitgetbot.ftclient import FreqtradeClient
 from bitgetbot.panel import ops, widget_token
 from bitgetbot.panel.app import PanelDeps, create_app
+from bitgetbot.postmortem.watcher import Watcher
+from bitgetbot.privcfg import load_settings
 
 
 def _restrict_to_owner(path: Path) -> None:
@@ -89,7 +92,10 @@ def main(argv: list[str] | None = None) -> int:
         _write_token(Path(".panel/token"), token)
         # The read-only widget token persists across launches; only `widget_token rotate` replaces it.
         widget_token.ensure(widget_token.PATH, _write_token)
-        app = create_app(PanelDeps(token=token))
+        # Per-trade post-mortems: a background thread reads closed trades (GET only) and writes
+        # reports/postmortem/. It never places, changes or cancels orders.
+        watcher = Watcher(settings_loader=load_settings, ft_factory=FreqtradeClient)
+        app = create_app(PanelDeps(token=token, postmortem=watcher.run_forever))
         _ensure_stdio(Path(".panel"))
         uvicorn.run(
             app, host="127.0.0.1", port=8090, log_level="warning", access_log=False,

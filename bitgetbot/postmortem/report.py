@@ -265,20 +265,25 @@ def _row(doc: dict) -> dict:
     }
 
 
-def rebuild_index(directory: Path) -> dict:
+def _index(directory: Path) -> dict:
     rows = sorted((_row(doc) for doc in report_docs(directory)),
                   key=lambda row: (row["close_ts"] or 0, row["key"]), reverse=True)
-    index = {"schema": "postmortem-index/1", "reports": rows}
+    return {"schema": "postmortem-index/1", "reports": rows}
+
+
+def rebuild_index(directory: Path) -> dict:
+    index = _index(directory)
     if directory.is_dir():
         _atomic_write(directory / INDEX_NAME, json.dumps(index, ensure_ascii=False, indent=1) + "\n")
     return index
 
 
-def read_index(directory: Path) -> dict:
+def read_index(directory: Path, persist: bool = True) -> dict:
+    """The stored index; rebuilt from the report files when missing or broken (saved only if persist)."""
     try:
         index = json.loads((directory / INDEX_NAME).read_text(encoding="utf-8"))
         if isinstance(index, dict) and isinstance(index.get("reports"), list):
             return index
     except (OSError, ValueError, UnicodeError):
         pass
-    return rebuild_index(directory)
+    return rebuild_index(directory) if persist else _index(directory)

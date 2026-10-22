@@ -20,3 +20,5 @@ ledger/
 # Per-trade take-profits written by the panel (runtime state)
 freqtrade/user_data/manual_targets.json
 freqtrade/user_data/.manual_targets.json.*.tmp
+# Per-trade post-mortems (trade data; Claude reads them, nothing to commit)
+reports/

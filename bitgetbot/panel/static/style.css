@@ -165,3 +165,16 @@ dialog::backdrop { background: rgb(0 0 0 / 78%); }
   .dialog-actions button { flex: 1; }
 }
 @media (forced-colors: active) { button, .mode-badge, .side, .emergency { border: 1px solid ButtonText; } }
+
+/* Post-mortem report list: a quiet corner link and a read-only viewer. */
+.page-foot { display: flex; justify-content: flex-end; margin: 14px 0 28px; font-size: 12px; }
+.page-foot a { color: var(--muted); }
+.report-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.report-list button { width: 100%; text-align: left; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-weight: 400; }
+.report-list .up { color: var(--up); }
+.report-list .down { color: var(--down); }
+.report-view { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; overflow-wrap: anywhere; }
+.report-view h2 { font-size: 17px; margin: 0 0 8px; }
+.report-view h3 { font-size: 15px; margin: 16px 0 6px; }
+.report-view ul { margin: 0; padding-left: 20px; }
+.report-view code { background: var(--inset); padding: 0 4px; border-radius: 4px; }
