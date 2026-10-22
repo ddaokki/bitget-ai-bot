@@ -276,11 +276,128 @@ def test_lock_blocks_second_runner(world, tmp_path):
     assert not (world.directory / ".lock").exists()
 
 
-def test_corrupt_report_is_rewritten(world):
+def test_corrupt_report_is_set_aside_and_rewritten(world):
     world.directory.mkdir(parents=True)
     (world.directory / f"{world.key()}.json").write_text("{half-written", encoding="utf-8")
     world.watcher.cycle()
     assert world.doc()["status"] == "complete"
+    kept = [p for p in world.directory.iterdir() if ".json.corrupt-" in p.name]
+    assert len(kept) == 1 and kept[0].read_text(encoding="utf-8") == "{half-written"
+    assert [r["key"] for r in report.read_index(world.directory)["reports"]] == [world.key()]
+
+
+def test_unreadable_report_is_never_overwritten(world, monkeypatch):
+    world.watcher.cycle()
+    before = (world.directory / f"{world.key()}.json").read_bytes()
+    monkeypatch.setattr(report, "read_state", lambda directory, key: ("unreadable", None))
+    world.now += 2 * H
+    world.rows.append(row(trade_id=3, open_ts=OPEN_TS + H, close_ts=CLOSE_TS + H))
+    world.watcher.cycle()
+    assert (world.directory / f"{world.key()}.json").read_bytes() == before
+    assert not (world.directory / f"{world.key(trade_id=3, open_ts=OPEN_TS + H)}.json").exists()
+    assert world.research_calls == [world.key()]
+
+
+def test_transient_write_error_is_retried(world, monkeypatch):
+    real, sleeps, fails = report.write_report, [], [1]
+
+    def flaky(directory, doc):
+        if doc["status"] == "complete" and fails[0]:
+            fails[0] -= 1
+            raise PermissionError("held open")
+        real(directory, doc)
+
+    monkeypatch.setattr(report, "write_report", flaky)
+    world.watcher.sleep = sleeps.append
+    world.watcher.cycle()
+    assert world.doc()["status"] == "complete" and sleeps == [1]
+
+
+def test_unsaved_paid_result_is_recorded_not_left_in_progress(world, monkeypatch):
+    real = report.write_report
+
+    def no_complete(directory, doc):
+        if doc["status"] == "complete":
+            raise PermissionError("held open")
+        real(directory, doc)
+
+    monkeypatch.setattr(report, "write_report", no_complete)
+    world.watcher.sleep = lambda seconds: None
+    world.watcher.cycle()
+    doc = world.doc()
+    assert doc["status"] == "pending" and doc["in_progress_since_ms"] is None
+    assert doc["errors"][-1]["kind"] == "save" and doc["next_retry_ms"] == world.now + 10 * MIN
+    assert len(world.research_calls) == 1
+
+
+def test_unavailable_and_quota_do_not_use_attempts(world, monkeypatch):
+    monkeypatch.setattr(watcher, "MAX_DEFERRALS", 2)
+    world.research_error = ResearchError("unavailable")
+    world.watcher.cycle()
+    doc = world.doc()
+    assert doc["attempts"] == 0 and doc["deferrals"] == 1 and doc["next_retry_ms"] == world.now + 6 * H
+    world.now = doc["next_retry_ms"]
+    world.research_error = ResearchError("quota")
+    world.watcher.cycle()
+    doc = world.doc()
+    assert doc["attempts"] == 0 and doc["deferrals"] == 2 and doc["next_retry_ms"] == world.now + H
+    world.now = doc["next_retry_ms"]
+    world.watcher.cycle()  # cap reached: now it counts like any failure
+    doc = world.doc()
+    assert doc["attempts"] == 1 and doc["next_retry_ms"] == world.now + 10 * MIN
+
+
+def test_market_is_refreshed_once_after_seven_hours(world):
+    world.watcher.cycle()
+    first = world.doc()
+    assert first["market_refresh_due_ms"] == CLOSE_TS + 7 * H
+    world.now = CLOSE_TS + 7 * H - MIN
+    assert world.watcher.cycle() == []
+    world.now = CLOSE_TS + 7 * H
+    assert world.watcher.cycle() == [world.key()]
+    doc = world.doc()
+    assert doc["market_refresh_due_ms"] is None and doc["market_refreshed_utc"]
+    assert doc["market"]["candles"][-1][0] > first["market"]["candles"][-1][0]
+    assert doc["market"]["summary"]["covers_close"] is True
+    assert doc["verdict"]["by"] == "llm" and world.research_calls == [world.key()]
+    world.now += 3 * H
+    assert world.watcher.cycle() == []
+
+
+def test_market_refresh_failures_are_bounded(world):
+    world.watcher.cycle()
+    world.market_error = True
+    world.watcher._exchange = None  # drop the cached public client so the broken one is used
+    world.now = CLOSE_TS + 7 * H
+    for expected in (1, 2, 3):
+        world.watcher.cycle()
+        doc = world.doc()
+        assert doc["market_refresh_tries"] == expected
+        if doc["market_refresh_due_ms"]:
+            world.now = doc["market_refresh_due_ms"]
+    assert world.doc()["market_refresh_due_ms"] is None and world.doc()["market"]["status"] == "ok"
+
+
+def test_lock_release_never_removes_a_foreign_lock(world):
+    world.directory.mkdir(parents=True)
+    clock = lambda: world.now / 1000
+    old = watcher.DirLock(world.directory / ".lock", clock)
+    assert old.acquire()
+    world.now += 21 * MIN
+    new = watcher.DirLock(world.directory / ".lock", clock)
+    assert new.acquire()
+    old.release()
+    old.refresh()
+    assert (world.directory / ".lock").exists()
+    assert json.loads((world.directory / ".lock").read_text(encoding="utf-8"))["token"] == new.token
+    new.release()
+    assert not (world.directory / ".lock").exists()
+
+
+def test_half_written_lock_is_not_stale(world):
+    world.directory.mkdir(parents=True)
+    (world.directory / ".lock").write_text("", encoding="utf-8")  # created, not yet written
+    assert watcher.DirLock(world.directory / ".lock", lambda: world.now / 1000).acquire() is False
 
 
 def test_run_forever_survives_errors_and_stops(world):

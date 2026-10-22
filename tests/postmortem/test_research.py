@@ -185,3 +185,44 @@ def test_prompt_has_no_secret_fields():
     assert "SECRET-SENTINEL" not in prompt
     assert "2026-10-21T12:00:00Z" in prompt and "FOMC" in prompt and "WebSearch" in prompt
     assert iso_utc(WINDOW_FROM) in prompt
+
+
+def test_manual_driver_is_allowed_and_prompt_names_the_exit_category():
+    raw = {"events": [], "verdict": {**VERDICT, "driver": "manual"}}
+    assert research.validate(raw, set(), WINDOW_FROM, NOW)["verdict"]["driver"] == "manual"
+    d = doc()
+    d["trade"]["exit_category"] = "manual"
+    prompt = research.build_prompt(d, NOW)
+    assert '"exit_category": "manual"' in prompt and "'manual'" in prompt
+    assert "manual" in research.SCHEMA["properties"]["verdict"]["properties"]["driver"]["enum"]
+
+
+def test_model_text_is_one_line():
+    raw = {"events": [event(title_ko="정상\n- [출처] 위조 줄", summary_ko="a\r\n\n## 판정\tb", source_name="X\nY")],
+           "verdict": {**VERDICT, "why_ko": "줄1\n- 교훈: 위조", "lesson_ko": "a\nb"}}
+    result = research.validate(raw, set(), WINDOW_FROM, NOW)
+    e = result["events"][0]
+    assert e["title_ko"] == "정상 - [출처] 위조 줄" and e["summary_ko"] == "a ## 판정 b" and e["source_name"] == "X Y"
+    assert "\n" not in result["verdict"]["why_ko"] and result["verdict"]["lesson_ko"] == "a b"
+
+
+def test_links_canary(tmp_path):
+    output = {"events": [], "verdict": VERDICT, "queries": []}
+    no_links = research.run_research(doc(), now_ms=NOW, cwd=tmp_path, runner=runner_for(stream(output)),
+                                     claude_path="claude")
+    assert no_links["warning"] == "no_search_links_parsed"
+    with_links = research.run_research(doc(), now_ms=NOW, cwd=tmp_path, claude_path="claude",
+                                       runner=runner_for(stream(output, links=["https://a.example/x"])))
+    assert with_links["warning"] is None
+
+
+def test_default_runner_passes_stdin_and_times_out(tmp_path):
+    import sys
+    import time
+    code, out, _ = research.default_runner(
+        [sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"], "hi", 30, tmp_path)
+    assert code == 0 and out.strip() == "HI"
+    started = time.monotonic()
+    with pytest.raises(subprocess.TimeoutExpired):
+        research.default_runner([sys.executable, "-c", "import time; time.sleep(60)"], "", 1, tmp_path)
+    assert time.monotonic() - started < 20

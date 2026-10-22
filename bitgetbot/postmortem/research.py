@@ -8,6 +8,7 @@ was really in the search results instead of trusting the model.
 import json
 import os
 import re
+import signal
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -29,7 +30,7 @@ CATEGORIES = ["monetary_policy", "macro_data", "geopolitics", "war", "tariffs_tr
 REGIONS = ["US", "KR", "CN", "EU", "JP", "UK", "MIDEAST", "RU_UA", "GLOBAL", "CRYPTO", "OTHER"]
 IMPORTANCE = ["low", "med", "high"]
 PRECISION = ["minute", "hour", "day"]
-DRIVERS = ["rule", "event", "mixed", "unclear"]
+DRIVERS = ["rule", "event", "mixed", "manual", "unclear"]
 
 Runner = Callable[[list[str], str, int, Path], tuple[int, str, str]]
 
@@ -190,7 +191,8 @@ def parse_stream(stdout: str) -> tuple[dict | None, set[str], list[str], dict | 
 
 
 def _text(value, limit: int) -> str:
-    return value.strip()[:limit] if isinstance(value, str) else ""
+    # One line only: a newline in model or search text must never start a forged markdown line.
+    return " ".join(value.split())[:limit] if isinstance(value, str) else ""
 
 
 def _choice(value, choices: list[str], default: str) -> str:
@@ -262,7 +264,7 @@ def build_prompt(doc: dict, now_ms: int) -> str:
     picked = {
         "trade": {name: trade.get(name) for name in (
             "pair", "side", "open_utc", "close_utc", "entry_price", "exit_price", "pnl_pct_margin", "leverage",
-            "hold_minutes", "exit_reason", "exit_label_ko", "mfe_pct", "mae_pct")},
+            "hold_minutes", "exit_reason", "exit_category", "exit_label_ko", "mfe_pct", "mae_pct")},
         "market": {
             "summary": {name: summary.get(name) for name in (
                 "hold_high", "hold_low", "vol_ratio_hold", "max_hold_absret_1h_pct", "shock_during_hold")},
@@ -287,17 +289,45 @@ def build_prompt(doc: dict, now_ms: int) -> str:
         "4. what explains the biggest 1h moves listed above.",
         "Prefer news published inside the window. Return at most 12 events, most relevant first. Returning few or "
         "no events is fine when nothing notable happened.",
-        "Then judge the exit: 'rule' if the strategy's own rule fired on ordinary price action, 'event' if a news "
-        "event pushed the price into the exit, 'mixed', or 'unclear'. Give one short lesson for future trades.",
+        "Then judge the exit: 'rule' if the strategy's own rule (stop, exit signal or the user's take-profit price) "
+        "fired on ordinary price action, 'event' if a news event pushed the price into the exit, 'mixed', 'manual' "
+        "if a person closed the trade (exit_category 'manual') and no event explains it, or 'unclear'. Give one "
+        "short lesson for future trades.",
     ])
 
 
+def _kill_tree(process: subprocess.Popen) -> None:
+    """Kill claude and anything it started, so no leftover child keeps the output pipes open."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True,
+                           timeout=15, creationflags=NO_WINDOW)
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
+    except Exception:
+        pass
+    try:
+        process.kill()
+    except Exception:
+        pass
+
+
 def default_runner(argv: list[str], prompt: str, timeout_s: int, cwd: Path) -> tuple[int, str, str]:
-    result = subprocess.run(
-        argv, input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=timeout_s, cwd=cwd, creationflags=NO_WINDOW,
+    group = {"creationflags": NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
+    process = subprocess.Popen(
+        argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        encoding="utf-8", errors="replace", cwd=cwd, **group,
     )
-    return result.returncode, result.stdout, result.stderr
+    try:
+        stdout, stderr = process.communicate(prompt, timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        _kill_tree(process)
+        try:
+            process.communicate(timeout=10)
+        except Exception:
+            pass  # never block the watcher thread on pipes a stray process still holds
+        raise subprocess.TimeoutExpired(argv, timeout_s) from None
+    return process.returncode, stdout, stderr
 
 
 def run_research(doc: dict, *, now_ms: int, cwd: Path, runner: Runner | None = None,
@@ -315,8 +345,11 @@ def run_research(doc: dict, *, now_ms: int, cwd: Path, runner: Runner | None = N
         window = doc.get("window") or {}
         result = validate(output, links, window.get("from_ms", 0), now_ms)
         cost = meta.get("total_cost_usd")
+        # Canary: searches ran but no result links were parsed (the CLI output format may have changed),
+        # so every event would silently become a guess.
+        warning = "no_search_links_parsed" if queries and not links else None
         return {**result, "queries": queries, "search_links_count": len(links), "model": MODEL,
-                "cost_usd": cost if isinstance(cost, (int, float)) else None}
+                "cost_usd": cost if isinstance(cost, (int, float)) else None, "warning": warning}
     result_text = str((meta or {}).get("result") or "")
     if (meta or {}).get("api_error_status") == 429 or QUOTA_RE.search(result_text) or QUOTA_RE.search(stderr or ""):
         raise ResearchError("quota")

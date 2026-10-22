@@ -12,7 +12,10 @@
 - `status: pending` 조사 대기(`attempts`, `next_retry_utc`, `errors[].kind` 확인).
 - `status: complete` 완료. `verdict.by: "llm"`은 모델의 추정이다.
 - `status: incomplete` 5번 실패해서 사실만 남김. 다시 시도하지 않는다. 다시 하려면 그 JSON을 지우면 다음 주기에 처음부터 만든다(30일 안의 거래만).
-- 오류 종류: `timeout`(10분 초과), `quota`(구독 사용량 한도, 1시간 뒤), `unavailable`(`claude` 실행 파일 없음), `parse`/`error`, `market`(비트겟 공개 시세 실패), `interrupted`(패널이 조사 중에 꺼짐).
+- 오류 종류: `timeout`(10분 초과), `quota`(구독 사용량 한도, 1시간 뒤), `unavailable`(`claude` 실행 파일 없음, 6시간 뒤), `parse`/`error`, `market`(비트겟 공개 시세 실패), `interrupted`(패널이 조사 중에 꺼짐), `save`(조사 결과 저장 실패). `quota`·`unavailable`은 시도 횟수를 쓰지 않는다.
+- 청산 7시간 뒤 시세를 한 번 다시 받는다(`market_refreshed_utc`). 모델은 다시 부르지 않는다.
+- `*.json.corrupt-<ms>`는 깨진 리포트를 옮겨 둔 것. 확인 후 지워도 된다.
+- `research.warning: no_search_links_parsed`가 보이면 `claude` CLI의 검색 결과 형식이 바뀐 것일 수 있다. 그동안의 사건은 모두 `[추정]`으로 남는다.
 
 ## 직접 실행 (저장소 루트에서)
 ```

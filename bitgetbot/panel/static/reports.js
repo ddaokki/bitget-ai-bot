@@ -5,7 +5,7 @@
 
 const KEY = /^(dry|live)-[0-9]{1,12}-[0-9]{1,16}$/;
 const STATUS = {complete: "완료", pending: "조사 대기", incomplete: "사실만 기록"};
-const DRIVER = {rule: "규칙", event: "사건", mixed: "혼합", unclear: "불명"};
+const DRIVER = {rule: "규칙", event: "사건", mixed: "혼합", manual: "수동", unclear: "불명"};
 
 const $ = id => document.getElementById(id);
 
@@ -59,18 +59,20 @@ function renderList(rows) {
 }
 
 function inline(parent, text) {
-    // `code` spans and bare http(s) URLs; everything else is plain text.
-    const parts = text.split(/(`[^`]*`|https?:\/\/[^\s)]+)/);
+    // `code` spans and <http(s)://...> links (only verified source and calendar URLs are written that
+    // way); a bare URL inside model text stays plain text.
+    const parts = text.split(/(`[^`]*`|<https?:\/\/[^\s<>]+>)/);
     for (const part of parts) {
         if (!part) continue;
         if (part.startsWith("`") && part.endsWith("`") && part.length > 1) {
             const code = document.createElement("code");
             code.textContent = part.slice(1, -1);
             parent.append(code);
-        } else if (/^https?:\/\//.test(part)) {
+        } else if (/^<https?:\/\/[^\s<>]+>$/.test(part)) {
+            const url = part.slice(1, -1);
             const link = document.createElement("a");
-            link.href = part;
-            link.textContent = part;
+            link.href = url;
+            link.textContent = url;
             link.target = "_blank";
             link.rel = "noopener noreferrer";
             parent.append(link);
@@ -130,7 +132,12 @@ async function showList() {
 }
 
 function route() {
-    const key = decodeURIComponent(location.hash.slice(1));
+    let key = "";
+    try {
+        key = decodeURIComponent(location.hash.slice(1));
+    } catch (error) {
+        key = "";  // a malformed hash such as "#%" just shows the list
+    }
     if (KEY.test(key)) showReport(key); else showList();
 }
 

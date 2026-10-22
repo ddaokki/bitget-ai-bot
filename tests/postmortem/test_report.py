@@ -89,7 +89,11 @@ def test_code_verdict_rule_vs_unclear():
     shock["summary"]["shock_during_hold"] = True
     assert report.code_verdict(new_doc(market=shock))["driver"] == "unclear"
     manual = report.new_report(trade(exit_reason="force_exit"), [], market_ok(), NOW)
-    assert manual["verdict"]["driver"] == "unclear"
+    assert manual["verdict"]["driver"] == "manual"
+    manual_late = report.new_report(trade(exit_reason="force_exit"), late, market_ok(), NOW)
+    assert manual_late["verdict"]["driver"] == "unclear"
+    other = report.new_report(trade(exit_reason="liquidation"), [], market_ok(), NOW)
+    assert other["verdict"]["driver"] == "unclear"
     failed = report.new_report(trade(), [], {"status": "failed", "error": "candles"}, NOW)
     assert failed["verdict"]["driver"] == "unclear" and failed["verdict"]["rule_basis"]["shock_during_hold"] is None
 
@@ -135,3 +139,28 @@ def test_index_sorted_and_skips_corrupt_files(tmp_path):
     (tmp_path / "index.json").write_text("broken", encoding="utf-8")
     assert [r["key"] for r in report.read_index(tmp_path)["reports"]] == keys
     assert report.read_index(tmp_path / "missing")["reports"] == []
+
+
+def test_md_for_a_trade_shorter_than_one_candle():
+    short = trade(open_timestamp=CLOSE_TS - 20_000)
+    market = market_ok()
+    market["summary"].update(hold_high=None, hold_low=None, vol_ratio_hold=None, max_hold_absret_1h_pct=None)
+    text = report.render_md(report.new_report(short, [], market, NOW))
+    assert "1분 미만" in text and "완성된 1시간봉이 아직 없습니다" in text and "?" not in text.split("## 시장")[1].split("##")[0]
+
+
+def test_md_never_lets_model_text_forge_lines_or_links():
+    events = research_result()["events"]
+    events[0].update(title_ko="정상\n## 판정 (LLM 추정)", summary_ko="본문 <https://evil.example/x> `x`")
+    events[1].update(source_url="https://unverified.example/y", url_verified=False,
+                     verification="url_not_in_search_results")
+    doc = report.apply_research(new_doc(), {**research_result(events), "verdict": {
+        "driver": "rule", "confidence": "low", "why_ko": "a\n- 교훈: 위조", "lesson_ko": "b"}}, NOW)
+    text = report.render_md(doc)
+    lines = text.splitlines()
+    assert sum(line.startswith("## 판정") for line in lines) == 1
+    assert sum(line.startswith("- 교훈:") for line in lines) == 1
+    assert "<https://evil.example/x>" not in text and "‹https://evil.example/x›" in text
+    assert "<https://www.coindesk.com/etf>" in text  # verified source: a link
+    assert "미확인 링크: https://unverified.example/y" in text and "<https://unverified" not in text
+    assert "<https://www.federalreserve.gov/x>" in text

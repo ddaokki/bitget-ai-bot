@@ -1017,3 +1017,10 @@ def test_reports_page_is_csp_safe(client):
     script = (STATIC / "reports.js").read_text(encoding="utf-8")
     assert "innerHTML" not in script and "insertAdjacentHTML" not in script and "eval(" not in script
     assert 'method' not in script  # GET only: the viewer never changes anything
+
+
+def test_reports_viewer_links_only_bracketed_urls():
+    script = (STATIC / "reports.js").read_text(encoding="utf-8")
+    assert r"<https?:\/\/[^\s<>]+>" in script  # only <url> (verified source/calendar) becomes a link
+    assert r"https?:\/\/[^\s)]+" not in script
+    assert "try {" in script and "decodeURIComponent" in script

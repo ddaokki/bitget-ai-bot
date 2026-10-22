@@ -133,3 +133,25 @@ def test_event_reaction_needs_six_hours_after():
     assert market.event_reaction(candles, OPEN_TS + 5 * H, baseline) is None  # only 3h after
     assert market.event_reaction(candles, start - H, baseline) is None
     assert market.event_reaction(candles, OPEN_TS, None)["vol_ratio_6h"] is None
+
+
+def test_short_hold_has_unknown_shock_and_close_coverage():
+    start, closes = scenario()
+    close_ts = OPEN_TS + 7 * H + 20 * 60_000  # exit inside the still-forming candle
+    result = market.fetch_market(Exchange(closes, start), "BTCUSDT", OPEN_TS + 7 * H, close_ts, close_ts + 60_000)
+    summary = result["summary"]
+    assert summary["hold_high"] is None and summary["shock_during_hold"] is None
+    assert summary["covers_close"] is False
+    later = market.fetch_market(Exchange(closes, start), "BTCUSDT", OPEN_TS, CLOSE_TS, OPEN_TS + 8 * H)
+    assert later["summary"]["covers_close"] is True
+
+
+def test_gaps_are_not_bridged():
+    start, closes = scenario()
+    result = market.fetch_market(Exchange(closes, start), "BTCUSDT", OPEN_TS, CLOSE_TS, OPEN_TS + 8 * H)
+    candles = [c for c in result["candles"] if c[0] != OPEN_TS + 4 * H]  # drop one hour
+    baseline = result["summary"]["baseline_absret_6h_pct"]
+    assert market.event_reaction(candles, OPEN_TS + H + 10 * 60_000, baseline) is None
+    assert market.event_reaction(result["candles"], OPEN_TS + H + 10 * 60_000, baseline) is not None
+    pairs = market._returns(candles)
+    assert OPEN_TS + 5 * H not in [ts for ts, _ in pairs]  # the return across the gap is skipped

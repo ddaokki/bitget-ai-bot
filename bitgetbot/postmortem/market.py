@@ -56,14 +56,16 @@ def _candles(exchange, symbol: str, start_ms: int, end_ms: int) -> list[list]:
 
 
 def _returns(candles: list[list]) -> list[tuple[int, float]]:
-    """(candle start, close-to-close % return) for every candle that has a previous one."""
-    return [(cur[0], (cur[4] / prev[4] - 1) * 100) for prev, cur in zip(candles, candles[1:]) if prev[4] > 0]
+    """(candle start, close-to-close % return) for every candle whose previous hour is present."""
+    return [(cur[0], (cur[4] / prev[4] - 1) * 100) for prev, cur in zip(candles, candles[1:])
+            if prev[4] > 0 and cur[0] - prev[0] == H]
 
 
 def _absret_6h(candles: list[list]) -> list[float]:
     span = REACTION_HOURS
     return [abs(candles[i + span - 1][4] / candles[i][1] - 1) * 100
-            for i in range(len(candles) - span + 1) if candles[i][1] > 0]
+            for i in range(len(candles) - span + 1)
+            if candles[i][1] > 0 and candles[i + span - 1][0] - candles[i][0] == (span - 1) * H]
 
 
 def _mean(values) -> float | None:
@@ -135,8 +137,12 @@ def fetch_market(exchange, symbol: str, open_ts: int, close_ts: int, now_ms: int
             "hold_absret_1h_pct": hold_mean,
             "vol_ratio_hold": hold_mean / base_mean if hold_mean is not None and base_mean else None,
             "max_hold_absret_1h_pct": max_hold,
-            "shock_during_hold": bool(max_hold is not None and base_mean
-                                      and max_hold >= SHOCK_RATIO * base_mean and max_hold >= SHOCK_MIN_PCT),
+            # None, not False, when no completed candle covers the hold yet: unknown is not "calm".
+            "shock_during_hold": (None if max_hold is None or not base_mean
+                                  else max_hold >= SHOCK_RATIO * base_mean and max_hold >= SHOCK_MIN_PCT),
+            # The candle holding the exit is complete only an hour after the close; the watcher
+            # refreshes the market later (report.MARKET_REFRESH_AFTER_MS).
+            "covers_close": candles[-1][0] + H >= close_ts,
         },
         "big_moves": [{"ts_utc": iso_utc(ts), "ts": ts, "ret_pct": r} for ts, r in moves],
         "funding": _funding(exchange, symbol, window_start, now_ms),
@@ -149,6 +155,10 @@ def event_reaction(candles: list[list], ts_ms: int, baseline_6h: float | None) -
     index = next((i for i, c in enumerate(candles) if c[0] <= ts_ms < c[0] + H), None)
     if index is None or index + REACTION_HOURS > len(candles) or index < PRE_HOURS:
         return None
+    start_ts = candles[index][0]
+    if (candles[index + REACTION_HOURS - 1][0] != start_ts + (REACTION_HOURS - 1) * H
+            or candles[index - PRE_HOURS][0] != start_ts - PRE_HOURS * H):
+        return None  # a missing hour would silently stretch the window
     start = candles[index][1]
     if start <= 0 or candles[index - PRE_HOURS][1] <= 0:
         return None

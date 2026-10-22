@@ -14,12 +14,15 @@ SCHEMA = "postmortem/1"
 WINDOW_BEFORE_MS = 24 * 3600_000
 NEAR_EXIT_MS = 2 * 3600_000
 RULE_EXITS = {"stop", "strategy", "user_take_profit"}
+# Re-read the market once the exit candle has closed and events near the exit have 6 h of reaction.
+MARKET_REFRESH_AFTER_MS = 7 * 3600_000
+MARKET_REFRESH_TRIES = 3
 EVIDENCE_NOTE = (
     "trade/calendar: sourced (Freqtrade API, official release calendar). market: Bitget public API. "
     "events[].evidence: 'sourced' only when source_url appeared in this run's WebSearch results, else 'guess'. "
     "verdict.by='llm' is a model judgment (a guess); verdict.by='code' is the fixed rule in report.code_verdict."
 )
-DRIVER_KO = {"rule": "규칙", "event": "사건", "mixed": "혼합", "unclear": "불명"}
+DRIVER_KO = {"rule": "규칙", "event": "사건", "mixed": "혼합", "manual": "수동", "unclear": "불명"}
 CONFIDENCE_KO = {"low": "낮음", "med": "중간", "high": "높음"}
 
 
@@ -35,6 +38,7 @@ def new_report(facts: dict, calendar: list[dict], market: dict, now_ms: int) -> 
         "trade": facts, "market": market, "calendar": calendar,
         "events": [], "events_dropped": 0,
         "research": {"status": "pending"},
+        "market_refresh_due_ms": facts["close_ts"] + MARKET_REFRESH_AFTER_MS, "market_refresh_tries": 0,
         "evidence_note": EVIDENCE_NOTE,
     }
     doc["verdict"] = code_verdict(doc)
@@ -64,9 +68,13 @@ def rule_basis(doc: dict) -> dict:
 def code_verdict(doc: dict) -> dict:
     """Fixed rule when no model judgment exists: a rule exit with no nearby evidence and no shock is 'rule'."""
     basis = rule_basis(doc)
-    rule = (basis["exit_category"] in RULE_EXITS and not basis["event_within_2h_of_exit"]
-            and basis["shock_during_hold"] is False)
-    return {"by": "code", "driver": "rule" if rule else "unclear", "confidence": "low",
+    quiet = not basis["event_within_2h_of_exit"] and basis["shock_during_hold"] is False
+    driver = "unclear"
+    if quiet and basis["exit_category"] in RULE_EXITS:
+        driver = "rule"
+    elif quiet and basis["exit_category"] == "manual":
+        driver = "manual"
+    return {"by": "code", "driver": driver, "confidence": "low",
             "why_ko": "웹 조사 결과가 없어 코드 규칙(청산 사유·청산 전후 2시간 사건·보유 중 급변)으로만 판정했습니다.",
             "lesson_ko": "", "rule_basis": basis}
 
@@ -77,21 +85,40 @@ def _with_reaction(event: dict, candles, baseline) -> dict:
     return {**event, "btc_reaction": reaction}
 
 
-def apply_research(doc: dict, research: dict, now_ms: int) -> dict:
+def _reactions(doc: dict, events: list[dict]) -> list[dict]:
     market = doc.get("market") or {}
     candles = market.get("candles") if market.get("status") == "ok" else None
     baseline = (market.get("summary") or {}).get("baseline_absret_6h_pct")
+    return [_with_reaction(event, candles, baseline) for event in events]
+
+
+def apply_research(doc: dict, research: dict, now_ms: int) -> dict:
     doc = {
         **doc, "status": "complete", "updated_utc": iso_utc(now_ms),
         "next_retry_ms": None, "next_retry_utc": None, "in_progress_since_ms": None,
-        "events": [_with_reaction(event, candles, baseline) for event in research["events"]],
-        "calendar": [_with_reaction(event, candles, baseline) for event in doc.get("calendar") or []],
+        "events": _reactions(doc, research["events"]),
+        "calendar": _reactions(doc, doc.get("calendar") or []),
         "events_dropped": research.get("dropped", 0),
         "research": {"status": "ok", "finished_utc": iso_utc(now_ms), "model": research.get("model"),
                      "queries": research.get("queries", []), "search_links_count": research.get("search_links_count"),
-                     "cost_usd": research.get("cost_usd")},
+                     "cost_usd": research.get("cost_usd"), "warning": research.get("warning")},
     }
     doc["verdict"] = {**research["verdict"], "by": "llm", "rule_basis": rule_basis(doc)}
+    return doc
+
+
+def refresh_market(doc: dict, market: dict | None, now_ms: int) -> dict:
+    """One later market re-read (no model call): reactions and the code basis use the fuller path."""
+    if market is None or market.get("status") != "ok":
+        tries = doc.get("market_refresh_tries", 0) + 1
+        due = None if tries >= MARKET_REFRESH_TRIES else now_ms + 3600_000
+        return {**doc, "market_refresh_tries": tries, "market_refresh_due_ms": due, "updated_utc": iso_utc(now_ms)}
+    doc = {**doc, "market": market, "market_refresh_due_ms": None, "market_refreshed_utc": iso_utc(now_ms),
+           "updated_utc": iso_utc(now_ms)}
+    doc["events"] = _reactions(doc, doc.get("events") or [])
+    doc["calendar"] = _reactions(doc, doc.get("calendar") or [])
+    verdict = doc.get("verdict") or {}
+    doc["verdict"] = code_verdict(doc) if verdict.get("by") != "llm" else {**verdict, "rule_basis": rule_basis(doc)}
     return doc
 
 
@@ -120,11 +147,19 @@ def _usdt(value) -> str:
 def _duration(minutes) -> str:
     if not isinstance(minutes, int):
         return "?"
+    if minutes < 1:
+        return "1분 미만"
     days, rest = divmod(minutes, 1440)
     hours, mins = divmod(rest, 60)
     if days:
         return f"{days}일 {hours}시간"
     return f"{hours}시간 {mins}분" if hours else f"{mins}분"
+
+
+def _safe(value) -> str:
+    """Model or file text as one inert markdown line: no line breaks, no <link> or `code` markup."""
+    text = " ".join(str(value or "").split())
+    return text.replace("<", "‹").replace(">", "›").replace("`", "'")
 
 
 def _short_kst(ts_utc: str) -> str:
@@ -158,9 +193,14 @@ def render_md(doc: dict) -> str:
     ]
     if m.get("status") == "ok":
         s = m["summary"]
-        ratio = f"{s['vol_ratio_hold']:.1f}배" if isinstance(s.get("vol_ratio_hold"), (int, float)) else "?"
-        lines.append(f"- 보유 중 고가 {_price(s.get('hold_high'))} / 저가 {_price(s.get('hold_low'))}"
-                     f" · 변동성 평소의 {ratio} · {'급변 있음' if s.get('shock_during_hold') else '급변 없음'}")
+        if isinstance(s.get("hold_high"), (int, float)) and isinstance(s.get("vol_ratio_hold"), (int, float)):
+            lines.append(f"- 보유 중 고가 {_price(s['hold_high'])} / 저가 {_price(s['hold_low'])}"
+                         f" · 변동성 평소의 {s['vol_ratio_hold']:.1f}배"
+                         f" · {'급변 있음' if s.get('shock_during_hold') else '급변 없음'}")
+        else:
+            lines.append("- 보유 구간에 완성된 1시간봉이 아직 없습니다(보유가 짧음).")
+        if s.get("covers_close") is False and doc.get("market_refresh_due_ms"):
+            lines.append("- 청산 시간대 1시간봉은 아직 미완성입니다(청산 7시간 뒤 다시 받음).")
         moves = ", ".join(f"{_short_kst(x['ts_utc'])} {_signed(x['ret_pct'])}%" for x in m.get("big_moves") or [])
         if moves:
             lines.append(f"- 큰 1시간 움직임: {moves}")
@@ -173,20 +213,25 @@ def render_md(doc: dict) -> str:
     sourced = sum(1 for e in events if e.get("evidence") == "sourced")
     lines += ["", f"## 사건 (출처 확인 {sourced} · 추정 {len(events) - sourced} · 일정 {len(doc.get('calendar') or [])})"]
     for e in doc.get("calendar") or []:
-        lines.append(f"- [일정] {_short_kst(e['ts_utc'])} {e['title']} — {e['source_url']}")
+        lines.append(f"- [일정] {_short_kst(e['ts_utc'])} {_safe(e['title'])} — <{e['source_url']}>")
     for e in events:
         mark = "[출처]" if e.get("evidence") == "sourced" else "[추정]"
-        where = f" ({e['source_name'] or '출처'}) {e['source_url']}" if e.get("source_url") else ""
-        lines.append(f"- {mark} {_short_kst(e['ts_utc'])} {e['title_ko']} — {e['summary_ko']}{where}")
+        where = ""
+        if e.get("source_url") and e.get("url_verified"):
+            where = f" ({_safe(e['source_name']) or '출처'}) <{e['source_url']}>"
+        elif e.get("source_url"):
+            # Not in this run's search results: shown as text, never as a link.
+            where = f" (미확인 링크: {_safe(e['source_url'])})"
+        lines.append(f"- {mark} {_short_kst(e['ts_utc'])} {_safe(e['title_ko'])} — {_safe(e['summary_ko'])}{where}")
     if not events and not doc.get("calendar"):
         lines.append("- 없음" if doc["status"] == "complete" else "- 아직 조사하지 않았습니다.")
     v = doc["verdict"]
     by = "LLM 추정" if v["by"] == "llm" else "코드 규칙"
     lines += ["", f"## 판정 ({by})",
               f"- 원인: {DRIVER_KO.get(v['driver'], v['driver'])} (확신 {CONFIDENCE_KO.get(v['confidence'], '?')})"
-              f" — {v['why_ko']}"]
+              f" — {_safe(v['why_ko'])}"]
     if v.get("lesson_ko"):
-        lines.append(f"- 교훈: {v['lesson_ko']}")
+        lines.append(f"- 교훈: {_safe(v['lesson_ko'])}")
     lines += ["", _status_line(doc)]
     return "\n".join(lines) + "\n"
 
@@ -217,16 +262,39 @@ def write_report(directory: Path, doc: dict) -> None:
     rebuild_index(directory)
 
 
-def _read_doc(path: Path) -> dict | None:
+def _parse_doc(text: str, key: str) -> dict | None:
     try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, UnicodeError):
+        doc = json.loads(text)
+    except ValueError:
         return None
-    if not isinstance(doc, dict) or doc.get("schema") != SCHEMA or doc.get("key") != path.stem:
+    if not isinstance(doc, dict) or doc.get("schema") != SCHEMA or doc.get("key") != key:
         return None
-    if not isinstance(doc.get("trade"), dict):
-        return None
-    return doc
+    return doc if isinstance(doc.get("trade"), dict) else None
+
+
+def read_state(directory: Path, key: str) -> tuple[str, dict | None]:
+    """("ok", doc) | ("missing", None) | ("corrupt", None) | ("unreadable", None).
+
+    "unreadable" is a read error (a Windows sharing violation, antivirus): the file may be fine, so the
+    watcher must not overwrite it. "corrupt" means the bytes were read and are not a report.
+    """
+    path = directory / f"{key}.json"
+    try:
+        raw = path.read_bytes()
+    except FileNotFoundError:
+        return "missing", None
+    except OSError:
+        return "unreadable", None
+    try:
+        doc = _parse_doc(raw.decode("utf-8"), key)
+    except UnicodeError:
+        doc = None
+    return ("ok", doc) if doc is not None else ("corrupt", None)
+
+
+def _read_doc(path: Path) -> dict | None:
+    state, doc = read_state(path.parent, path.stem)
+    return doc if state == "ok" else None
 
 
 def load_report(directory: Path, key: str) -> dict | None:
