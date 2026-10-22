@@ -32,6 +32,8 @@ from bitgetbot.panel.auth import (
     verify_pin,
 )
 from bitgetbot.panel.jobs import JobRunner
+from bitgetbot.postmortem import report as postmortem_report
+from bitgetbot.postmortem.facts import KEY_RE as REPORT_KEY
 from bitgetbot.privcfg import Settings, keys_configured, load_settings, set_exchange_keys, set_mode
 from bitgetbot.smoke import SmokeIO, run_command
 
@@ -69,6 +71,7 @@ AUTO_START_INTERVAL_S = 3
 WIDGET_PATH = "/api/widget/summary"
 WIDGET_DENIED = "위젯 토큰이 올바르지 않습니다"
 WIDGET_LOCKED = "위젯 토큰 확인이 잠겼습니다. 잠시 후 다시 시도하세요"
+REPORT_GONE = "요청한 리포트가 없습니다"
 # Audit actions by exact POST path. Request bodies, keys, PINs and tokens are never recorded.
 AUDIT_ACTIONS = {
     "/api/pin": "pin_set", "/api/keys": "keys_saved", "/api/mode": "mode",
@@ -131,6 +134,10 @@ class PanelDeps:
     widget_token: Callable[[], str | None] | None = None
     # Separate from the PIN lockout: widget failures never lock the panel or the phone login.
     widget_lockout: Lockout | None = None
+    # Per-trade post-mortem watcher (bitgetbot.postmortem.watcher), run once in the background on
+    # startup. None (tests, static checks) starts nothing.
+    postmortem: Callable[[], None] | None = None
+    reports_dir: Path = postmortem_report.REPORTS_DIR
 
     def __post_init__(self):
         if self.audit_path is None:
@@ -325,6 +332,11 @@ def create_app(deps: PanelDeps) -> FastAPI:
         if deps.record_on_startup:
             try:
                 deps.background(record_equity_on_startup)
+            except Exception:
+                pass
+        if deps.postmortem is not None:
+            try:
+                deps.background(deps.postmortem)
             except Exception:
                 pass
         yield
@@ -820,6 +832,25 @@ def create_app(deps: PanelDeps) -> FastAPI:
             f"거래 #{trade_id} 익절가 {price:,.1f} 설정. 가격이 닿으면 거래 봇이 시장가로 전량 청산합니다. "
             "그때까지 거래소 손절은 그대로입니다.")}
 
+    @app.get("/api/reports")
+    def reports():
+        # Read-only: the index the post-mortem watcher keeps. Never written from the panel.
+        rows = postmortem_report.read_index(deps.reports_dir, persist=False)["reports"]
+        return {"reports": rows}
+
+    @app.get("/api/reports/{key}")
+    def report_view(key: str):
+        if not REPORT_KEY.fullmatch(key):
+            raise _PanelError(404, REPORT_GONE)
+        doc = postmortem_report.load_report(deps.reports_dir, key)
+        if doc is None:
+            raise _PanelError(404, REPORT_GONE)
+        try:
+            markdown = (deps.reports_dir / f"{key}.md").read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            markdown = postmortem_report.render_md(doc)
+        return {"key": key, "status": doc.get("status"), "markdown": markdown}
+
     @app.post("/api/keys")
     def save_keys(request: Request, body: dict = Depends(_body)):
         require_local(request)
@@ -845,6 +876,10 @@ def create_app(deps: PanelDeps) -> FastAPI:
             raise _PanelError(404, "요청한 파일이 없습니다")
         media_type = {"manifest.webmanifest": "application/manifest+json", "sw.js": "application/javascript"}.get(name)
         return FileResponse(path, media_type=media_type)
+
+    @app.get("/reports")
+    def reports_page():
+        return public_file("reports.html")
 
     @app.get("/manifest.webmanifest")
     def manifest():

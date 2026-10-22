@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0e11">
+  <meta name="description" content="거래별 사후 분석 리포트 목록 (읽기 전용)">
+  <title>거래 리포트</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" type="image/png" href="/static/icon-192.png">
+  <script src="/static/reports.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div><p class="eyebrow">거래별 사후 분석 · 읽기 전용</p><h1>거래 리포트</h1></div>
+    <div class="topbar-actions"><a href="/">제어판으로</a></div>
+  </header>
+  <main>
+    <p id="reports-status" class="connection" role="status">불러오는 중입니다.</p>
+    <noscript><p class="notice error">리포트를 보려면 자바스크립트를 켜 주세요.</p></noscript>
+    <section id="list-card" aria-labelledby="list-title">
+      <div class="section-heading"><h2 id="list-title">청산된 거래</h2><span class="muted">최신순</span></div>
+      <ul id="report-list" class="report-list"></ul>
+    </section>
+    <section id="view-card" aria-label="리포트 내용" hidden>
+      <p><a id="back-to-list" href="#">← 목록</a></p>
+      <article id="report-view" class="report-view"></article>
+    </section>
+  </main>
+</body>
+</html>

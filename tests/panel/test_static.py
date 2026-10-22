@@ -995,3 +995,32 @@ assert.match(element("trade-help").textContent, /다시 시작한 뒤/);
 run("applyStatus")({...live, trades: [{...trade, kind: "smoke"}]});
 assert.equal(element("trade-controls").hidden, true);
 ''')
+
+
+def test_index_has_corner_report_link(client):
+    document = Elements(client.get("/").text)
+    tags = [tag for tag, _ in document.tags]
+    footer = tags.index("footer")
+    assert document.tags[footer + 1] == ("a", {"href": "/reports"})
+    assert "리포트 목록" in client.get("/").text
+
+
+def test_reports_page_is_csp_safe(client):
+    response = client.get("/reports")
+    assert response.status_code == 200
+    document = Elements(response.text)
+    scripts = [attrs for tag, attrs in document.tags if tag == "script"]
+    assert scripts == [{"src": "/static/reports.js", "defer": None}]
+    assert not "".join(document.script_text).strip()
+    assert not any(key == "style" or key.startswith("on") for _, attrs in document.tags for key in attrs)
+    assert "default-src 'self'" in response.headers["content-security-policy"]
+    script = (STATIC / "reports.js").read_text(encoding="utf-8")
+    assert "innerHTML" not in script and "insertAdjacentHTML" not in script and "eval(" not in script
+    assert 'method' not in script  # GET only: the viewer never changes anything
+
+
+def test_reports_viewer_links_only_bracketed_urls():
+    script = (STATIC / "reports.js").read_text(encoding="utf-8")
+    assert r"<https?:\/\/[^\s<>]+>" in script  # only <url> (verified source/calendar) becomes a link
+    assert r"https?:\/\/[^\s)]+" not in script
+    assert "try {" in script and "decodeURIComponent" in script
