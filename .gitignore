@@ -22,3 +22,6 @@ freqtrade/user_data/manual_targets.json
 freqtrade/user_data/.manual_targets.json.*.tmp
 # Per-trade post-mortems (trade data; Claude reads them, nothing to commit)
 reports/
+
+# Claude Code worktrees and session files
+.claude/
